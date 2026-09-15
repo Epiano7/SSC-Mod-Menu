@@ -1,0 +1,11 @@
+/build/
+/work/
+*.exe
+*.dll
+*.zip
+*.log
+*.dmp
+__pycache__/
+*.pyc
+menu.ini
+settings.ini
