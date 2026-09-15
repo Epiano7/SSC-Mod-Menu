@@ -93,6 +93,25 @@ public static class InstallerTests {
             string edited=Fixture(parent); var editedPackage=PackageFor(edited);
             Reject(()=>Engine.Install(edited,editedPackage,n=>{if(n==1) {File.WriteAllText(Path.Combine(edited,"opengl32.dll"),"changed during install"); throw new IOException("Injected failure");}}),"failure with modified payload");
             Check(File.ReadAllText(Path.Combine(edited,"opengl32.dll"))=="changed during install"&&File.Exists(Path.Combine(edited,Engine.ManifestName)),"rollback preserves changed payload and recovery journal");
+            string repairRoot=Fixture(parent);var repairPackage=PackageFor(repairRoot);
+            Check(Engine.InspectRepair(repairRoot,repairPackage).CanInstall,"Repair preflight permits fresh install");
+            Engine.Repair(repairRoot,repairPackage);
+            for(int failure=0;failure<=3;failure++) {
+                File.WriteAllText(Path.Combine(repairRoot,"opengl32.dll"),"damaged original");
+                File.Delete(Path.Combine(repairRoot,"SSCMods/runtime.dll"));
+                File.WriteAllText(Path.Combine(repairRoot,"SSCMods/settings.ini"),"personal");
+                if(failure==0)Engine.Repair(repairRoot,repairPackage);
+                else Reject(()=>Engine.Repair(repairRoot,repairPackage,n=>{if(n==failure)throw new IOException("repair failure");}),"Repair failure injection "+failure);
+                if(failure==0)Check(repairPackage.Files.All(f=>Engine.FileHash(Path.Combine(repairRoot,f.Path))==Engine.Hash(f.Bytes)),"Repair restores modified and missing files");
+                else Check(File.ReadAllText(Path.Combine(repairRoot,"opengl32.dll"))=="damaged original"&&!File.Exists(Path.Combine(repairRoot,"SSCMods/runtime.dll")),"Repair rollback preserves original damage and absence "+failure);
+                Check(File.ReadAllText(Path.Combine(repairRoot,"SSCMods/settings.ini"))=="personal","Repair keeps preferences "+failure);
+            }
+            string reinstall=Fixture(parent);var reinstallPackage=PackageFor(reinstall);Engine.Repair(reinstall,reinstallPackage);Engine.Repair(reinstall,reinstallPackage);
+            Engine.Uninstall(reinstall);Engine.Install(reinstall,reinstallPackage);
+            Check(File.Exists(Path.Combine(reinstall,Engine.ManifestName)),"Repair recovery copies do not block reinstall after uninstall");
+            Reject(()=>Engine.Repair(conflict,PackageFor(conflict)),"Repair refuses unowned proxy");
+            Reject(()=>Engine.Repair(malformed,PackageFor(malformed)),"Repair rejects unsafe manifest");
+            Reject(()=>Engine.Repair(repairRoot,wrong),"Repair rejects incompatible game");
             if(args.Length>1) {
                 var actual=Engine.Inspect(args[1],Release.Package());
                 Check(actual.CanInstall==Release.Package().RuntimeValidated,"actual build preflight follows release validation gate");

@@ -1,11 +1,7 @@
-# Compact installer direction
+# Compact installer
 
-Product name: SSC Mod Menu. Target form factor: a small, wide borderless window, approximately 600 by 280 logical pixels. Dark blue panels, squared game-style typography and restrained aqua accents.
+Implemented form factor: 600 by 280 logical pixels, borderless navy window, centered SSC Mod Menu title, aqua rule and primary action, muted Uninstall, Close at bottom right. The header drags the window. Buttons have hover, pressed and keyboard-focus states.
 
-Center the product title above a Game folder label, path field and Browse button. Place the aqua Install/Update action bottom left, a muted Uninstall action in the middle and Close at bottom right. Choose Install or Update after validating the selected installation. Disable Uninstall when no valid manifest exists. A dragging area and keyboard focus indicators should remain available even without a system title bar.
+Game folder and Browse sit above the bottom actions. The small Repair link stays beneath Browse regardless of installation state. A short status line reports compatibility, progress or errors; long messages are also available as tooltips. There are no tabs or module descriptions in the installer.
 
-Optional separate concept: one short compatibility/status line. Keep it out of the base concept until selected.
-
-Design stage only: static sketches first; formatting-only test EXEs will follow user selection. Existing setup code is retained pending that decision. Repository screenshots will be replaced with full-screen captures after the new design is implemented and verified.
-
-Legacy internal manifest identifiers and settings directories remain stable to preserve updates/uninstall and existing preferences; all display branding uses SSC Mod Menu. The Discord application's display name is managed in its developer portal, independently of the bundled public application ID.
+The primary action is selected by a validated ownership manifest. Invalid/missing files can be recovered through Repair. Saved settings and internal directory identifiers remain compatible with existing installations.

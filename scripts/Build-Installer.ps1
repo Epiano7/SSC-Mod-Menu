@@ -7,11 +7,11 @@ New-Item -ItemType Directory -Force -Path $BuildDirectory | Out-Null
 $build=(Resolve-Path -LiteralPath $BuildDirectory).Path
 $compiler=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if(-not(Test-Path -LiteralPath $compiler)) { throw 'The Windows .NET Framework C# compiler is required.' }
-$sources=@("$root\installer\Engine.cs","$root\installer\Setup.cs")
+$sources=@("$root\installer\Engine.cs","$root\installer\Setup.cs","$root\installer\Updater.cs")
 $common=@('/nologo','/warnaserror','/platform:x64','/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Web.Extensions.dll')
 if($RuntimeDirectory) {
     # Approved runtime/proxy hashes for the packaged release.
-    $approved=@{'opengl32.dll'='92615F0B6DA426D52156E83BDAC72C1B9ABBBDA9E198A9A3636BD3B81747E1D2';'runtime.dll'='A377E564E100917E7140E6C44EFD7D25D776B7BE0CA7408FEE8A77145FD95B49'}
+    $approved=@{'opengl32.dll'='FE87B7544408F789F8123400C5591AC5F75F0F416C75A1B0083E3CC3532437A5';'runtime.dll'='164FAE4E58ADD578BEF6458E50D4E49A92085B1595B6D0E2DA655657A32B76F9'}
     foreach($name in $approved.Keys) {
         $path=(Resolve-Path -LiteralPath (Join-Path $RuntimeDirectory $name)).Path
         if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $approved[$name]) { throw "Unapproved payload hash for $name. Run runtime and isolated installation checks before updating the approved release hashes." }
@@ -31,6 +31,10 @@ if($LASTEXITCODE) { throw 'Installer tests failed' }
 if($LASTEXITCODE) { throw 'Installer UI test compilation failed' }
 & "$build\installer_ui_test.exe" (Join-Path $build ('ui-' + [guid]::NewGuid().ToString('N')))
 if($LASTEXITCODE) { throw 'Installer UI tests failed' }
+& $compiler @common /target:exe /main:UpdaterTests "/out:$build\updater_test.exe" @sources "$root\tests\updater_test.cs"
+if($LASTEXITCODE) { throw 'Updater test compilation failed' }
+& "$build\updater_test.exe"
+if($LASTEXITCODE) { throw 'Updater tests failed' }
 Get-FileHash -LiteralPath "$build\SSC-Mod-Menu-Setup.exe" -Algorithm SHA256
 
 

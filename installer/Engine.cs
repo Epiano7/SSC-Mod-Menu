@@ -218,9 +218,41 @@ namespace SSCMods.Setup {
             result.CanInstall=true;result.Message="Ready to update SSC Mod Menu. Saved settings and game files are preserved.";return result;
         }
         public static void Update(string path,Package package,Action<int> afterCopy=null) {
-            var check=InspectUpdate(path,package);string root=check.Root;
+            ReplaceOwned(path,package,false,afterCopy);
+        }
+        public static Inspection InspectRepair(string path,Package package) {
+            string root=Root(path);
+            if(!File.Exists(Destination(root,ManifestName))) return Inspect(root,package);
+            ValidatePackage(package);RequireGameClosed();
+            string exe=Path.Combine(root,"SkillshotCity.exe");RejectLinks(exe);
+            var check=new Inspection{Root=root,Size=new FileInfo(exe).Length,Hash=FileHash(exe)};
+            if(check.Size!=package.GameSize||check.Hash!=package.GameHash) throw new IOException("This game version needs a newer mod release.");
+            var manifest=ReadManifest(root);
+            foreach(var file in package.Files) {
+                string target=Destination(root,file.Path);
+                if(Directory.Exists(target)) throw new IOException("A folder blocks the mod file: "+file.Path);
+                if(File.Exists(target)&&!manifest.Files.Any(f=>f.Path==file.Path)) throw new IOException("Unowned file will not be replaced: "+file.Path);
+            }
+            check.CanInstall=true;check.Message="Ready to repair.";return check;
+        }
+        public static void VerifyGamePackage(string path,Package package) {
+            ValidatePackage(package);string root=Root(path),exe=Path.Combine(root,"SkillshotCity.exe");RejectLinks(exe);
+            if(new FileInfo(exe).Length!=package.GameSize||FileHash(exe)!=package.GameHash)throw new IOException("This installer does not support the current game version.");
+            // Establish ownership before asking the game to close. Full preflight repeats after exit.
+            if(File.Exists(Destination(root,ManifestName)))ReadManifest(root);
+            else if(File.Exists(Path.Combine(root,"opengl32.dll"))||Directory.Exists(Path.Combine(root,"SSCMods")))throw new IOException("Unrecognized mod installation.");
+        }
+        public static void Repair(string path,Package package,Action<int> afterCopy=null) {
+            string root=Root(path);
+            if(!File.Exists(Destination(root,ManifestName))) Install(root,package,afterCopy);
+            else ReplaceOwned(root,package,true,afterCopy);
+        }
+        static void ReplaceOwned(string path,Package package,bool repair,Action<int> afterCopy) {
+            var check=repair?InspectRepair(path,package):InspectUpdate(path,package);string root=check.Root;
             var previous=ReadManifest(root);
-            string backup=Path.Combine(root,"SSCMods","update-backup-"+Guid.NewGuid().ToString("N"));
+            var originals=package.Files.ToDictionary(f=>f.Path,f=>File.Exists(Destination(root,f.Path))?FileHash(Destination(root,f.Path)):null);
+            string backup=Path.Combine(root,repair?"SSCMods-Recovery":"SSCMods",(repair?"repair-backup-":"update-backup-")+Guid.NewGuid().ToString("N"));
+            RejectLinks(backup);
             Directory.CreateDirectory(backup);
             var replaced=new List<Payload>();
             // Durable backups remain after an interrupted process for manual recovery.
@@ -234,9 +266,13 @@ namespace SSCMods.Setup {
                 int count=0;
                 foreach(var file in package.Files) {
                     RequireGameClosed();string target=Destination(root,file.Path);
-                    var old=previous.Files.Single(f=>f.Path==file.Path);
-                    if(FileHash(target)!=old.Sha256) throw new IOException("Mod file changed during update.");
-                    File.Replace(Path.Combine(backup,Path.GetFileName(file.Path)+".new"),target,Path.Combine(backup,Path.GetFileName(file.Path)+".old"));
+                    string original=originals[file.Path];
+                    if(original==null) {
+                        File.Move(Path.Combine(backup,Path.GetFileName(file.Path)+".new"),target);
+                    } else {
+                        if(FileHash(target)!=original) throw new IOException("Mod file changed during update.");
+                        File.Replace(Path.Combine(backup,Path.GetFileName(file.Path)+".new"),target,Path.Combine(backup,Path.GetFileName(file.Path)+".old"));
+                    }
                     replaced.Add(file);
                     if(FileHash(target)!=Hash(file.Bytes)) throw new IOException("Updated payload verification failed.");
                     if(afterCopy!=null) afterCopy(++count);
@@ -249,13 +285,15 @@ namespace SSCMods.Setup {
                     string target=Destination(root,file.Path);
                     try {
                         if(FileHash(target)!=Hash(file.Bytes)) {restored=false;continue;}
-                        File.Replace(Path.Combine(backup,Path.GetFileName(file.Path)+".old"),target,null);
+                        if(originals[file.Path]==null) File.Delete(target);
+                        else File.Replace(Path.Combine(backup,Path.GetFileName(file.Path)+".old"),target,null);
                     } catch {restored=false;}
                 }
                 if(restored) WriteManifest(root,previous);
                 throw new IOException((restored?"Update rolled back. ":"Update incomplete. ")+"Recovery files: "+backup+". "+error.Message,error);
             }
             // Delete only files this transaction created; never recurse into an existing directory.
+            if(repair) return; // Keep original bytes and manifest available for recovery.
             foreach(var file in package.Files) File.Delete(Path.Combine(backup,Path.GetFileName(file.Path)+".old"));
             File.Delete(Path.Combine(backup,"manifest.json"));Directory.Delete(backup);
         }
@@ -267,9 +305,12 @@ namespace SSCMods.Setup {
             string path=Destination(root,ManifestName);
             var info=new FileInfo(path);
             if(!info.Exists || info.Length>65536) throw new IOException("Valid installation manifest not found.");
-            Manifest m=Json.Deserialize<Manifest>(File.ReadAllText(path));
+            Manifest m;
+            try{m=Json.Deserialize<Manifest>(File.ReadAllText(path));}
+            catch(ArgumentException error){throw new IOException("Invalid installation manifest.",error);}
+            catch(InvalidOperationException error){throw new IOException("Invalid installation manifest.",error);}
             if(m==null || m.Schema!=1 || m.Product!=Product || (m.State!="Installed" && m.State!="Installing") ||
-                m.Files==null || m.Files.Count>Allowed.Length || m.Files.Select(f=>f.Path).Distinct().Count()!=m.Files.Count)
+                m.Files==null || m.Files.Count>Allowed.Length || m.Files.Any(f=>f==null) || m.Files.Select(f=>f.Path).Distinct().Count()!=m.Files.Count)
                 throw new IOException("Invalid installation manifest.");
             foreach(var file in m.Files) {
                 Destination(root,file.Path);
@@ -280,6 +321,9 @@ namespace SSCMods.Setup {
         public static Inspection InspectRemoval(string path) {
             string root=Root(path); RequireGameClosed(); ReadManifest(root);
             return new Inspection {Root=root,CanInstall=true,Message="Ready to uninstall."};
+        }
+        public static bool HasInstallation(string path) {
+            try{ReadManifest(Root(path));return true;}catch(IOException){return false;}
         }
         public static List<string> Uninstall(string path) {
             string root=Root(path); RequireGameClosed();

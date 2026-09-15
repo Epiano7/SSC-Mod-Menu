@@ -10,8 +10,8 @@ namespace SSCMods.Setup {
         public static Package Package() {
 #if MENU_ALPHA
             var assembly=Assembly.GetExecutingAssembly();
-            var package=new Package {RuntimeValidated=true,GameSize=15221248,
-                GameHash="34D8809E646C36E595FDB9DF072E09B31EA35108DEFF3B32EF40451695D05307"};
+            var package=new Package {RuntimeValidated=true,GameSize=15261184,
+                GameHash="11760857A577DFC2DCA0836614A250EBA31B309249DCC02F4D304A8A075A388A"};
             foreach(var name in new[]{"opengl32.dll","runtime.dll"}) {
                 using(var stream=assembly.GetManifestResourceStream(name))
                 using(var bytes=new MemoryStream()) {
@@ -34,99 +34,107 @@ namespace SSCMods.Setup {
     }
     sealed class CutButton : Button {
         public bool Selected;
+        bool pressed;
         bool hover;
-        public CutButton(){FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;Cursor=Cursors.Hand;Font=new Font("Segoe UI",10,FontStyle.Bold);SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);}
+        public CutButton(){FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;Cursor=Cursors.Hand;Font=new Font("Bahnschrift",10,FontStyle.Bold);SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);}
         protected override void OnMouseEnter(EventArgs e){hover=true;Invalidate();base.OnMouseEnter(e);}
         protected override void OnMouseLeave(EventArgs e){hover=false;Invalidate();base.OnMouseLeave(e);}
+        protected override void OnMouseDown(MouseEventArgs e){pressed=true;Invalidate();base.OnMouseDown(e);}
+        protected override void OnMouseUp(MouseEventArgs e){pressed=false;Invalidate();base.OnMouseUp(e);}
         protected override void OnPaint(PaintEventArgs e){
             e.Graphics.Clear(Parent.BackColor);int w=Width-1,h=Height-1,c=8;
             var points=new[]{new Point(c,0),new Point(w-c,0),new Point(w,c),new Point(w,h-c),new Point(w-c,h),new Point(c,h),new Point(0,h-c),new Point(0,c)};
-            Color fill=!Enabled?Theme.Panel:Selected?Theme.Blue:hover?Color.FromArgb(51,85,126):Theme.Raised;
+            Color fill=!Enabled?Theme.Panel:pressed?Color.FromArgb(25,90,115):Selected?(hover?Color.FromArgb(100,231,240):Color.FromArgb(64,207,222)):hover?Color.FromArgb(51,85,126):Theme.Raised;
             using(var brush=new SolidBrush(fill))e.Graphics.FillPolygon(brush,points);
             using(var pen=new Pen(Selected?Theme.Cyan:Theme.Raised))e.Graphics.DrawLine(pen,c,0,w-c,0);
-            TextRenderer.DrawText(e.Graphics,Text,Font,ClientRectangle,Enabled?Theme.Ink:Theme.Muted,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(e.Graphics,Text,Font,ClientRectangle,Enabled?(Selected?Theme.Background:Theme.Ink):Theme.Muted,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis);
             if(Focused&&ShowFocusCues)ControlPaint.DrawFocusRectangle(e.Graphics,Rectangle.Inflate(ClientRectangle,-5,-5),Theme.Cyan,fill);
         }
     }
     public sealed class SetupWindow : Form {
-        readonly TextBox folder=new TextBox(),details=new TextBox();
-        readonly Label status=new Label(),heading=new Label(),summary=new Label();
-        readonly CutButton action=new CutButton(),installTab=new CutButton(),removeTab=new CutButton(),browse=new CutButton(),check=new CutButton();
+        readonly TextBox folder=new TextBox();
+        readonly Label status=new Label();
+        readonly CutButton action=new CutButton(),remove=new CutButton(),browse=new CutButton(),close=new CutButton();
+        readonly LinkLabel repair=new LinkLabel();
+        readonly Timer debounce=new Timer{Interval=450};
+        readonly ToolTip tip=new ToolTip();
         readonly Package package;
-        bool uninstall,busy;
+        readonly bool production;
+        bool busy;Point dragOrigin;bool dragging;
         public bool Busy {get{return busy;}}
-        public SetupWindow(string root,bool remove):this(root,remove,Release.Package()){}
-        internal SetupWindow(string root,bool remove,Package payload){
-            package=payload;uninstall=remove;Text="SSC Mod Menu - Setup";
-            ClientSize=new Size(820,590);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;
-            AutoScaleMode=AutoScaleMode.Dpi;Font=new Font("Segoe UI",10);BackColor=Theme.Background;ForeColor=Theme.Ink;
+        public SetupWindow(string root,bool uninstall):this(root,uninstall,Release.Package()){production=true;}
+        internal SetupWindow(string root,bool uninstall,Package payload){
+            package=payload;Text="SSC Mod Menu";
+            ClientSize=new Size(600,280);FormBorderStyle=FormBorderStyle.None;MaximizeBox=false;
+            AutoScaleMode=AutoScaleMode.Dpi;Font=new Font("Bahnschrift",10);BackColor=Theme.Background;ForeColor=Theme.Ink;
             StartPosition=FormStartPosition.CenterScreen;DoubleBuffered=true;
-            var header=new Panel{BackColor=Theme.Panel};header.SetBounds(0,0,820,92);Controls.Add(header);
-            header.Controls.Add(new Label{Text="SSC MOD MENU",Font=new Font("Segoe UI",23,FontStyle.Bold),ForeColor=Theme.Ink,Left=26,Top=15,Width=500,Height=42});
-            header.Controls.Add(new Label{Text="CLIENT SETUP",ForeColor=Theme.Muted,Left=28,Top=59,Width=300,Height=24});
-            var rule=new Panel{BackColor=Theme.Blue};rule.SetBounds(0,90,820,2);Controls.Add(rule);rule.BringToFront();
-            installTab.Name="installTab";installTab.Text="INSTALL / UPDATE";installTab.SetBounds(26,114,224,42);installTab.Click+=(s,e)=>SelectMode(false);Controls.Add(installTab);
-            removeTab.Name="removeTab";removeTab.Text="UNINSTALL";removeTab.SetBounds(264,114,176,42);removeTab.Click+=(s,e)=>SelectMode(true);Controls.Add(removeTab);
-            heading.SetBounds(26,179,760,34);heading.Font=new Font("Segoe UI",16,FontStyle.Bold);Controls.Add(heading);
-            summary.SetBounds(28,218,758,30);summary.ForeColor=Theme.Muted;Controls.Add(summary);
-            Controls.Add(new Label{Text="GAME FOLDER",ForeColor=Theme.Muted,Left=28,Top=267,Width=300,Height=24});
-            var pathPanel=new Panel{BackColor=Theme.Panel};pathPanel.SetBounds(28,295,620,40);Controls.Add(pathPanel);
-            folder.Name="folder";folder.BorderStyle=BorderStyle.None;folder.BackColor=Theme.Panel;folder.ForeColor=Theme.Ink;folder.SetBounds(12,9,596,25);folder.Text=root??"";pathPanel.Controls.Add(folder);
+            var header=new Label{Text="SSC Mod Menu",TextAlign=ContentAlignment.MiddleCenter,BackColor=Theme.Panel,Font=new Font("Bahnschrift",22,FontStyle.Bold)};
+            header.SetBounds(0,0,600,70);Controls.Add(header);
+            header.MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){dragging=true;dragOrigin=Cursor.Position;header.Capture=true;}};
+            header.MouseMove+=(s,e)=>{if(dragging){var point=Cursor.Position;Location=new Point(Left+point.X-dragOrigin.X,Top+point.Y-dragOrigin.Y);dragOrigin=point;}};
+            header.MouseUp+=(s,e)=>{dragging=false;header.Capture=false;};
+            var rule=new Panel{BackColor=Theme.Cyan};rule.SetBounds(0,69,600,2);Controls.Add(rule);rule.BringToFront();
+            Controls.Add(new Label{Text="GAME FOLDER",ForeColor=Theme.Muted,Left=24,Top=90,Width=300,Height=22});
+            var pathPanel=new Panel{BackColor=Theme.Panel};pathPanel.SetBounds(24,116,440,36);Controls.Add(pathPanel);
+            folder.Name="folder";folder.BorderStyle=BorderStyle.None;folder.BackColor=Theme.Panel;folder.ForeColor=Theme.Ink;folder.SetBounds(10,9,420,23);folder.Text=root??"";pathPanel.Controls.Add(folder);
             folder.AccessibleName="Skillshot City game folder";
-            browse.Name="browse";browse.Text="BROWSE";browse.SetBounds(662,295,130,40);browse.Click+=(s,e)=>{
+            browse.Name="browse";browse.Text="BROWSE";browse.SetBounds(476,116,100,36);browse.Click+=(s,e)=>{
                 using(var dialog=new FolderBrowserDialog()){dialog.Description="Choose the Skillshot City game folder";dialog.SelectedPath=folder.Text;if(dialog.ShowDialog(this)==DialogResult.OK){folder.Text=dialog.SelectedPath;Check();}}
             };Controls.Add(browse);
-            status.Name="status";status.SetBounds(28,354,762,50);status.ForeColor=Theme.Cyan;Controls.Add(status);
-            details.Name="details";details.SetBounds(28,407,764,88);details.Multiline=true;details.ReadOnly=true;details.BorderStyle=BorderStyle.None;details.BackColor=Theme.Background;details.ForeColor=Theme.Muted;details.ScrollBars=ScrollBars.None;details.TabStop=false;Controls.Add(details);
-            var footer=new Panel{BackColor=Theme.Raised};footer.SetBounds(26,512,768,1);Controls.Add(footer);
-            check.Name="check";check.Text="CHECK AGAIN";check.SetBounds(28,534,154,40);check.Click+=(s,e)=>Check();Controls.Add(check);
-            action.Name="action";action.Selected=true;action.SetBounds(440,534,208,40);action.Click+=(s,e)=>Execute();Controls.Add(action);
-            var close=new CutButton{Name="close",Text="CLOSE"};close.SetBounds(662,534,130,40);close.Click+=(s,e)=>Close();Controls.Add(close);
+            repair.Name="repair";repair.Text="REPAIR";repair.TextAlign=ContentAlignment.MiddleCenter;repair.SetBounds(476,157,100,26);
+            repair.LinkColor=Theme.Muted;repair.ActiveLinkColor=Theme.Cyan;repair.VisitedLinkColor=Theme.Muted;
+            repair.LinkClicked+=(s,e)=>Execute(2);Controls.Add(repair);
+            tip.SetToolTip(repair,"Restore mod files or install if missing. Keeps your settings.");
+            status.Name="status";status.SetBounds(24,160,436,42);status.ForeColor=Theme.Cyan;Controls.Add(status);
+            action.Name="action";action.Text="INSTALL";action.Selected=true;action.SetBounds(24,216,180,40);action.Click+=(s,e)=>Execute(0);Controls.Add(action);
+            remove.Name="remove";remove.Text="UNINSTALL";remove.SetBounds(222,216,180,40);remove.Click+=(s,e)=>Execute(1);Controls.Add(remove);
+            close.Name="close";close.Text="CLOSE";close.SetBounds(476,216,100,40);close.Click+=(s,e)=>Close();Controls.Add(close);
             AcceptButton=action;CancelButton=close;
-            folder.TextChanged+=(s,e)=>{action.Enabled=false;status.Text="Check this folder to continue.";};
+            folder.TextChanged+=(s,e)=>{if(busy)return;action.Enabled=remove.Enabled=false;status.Text="Checking game folder...";debounce.Stop();debounce.Start();};
+            debounce.Tick+=(s,e)=>{debounce.Stop();Check();};
             FormClosing+=(s,e)=>{if(busy)e.Cancel=true;};
-            SetModeText();Shown+=(s,e)=>Check();
+            Shown+=(s,e)=>Check();
         }
-        void SetModeText(){
-            installTab.Selected=!uninstall;removeTab.Selected=uninstall;installTab.Invalidate();removeTab.Invalidate();
-            heading.Text=uninstall?"Uninstall SSC Mod Menu":"Set up your client";
-            summary.Text=uninstall?"Remove the mod from your selected game folder.":"Install or update SSC Mod Menu, then launch through Steam.";
-            details.Text=uninstall?"Your saved settings will stay available. Changed or unrelated files are kept.":"SOUND REPLACER    /    COSMETICS\r\nDISCORD PRESENCE    /    HUD EDITOR\r\nRight Shift opens the menu in game.";
-            action.Text=uninstall?"UNINSTALL":"INSTALL";
-        }
-        void SelectMode(bool remove){if(busy)return;uninstall=remove;SetModeText();Check();}
-        void SetBusy(bool value){busy=value;folder.Enabled=browse.Enabled=check.Enabled=installTab.Enabled=removeTab.Enabled=!value;action.Enabled=false;UseWaitCursor=value;}
+        protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);using(var pen=new Pen(Theme.Raised))e.Graphics.DrawRectangle(pen,0,0,ClientSize.Width-1,ClientSize.Height-1);}
+        protected override void Dispose(bool disposing){if(disposing){debounce.Dispose();tip.Dispose();}base.Dispose(disposing);}
+        void SetBusy(bool value){busy=value;folder.Enabled=browse.Enabled=repair.Enabled=close.Enabled=!value;action.Enabled=remove.Enabled=false;UseWaitCursor=value;}
+        void Status(string value,bool error=false){status.Text=value;status.ForeColor=error?Color.FromArgb(255,196,99):Theme.Cyan;tip.SetToolTip(status,value);}
         async void Check(){
-            if(busy)return;SetBusy(true);status.ForeColor=Theme.Cyan;status.Text="Checking game folder...";
+            if(busy)return;debounce.Stop();SetBusy(true);Status("Checking game folder...");
             try{
                 string path=folder.Text;
                 if(String.IsNullOrWhiteSpace(path)){path=await System.Threading.Tasks.Task.Run(()=>Engine.Discover());folder.Text=path;}
-                bool remove=uninstall;
-                var result=await System.Threading.Tasks.Task.Run(()=>{
-                    if(remove)return Engine.InspectRemoval(path);
-                    return File.Exists(Path.Combine(path,Engine.ManifestName))?Engine.InspectUpdate(path,package):Engine.Inspect(path,package);
+                bool owned=false,ready=false;string message="";
+                await System.Threading.Tasks.Task.Run(()=>{
+                    owned=Engine.HasInstallation(path);
+                    try{var result=owned?Engine.InspectUpdate(path,package):Engine.Inspect(path,package);ready=result.CanInstall;message=result.Message;}
+                    catch(Exception error){message=error.Message;}
                 });
-                bool updating=File.Exists(Path.Combine(path,Engine.ManifestName));
-                SetBusy(false);action.Text=remove?"UNINSTALL":updating?"UPDATE":"INSTALL";
-                status.Text=result.CanInstall?(remove?"Ready to uninstall.":updating?"SSC Mod Menu is installed. Ready to update.":"Ready to install."):result.Message;
-                action.Enabled=result.CanInstall;
-            }catch(Exception error){SetBusy(false);status.ForeColor=Color.FromArgb(255,196,99);status.Text=error.Message;}
+                SetBusy(false);action.Text=owned?"UPDATE":"INSTALL";action.Enabled=ready;remove.Enabled=owned;
+                Status(ready?"Compatible game found":message,!ready);
+            }catch(Exception error){SetBusy(false);Status(error.Message,true);}
         }
         public void RefreshInspection(){Check();}
-        async void Execute(){
-            if(busy||!action.Enabled)return;string path=folder.Text;bool remove=uninstall;
-            SetBusy(true);status.ForeColor=Theme.Cyan;status.Text=remove?"Uninstalling...":"Installing...";
+        async void Execute(int operation){
+            if(busy)return;string path=folder.Text;debounce.Stop();SetBusy(true);
+            Status(operation==1?"Uninstalling...":operation==2?"Repairing...":"Installing...");
             try{
-                if(remove){
-                    var retained=await System.Threading.Tasks.Task.Run(()=>Engine.Uninstall(path));
-                    status.Text=retained.Count==0?"SSC Mod Menu uninstalled.":"Some changed files were kept.";
-                    details.Text=retained.Count==0?"Your game is ready to launch through Steam. Saved mod settings are kept.":"Kept files:\r\n"+String.Join("\r\n",retained);
-                }else{
-                    await System.Threading.Tasks.Task.Run(()=>Engine.InstallOrUpdate(path,package));
-                    status.Text="SSC Mod Menu is ready.";details.Text="Launch Skillshot City through Steam. Press Right Shift to open the menu.";
+                string message;
+                if(production&&Updater.NeedsElevation(path)) {
+                    message=await System.Threading.Tasks.Task.Run(()=>{
+                        string job=Path.Combine(Path.GetTempPath(),"SSCMods-Action-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(job);
+                        string args="--operation "+operation+" "+Updater.Quote(path)+" "+Updater.Quote(job);
+                        using(var child=Process.Start(new ProcessStartInfo(Assembly.GetExecutingAssembly().Location,args){UseShellExecute=true,Verb="runas",WindowStyle=ProcessWindowStyle.Hidden})){
+                            child.WaitForExit();string outcome=Path.Combine(job,"status.txt");string result=File.Exists(outcome)?File.ReadAllText(outcome):"Installer did not complete.";
+                            if(child.ExitCode!=0)throw new IOException(result);return result;
+                        }
+                    });
                 }
-                SetBusy(false);
-            }catch(Exception error){SetBusy(false);status.ForeColor=Color.FromArgb(255,196,99);status.Text="Could not complete this action.";details.Text=error.Message;}
+                else if(operation==1){var retained=await System.Threading.Tasks.Task.Run(()=>Engine.Uninstall(path));message=retained.Count==0?"SSC Mod Menu uninstalled.":"Some changed files were kept.";}
+                else {await System.Threading.Tasks.Task.Run(()=>{if(operation==2)Engine.Repair(path,package);else Engine.InstallOrUpdate(path,package);});message=operation==2?"Repair complete. Settings kept.":"SSC Mod Menu is ready.";}
+                SetBusy(false);Status(message);
+                bool owned=File.Exists(Path.Combine(path,Engine.ManifestName));action.Text=owned?"UPDATE":"INSTALL";action.Enabled=true;remove.Enabled=owned;
+            }catch(Exception error){SetBusy(false);Status(error.Message,true);}
         }
     }
     public static class Program {
@@ -134,6 +142,22 @@ namespace SSCMods.Setup {
         public static int Main(string[] args) {
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             try {
+                if(args.Length==2&&args[0]=="--update-check"){Updater.Check(args[1]);return 0;}
+                if(args.Length==6&&args[0]=="--update-download"){Updater.DownloadAndApply(args[1],Int32.Parse(args[2]),Int64.Parse(args[3]),args[4],args[5]);return 0;}
+                if(args.Length==5&&args[0]=="--update-wait"){
+                    try{Updater.ApplyAfterExit(args[1],Int32.Parse(args[2]),Int64.Parse(args[3]),args[4],Release.Package());return 0;}
+                    catch(Exception error){Updater.Report(args[4],"error "+error.Message);return 1;}
+                }
+                if(args.Length==4&&args[0]=="--operation"){
+                    try{
+                        string message;
+                        if(args[1]=="1")message=Engine.Uninstall(args[2]).Count==0?"SSC Mod Menu uninstalled.":"Some changed files were kept.";
+                        else if(args[1]=="2"){Engine.Repair(args[2],Release.Package());message="Repair complete. Settings kept.";}
+                        else if(args[1]=="0"){Engine.InstallOrUpdate(args[2],Release.Package());message="SSC Mod Menu is ready.";}
+                        else throw new IOException("Invalid installer operation.");
+                        Updater.Report(args[3],message);return 0;
+                    }catch(Exception error){Updater.Report(args[3],error.Message);return 1;}
+                }
                 if(args.Length==2&&args[0]=="--apply") {Engine.InstallOrUpdate(args[1],Release.Package());return 0;}
                 string exe=Assembly.GetExecutingAssembly().Location;
                 // The installed uninstaller runs from a private staging folder so the game-side EXE can be removed.
@@ -153,7 +177,7 @@ namespace SSCMods.Setup {
                     catch(ArgumentException) {}
                 } else if(args.Length!=0 && !(remove&&args.Length==2)) throw new IOException("Usage: SSC-Mod-Menu-Setup.exe [--uninstall GAME_DIRECTORY]");
                 Application.Run(new SetupWindow(remove?args[1]:null,remove)); return 0;
-            } catch(Exception error) { if(args.Length>0&&args[0]=="--apply") {Console.Error.WriteLine(error);return 1;} MessageBox.Show(error.Message,"SSC Mod Menu",MessageBoxButtons.OK,MessageBoxIcon.Error); return 1; }
+            } catch(Exception error) { if(args.Length>0&&(args[0]=="--apply"||args[0].StartsWith("--update-"))) {Console.Error.WriteLine(error);return 1;} MessageBox.Show(error.Message,"SSC Mod Menu",MessageBoxButtons.OK,MessageBoxIcon.Error); return 1; }
         }
     }
 }
