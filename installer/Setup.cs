@@ -57,12 +57,12 @@ namespace SSCMods.Setup {
         public bool Busy {get{return busy;}}
         public SetupWindow(string root,bool remove):this(root,remove,Release.Package()){}
         internal SetupWindow(string root,bool remove,Package payload){
-            package=payload;uninstall=remove;Text="SSC Mods - Setup";
+            package=payload;uninstall=remove;Text="SSC Mod Menu - Setup";
             ClientSize=new Size(820,590);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;
             AutoScaleMode=AutoScaleMode.Dpi;Font=new Font("Segoe UI",10);BackColor=Theme.Background;ForeColor=Theme.Ink;
             StartPosition=FormStartPosition.CenterScreen;DoubleBuffered=true;
             var header=new Panel{BackColor=Theme.Panel};header.SetBounds(0,0,820,92);Controls.Add(header);
-            header.Controls.Add(new Label{Text="SSC MODS",Font=new Font("Segoe UI",23,FontStyle.Bold),ForeColor=Theme.Ink,Left=26,Top=15,Width=500,Height=42});
+            header.Controls.Add(new Label{Text="SSC MOD MENU",Font=new Font("Segoe UI",23,FontStyle.Bold),ForeColor=Theme.Ink,Left=26,Top=15,Width=500,Height=42});
             header.Controls.Add(new Label{Text="CLIENT SETUP",ForeColor=Theme.Muted,Left=28,Top=59,Width=300,Height=24});
             var rule=new Panel{BackColor=Theme.Blue};rule.SetBounds(0,90,820,2);Controls.Add(rule);rule.BringToFront();
             installTab.Name="installTab";installTab.Text="INSTALL / UPDATE";installTab.SetBounds(26,114,224,42);installTab.Click+=(s,e)=>SelectMode(false);Controls.Add(installTab);
@@ -89,8 +89,8 @@ namespace SSCMods.Setup {
         }
         void SetModeText(){
             installTab.Selected=!uninstall;removeTab.Selected=uninstall;installTab.Invalidate();removeTab.Invalidate();
-            heading.Text=uninstall?"Uninstall SSC Mods":"Set up your client";
-            summary.Text=uninstall?"Remove the mod from your selected game folder.":"Install or update SSC Mods, then launch through Steam.";
+            heading.Text=uninstall?"Uninstall SSC Mod Menu":"Set up your client";
+            summary.Text=uninstall?"Remove the mod from your selected game folder.":"Install or update SSC Mod Menu, then launch through Steam.";
             details.Text=uninstall?"Your saved settings will stay available. Changed or unrelated files are kept.":"SOUND REPLACER    /    COSMETICS\r\nDISCORD PRESENCE    /    HUD EDITOR\r\nRight Shift opens the menu in game.";
             action.Text=uninstall?"UNINSTALL":"INSTALL";
         }
@@ -108,7 +108,7 @@ namespace SSCMods.Setup {
                 });
                 bool updating=File.Exists(Path.Combine(path,Engine.ManifestName));
                 SetBusy(false);action.Text=remove?"UNINSTALL":updating?"UPDATE":"INSTALL";
-                status.Text=result.CanInstall?(remove?"Ready to uninstall.":updating?"SSC Mods is installed. Ready to update.":"Ready to install."):result.Message;
+                status.Text=result.CanInstall?(remove?"Ready to uninstall.":updating?"SSC Mod Menu is installed. Ready to update.":"Ready to install."):result.Message;
                 action.Enabled=result.CanInstall;
             }catch(Exception error){SetBusy(false);status.ForeColor=Color.FromArgb(255,196,99);status.Text=error.Message;}
         }
@@ -119,11 +119,11 @@ namespace SSCMods.Setup {
             try{
                 if(remove){
                     var retained=await System.Threading.Tasks.Task.Run(()=>Engine.Uninstall(path));
-                    status.Text=retained.Count==0?"SSC Mods uninstalled.":"Some changed files were kept.";
+                    status.Text=retained.Count==0?"SSC Mod Menu uninstalled.":"Some changed files were kept.";
                     details.Text=retained.Count==0?"Your game is ready to launch through Steam. Saved mod settings are kept.":"Kept files:\r\n"+String.Join("\r\n",retained);
                 }else{
                     await System.Threading.Tasks.Task.Run(()=>Engine.InstallOrUpdate(path,package));
-                    status.Text="SSC Mods is ready.";details.Text="Launch Skillshot City through Steam. Press Right Shift to open the menu.";
+                    status.Text="SSC Mod Menu is ready.";details.Text="Launch Skillshot City through Steam. Press Right Shift to open the menu.";
                 }
                 SetBusy(false);
             }catch(Exception error){SetBusy(false);status.ForeColor=Color.FromArgb(255,196,99);status.Text="Could not complete this action.";details.Text=error.Message;}
@@ -141,7 +141,7 @@ namespace SSCMods.Setup {
                     string root=Directory.GetParent(Path.GetDirectoryName(exe)).FullName;
                     string temp=Path.Combine(Path.GetTempPath(),"SSCMods-Uninstall-"+Guid.NewGuid().ToString("N"));
                     Directory.CreateDirectory(temp);
-                    string helper=Path.Combine(temp,"SSCMods-Setup.exe"); File.Copy(exe,helper,false);
+                    string helper=Path.Combine(temp,"SSC-Mod-Menu-Setup.exe"); File.Copy(exe,helper,false);
                     Process.Start(new ProcessStartInfo(helper,"--uninstall \""+root+"\" --wait "+Process.GetCurrentProcess().Id) {UseShellExecute=true});
                     return 0;
                 }
@@ -151,9 +151,9 @@ namespace SSCMods.Setup {
                     if(!Int32.TryParse(args[3],out pid)) throw new IOException("Invalid uninstaller process identifier.");
                     try { using(var parent=Process.GetProcessById(pid)) if(!parent.WaitForExit(10000)) throw new IOException("Close the previous uninstaller and retry."); }
                     catch(ArgumentException) {}
-                } else if(args.Length!=0 && !(remove&&args.Length==2)) throw new IOException("Usage: SSCMods-Setup.exe [--uninstall GAME_DIRECTORY]");
+                } else if(args.Length!=0 && !(remove&&args.Length==2)) throw new IOException("Usage: SSC-Mod-Menu-Setup.exe [--uninstall GAME_DIRECTORY]");
                 Application.Run(new SetupWindow(remove?args[1]:null,remove)); return 0;
-            } catch(Exception error) { if(args.Length>0&&args[0]=="--apply") {Console.Error.WriteLine(error);return 1;} MessageBox.Show(error.Message,"SSC Mods",MessageBoxButtons.OK,MessageBoxIcon.Error); return 1; }
+            } catch(Exception error) { if(args.Length>0&&args[0]=="--apply") {Console.Error.WriteLine(error);return 1;} MessageBox.Show(error.Message,"SSC Mod Menu",MessageBoxButtons.OK,MessageBoxIcon.Error); return 1; }
         }
     }
 }

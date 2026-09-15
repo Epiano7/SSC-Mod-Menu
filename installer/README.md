@@ -1,6 +1,6 @@
 # Installer
 
-SSCMods-Setup.exe embeds the validated runtime, OpenGL proxy and uninstaller. It discovers Steam or accepts a selected game folder. Install / Update and Uninstall are available from the same window.
+SSC-Mod-Menu-Setup.exe embeds the validated runtime, OpenGL proxy and uninstaller. It discovers Steam or accepts a selected game folder. Install / Update and Uninstall are available from the same window.
 
 Owned paths: opengl32.dll, SSCMods/runtime.dll, SSCMods/Uninstall.exe and SSCMods/install-manifest.json. Updates verify existing ownership and hashes; failed replacements roll back. Uninstall validates the entire manifest before removing files and retains changed files and preferences.
 

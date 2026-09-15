@@ -19,7 +19,7 @@ if($RuntimeDirectory) {
     }
     $common+='/define:MENU_ALPHA'
 }
-& $compiler @common /target:winexe "/win32manifest:$root\installer\app.manifest" "/out:$build\SSCMods-Setup.exe" @sources
+& $compiler @common /target:winexe "/win32manifest:$root\installer\app.manifest" "/out:$build\SSC-Mod-Menu-Setup.exe" @sources
 if($LASTEXITCODE) { throw 'Installer compilation failed' }
 & $compiler @common /target:exe /main:InstallerTests "/out:$build\installer_test.exe" @sources "$root\tests\installer_test.cs"
 if($LASTEXITCODE) { throw 'Installer test compilation failed' }
@@ -31,7 +31,7 @@ if($LASTEXITCODE) { throw 'Installer tests failed' }
 if($LASTEXITCODE) { throw 'Installer UI test compilation failed' }
 & "$build\installer_ui_test.exe" (Join-Path $build ('ui-' + [guid]::NewGuid().ToString('N')))
 if($LASTEXITCODE) { throw 'Installer UI tests failed' }
-Get-FileHash -LiteralPath "$build\SSCMods-Setup.exe" -Algorithm SHA256
+Get-FileHash -LiteralPath "$build\SSC-Mod-Menu-Setup.exe" -Algorithm SHA256
 
 
 

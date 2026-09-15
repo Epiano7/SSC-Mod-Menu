@@ -38,7 +38,7 @@ inline Snapshot from_steam(const std::string& display,const std::string& status)
 }
 inline Json activity(const Snapshot& s,std::time_t start,bool timer) {
     Json a={{"details",utf8_limit(s.details)},{"state",utf8_limit(s.state)},{"instance",false}};
-    a["assets"]={{"large_image",large_image_key},{"large_text","Skillshot City - SSC Mods"}};
+    a["assets"]={{"large_image",large_image_key},{"large_text","Skillshot City - SSC Mod Menu"}};
     if(timer)a["timestamps"]={{"start",start}};
     return a;
 }

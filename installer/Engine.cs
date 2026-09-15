@@ -215,7 +215,7 @@ namespace SSCMods.Setup {
                 string target=Destination(root,file.Path);
                 if(!File.Exists(target)||FileHash(target)!=file.Sha256) throw new IOException("Modified or missing mod file: "+file.Path+". Update blocked.");
             }
-            result.CanInstall=true;result.Message="Ready to update SSC Mods. Saved settings and game files are preserved.";return result;
+            result.CanInstall=true;result.Message="Ready to update SSC Mod Menu. Saved settings and game files are preserved.";return result;
         }
         public static void Update(string path,Package package,Action<int> afterCopy=null) {
             var check=InspectUpdate(path,package);string root=check.Root;

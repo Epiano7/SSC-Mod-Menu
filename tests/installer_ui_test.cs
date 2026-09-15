@@ -24,7 +24,7 @@ public static class InstallerUiTests {
             Click(w,"removeTab");Check(!Find(w,"action").Enabled,"Uninstall refuses missing manifest");
             Click(w,"installTab");Click(w,"action");Check(File.Exists(Path.Combine(root,Engine.ManifestName)),"Install button writes package: "+Find(w,"status").Text+" / "+Find(w,"details").Text);
             Click(w,"check");Check(Find(w,"action").Enabled&&Find(w,"action").Text=="UPDATE","installed folder selects Update");Shot(w,Path.Combine(parent,"update.png"));
-            Click(w,"action");Check(Find(w,"status").Text=="SSC Mods is ready.","Update completes with success state");
+            Click(w,"action");Check(Find(w,"status").Text=="SSC Mod Menu is ready.","Update completes with success state");
             Click(w,"removeTab");Check(Find(w,"action").Enabled&&Find(w,"action").Text=="UNINSTALL","same installer offers Uninstall");Shot(w,Path.Combine(parent,"uninstall.png"));
             File.WriteAllText(Path.Combine(root,"opengl32.dll"),"Edited");Click(w,"action");Check(File.Exists(Path.Combine(root,"opengl32.dll"))&&Find(w,"status").Text=="Some changed files were kept.","Uninstall preserves changed files and explains partial result");
             File.WriteAllBytes(Path.Combine(root,"opengl32.dll"),p.Files[0].Bytes);Click(w,"check");Click(w,"action");

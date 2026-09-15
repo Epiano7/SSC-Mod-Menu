@@ -346,7 +346,7 @@ void paint_panel() {
     std::memset(pixels,0,raster_w*raster_h*4);
     rectangle(0,0,panel_w,panel_h,RGB(8,21,41));rectangle(4,4,panel_w-8,78,RGB(18,41,72));
     rectangle(4,82,panel_w-8,2,RGB(48,135,208));
-    text(26,24,L"SSC MODS",ink,true);text(26,58,manager?L"MODULE SETTINGS":L"QUICK MENU",muted);
+    text(26,24,L"SSC MOD MENU",ink,true);text(26,58,manager?L"MODULE SETTINGS":L"QUICK MENU",muted);
     button(1,panel_w-60,23,36,36,L"X");
     if(!manager) {
         const wchar_t* names[]={L"SOUND REPLACER",L"COSMETICS",L"DISCORD PRESENCE",L"HUD EDITOR"};
@@ -408,16 +408,16 @@ void paint_panel() {
             text(266,111,L"HUD EDITOR",ink,true);toggle(86,986,106,ssc_hud::enabled);
             button(146,266,188,300,48,L"EDIT HUD");button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
-            text(266,111,L"ABOUT SSC MODS",ink,true);
+            text(266,111,L"ABOUT SSC MOD MENU",ink,true);
             text(266,157,L"0.1.0-beta.1",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
             text(282,314,L"Supported game build: September 12, 2026",muted);
-            text(282,343,L"Game updates may require a newer version of SSC Mods.",muted);
+            text(282,343,L"Game updates may require a newer version of SSC Mod Menu.",muted);
             text(266,414,L"UPDATES");
             text(266,455,L"In-app updates coming soon.",muted);
-            text(266,496,L"Releases: github.com/Epiano7/SSC-Mod-Client",muted);
+            text(266,496,L"Releases: github.com/Epiano7/SSC-Mod-Menu",muted);
             text(266,578,L"Unofficial mod client. Not affiliated with the game developer.",muted,false,14);
 
         }
