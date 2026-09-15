@@ -42,20 +42,20 @@ int main(){
     rated=game;add_rating(rated,true,NAN,12,5);assert(rated.state=="Ranked");
     auto base=reinterpret_cast<uintptr_t>(VirtualAlloc(nullptr,0x1000000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));
     auto world=reinterpret_cast<uintptr_t>(VirtualAlloc(nullptr,0xc000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));
-    auto actor=reinterpret_cast<uintptr_t>(VirtualAlloc(nullptr,0x3450,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));assert(base&&world&&actor);
+    auto actor=reinterpret_cast<uintptr_t>(VirtualAlloc(nullptr,0x3460,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));assert(base&&world&&actor);
     auto put=[](uintptr_t at,auto value){std::memcpy(reinterpret_cast<void*>(at),&value,sizeof(value));};
-    put(base+0xf9630c,1);assert(native_fallback(base).details=="Main menu");
-    put(base+0xf9630c,2);put(base+0xdce5d0,world);put(world+0x128,6);put(world+0x480,1);put(world+0x3e0,3);
-    put(world+0xa5a8,actor);put(world+0xa5b0,actor+0x3450);put(base+0xe05dc8,actor);put(base+0xe02370,0);
+    put(base+0xfa035c,1);assert(native_fallback(base).details=="Main menu");
+    put(base+0xfa035c,2);put(base+0xdd85d0,world);put(world+0x128,6);put(world+0x480,1);put(world+0x3e0,3);
+    put(world+0xa5b8,actor);put(world+0xa5c0,actor+0x3460);put(base+0xe0fdf8,actor);put(base+0xe0c390,0);
     put(actor+0x81,static_cast<unsigned char>(1));put(actor+0x858,7);put(actor+0x350,-1);
     auto sampled=native_fallback(base);assert(sampled.details=="BR Solos - Round 2"&&sampled.state=="Level 7");
     put(actor+0x6e8,uint64_t(7));put(actor+0x270,static_cast<unsigned char>(1));put(actor+0xa9c,481);put(actor+0x204,2);
-    put(base+0xf9a61c,25.f);put(base+0xf9a620,25.f);put(base+0xde8040,1);put(base+0xde88e4,4554.f);put(base+0xde88e0,41.f);put(base+0xf9a5f0,5);
+    put(base+0xfa4684,25.f);put(base+0xfa4688,25.f);put(base+0xdf2050,1);put(base+0xdf28f4,4554.f);put(base+0xdf28f0,41.f);put(base+0xfa4658,5);
     sample_rating(base,sampled);assert(sampled.state=="Ranked | SSC rating: 4554 | Level 7");
     put(world+0x2f4,static_cast<unsigned char>(1));sampled=native_fallback(base);sample_rating(base,sampled);assert(sampled.state=="Level 7");
     put(actor+0x78,5);assert(native_fallback(base).state=="In game");put(actor+0x78,0);
-    put(base+0xe02370,5);assert(native_fallback(base).state=="In game");
-    put(base+0xf9630c,1);sampled=native_fallback(base);sample_rating(base,sampled);assert(sampled.state=="Choosing a game");
+    put(base+0xe0c390,5);assert(native_fallback(base).state=="In game");
+    put(base+0xfa035c,1);sampled=native_fallback(base);sample_rating(base,sampled);assert(sampled.state=="Choosing a game");
     VirtualFree(reinterpret_cast<void*>(actor),0,MEM_RELEASE);VirtualFree(reinterpret_cast<void*>(world),0,MEM_RELEASE);VirtualFree(reinterpret_cast<void*>(base),0,MEM_RELEASE);
     // An isolated mock pipe: these tests never connect to Discord or publish an activity.
     Shared state;state.enabled=true;state.id="123456789012345678";state.snapshot=game;state.sampled=GetTickCount64();

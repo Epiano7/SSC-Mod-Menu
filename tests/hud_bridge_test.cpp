@@ -54,7 +54,7 @@ int main(){
  weapon.x=0;ssc_hud::constrain(weapon);auto edge=ssc_hud::transform(weapon);assert(std::abs(edge[0]*(2*.9f-1)+edge[12]+1)<.00001f);
  // Resize and move the native hover rectangle with the visible HUD; the old
  // location no longer fades it, while the new location does.
- weapon.x=.1f;weapon.y=.2f;weapon.scale=3;ssc_hud::active_item=7;ssc_hud::game_base=reinterpret_cast<U>(native_fade)-0x443200;
+ weapon.x=.1f;weapon.y=.2f;weapon.scale=3;ssc_hud::active_item=7;ssc_hud::game_base=reinterpret_cast<U>(native_fade)-0x443300;
  mouse_x=940;mouse_y=535;assert(ssc_hud::fade_hook(0,1,900,500,80,70,30,0)==1);
  mouse_x=120;mouse_y=140;assert(ssc_hud::fade_hook(0,1,900,500,80,70,30,0)==.2f);
  ssc_hud::editing=true;assert(ssc_hud::fade_hook(0,1,900,500,80,70,30,0)==1&&fade_calls==2);ssc_hud::editing=false;

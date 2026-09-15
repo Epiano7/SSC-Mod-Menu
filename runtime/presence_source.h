@@ -27,19 +27,19 @@ inline void add_rating(Snapshot& s,bool is_ranked,float rating,float matches,int
 inline void sample_rating(uintptr_t base,Snapshot& snapshot){
     if(snapshot.phase!=2)return;
     using ssc_names::read;uintptr_t world=0,first=0,last=0,steam_first=0;int local=-1,slot=-1;
-    if(!read(base+0xdce5d0,world)||!world||!read(world+0xa5a8,first)||!read(world+0xa5b0,last)||!first||last<first||(last-first)%0x3450||(last-first)/0x3450>2048
-        ||!read(base+0xe05dc8,steam_first)||first!=steam_first||!read(base+0xe02370,local)||local<0||uintptr_t(local)>=(last-first)/0x3450)return;
-    auto actor=first+uintptr_t(local)*0x3450;if(!read(actor+0x78,slot)||slot!=local)return;
+    if(!read(base+0xdd85d0,world)||!world||!read(world+0xa5b8,first)||!read(world+0xa5c0,last)||!first||last<first||(last-first)%0x3460||(last-first)/0x3460>2048
+        ||!read(base+0xe0fdf8,steam_first)||first!=steam_first||!read(base+0xe0c390,local)||local<0||uintptr_t(local)>=(last-first)/0x3460)return;
+    auto actor=first+uintptr_t(local)*0x3460;if(!read(actor+0x78,slot)||slot!=local)return;
     RankedFields f;
     if(!read(world+0x128,f.mode)||!read(world+0x3e0,f.round)||!read(world+0x485,f.survival)||!read(world+0x2d2,f.singleplayer)
         ||!read(world+0x2f4,f.disabled)||!read(world+0x121,f.practice)||!read(world+0x30f,f.newbie)
         ||!read(actor+0x81,f.active)||!read(actor+0x7c4,f.kind)||!read(actor+0x6e8,f.name_length)||!read(actor+0x6c8,f.login)
         ||!read(actor+0x6cc,f.authenticated)||!read(actor+0x270,f.committed)||!read(actor+0xf80,f.bonus)
         ||!read(actor+0xa9c,f.account_level)||!read(actor+0x204,f.eligibility)
-        ||!read(base+0xf9a61c,f.normal_threshold)||!read(base+0xf9a620,f.bonus_threshold)||!ranked(f))return;
+        ||!read(base+0xfa4684,f.normal_threshold)||!read(base+0xfa4688,f.bonus_threshold)||!ranked(f))return;
     // Values used by the native own-profile "RATING THIS MONTH" display at 5f3a5f.
     float rating=-1,matches=-1;int required=0,profile_loaded=0;
-    if(read(base+0xde8040,profile_loaded)&&profile_loaded&&read(base+0xde88e4,rating)&&read(base+0xde88e0,matches)&&read(base+0xf9a5f0,required))add_rating(snapshot,true,rating,matches,required);
+    if(read(base+0xdf2050,profile_loaded)&&profile_loaded&&read(base+0xdf28f4,rating)&&read(base+0xdf28f0,matches)&&read(base+0xfa4658,required))add_rating(snapshot,true,rating,matches,required);
     else add_rating(snapshot,true,-1,-1,0);
 }
 inline std::string copy_steam_text(const char* value){
@@ -54,11 +54,11 @@ inline std::string native_string(uintptr_t address){
 }
 inline Snapshot native_fallback(uintptr_t base){
     using ssc_names::read;Snapshot s;int session=0;double joining=0;
-    if(!read(base+0xf9630c,session)||!read(base+0xf96320,joining)||!std::isfinite(joining))return s;
+    if(!read(base+0xfa035c,session)||!read(base+0xfa0370,joining)||!std::isfinite(joining))return s;
     if(session==1)return from_steam("#Status_AtMainMenu","");
     if(session!=2)return s;
     if(joining>0){s.details="Joining game";s.state="Loading";s.phase=3;return s;}
-    uintptr_t world=0;if(!read(base+0xdce5d0,world)||!world)return s;
+    uintptr_t world=0;if(!read(base+0xdd85d0,world)||!world)return s;
     int mode=-1,round=0,team_size=0;unsigned char survival=0,singleplayer=0;
     if(!read(world+0x128,mode)||!read(world+0x3e0,round)||!read(world+0x480,team_size)||!read(world+0x485,survival)||!read(world+0x2d2,singleplayer))return s;
     s.phase=2;s.state="In game";
@@ -67,13 +67,13 @@ inline Snapshot native_fallback(uintptr_t base){
             if(round>=2&&round<=100)s.details+=" - Round "+std::to_string(round-1);else s.state="Preparing round";break;
         default:s.details="Skillshot City";break;}
     uintptr_t first=0,last=0,steam_first=0;int local=-1,slot=-1,kind=-1,level=-1,class_id=-1;unsigned char active=0;
-    if(!read(world+0xa5a8,first)||!read(world+0xa5b0,last)||!first||last<first||(last-first)%0x3450||(last-first)/0x3450>2048
-        ||!read(base+0xe05dc8,steam_first)||first!=steam_first||!read(base+0xe02370,local)||local<0||uintptr_t(local)>=(last-first)/0x3450)return s;
-    auto actor=first+uintptr_t(local)*0x3450;
+    if(!read(world+0xa5b8,first)||!read(world+0xa5c0,last)||!first||last<first||(last-first)%0x3460||(last-first)/0x3460>2048
+        ||!read(base+0xe0fdf8,steam_first)||first!=steam_first||!read(base+0xe0c390,local)||local<0||uintptr_t(local)>=(last-first)/0x3460)return s;
+    auto actor=first+uintptr_t(local)*0x3460;
     if(!read(actor+0x78,slot)||slot!=local||!read(actor+0x7c4,kind)||kind!=0||!read(actor+0x81,active)||!active||!read(actor+0x858,level)||level<0||level>10000)return s;
     s.state="Level "+std::to_string(level);
     uintptr_t classes=0,end=0;
-    if(read(actor+0x350,class_id)&&class_id>=0&&read(base+0xe0bbf8,classes)&&read(base+0xe0bc00,end)&&classes&&end>=classes&&(end-classes)%0x98==0&&(end-classes)/0x98<=512&&uintptr_t(class_id)<(end-classes)/0x98){
+    if(read(actor+0x350,class_id)&&class_id>=0&&read(base+0xe15c28,classes)&&read(base+0xe15c30,end)&&classes&&end>=classes&&(end-classes)%0x98==0&&(end-classes)/0x98<=512&&uintptr_t(class_id)<(end-classes)/0x98){
         auto label=native_string(classes+uintptr_t(class_id)*0x98+0x18);if(!label.empty())s.state=label+" - "+s.state;
     }
     return s;
@@ -83,7 +83,7 @@ inline Snapshot native_fallback(uintptr_t base){
 inline Snapshot sample_steam(bool show_rating=true){
     auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));int initialized=0;
     auto fallback=native_fallback(base);if(show_rating)sample_rating(base,fallback);
-    if(!ssc_names::read(base+0xf95114,initialized)||initialized<=0)return fallback;
+    if(!ssc_names::read(base+0xf9f164,initialized)||initialized<=0)return fallback;
     auto dll=GetModuleHandleW(L"steam_api64.dll");if(!dll)return fallback;
     using Interface=void*(*)();using OwnId=uint64_t(*)(void*);using Presence=const char*(*)(void*,uint64_t,const char*);
     auto friends=reinterpret_cast<Interface>(GetProcAddress(dll,"SteamAPI_SteamFriends_v017"));

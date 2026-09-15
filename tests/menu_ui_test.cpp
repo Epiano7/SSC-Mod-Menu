@@ -6,6 +6,7 @@ static void snapshot(const std::filesystem::path& path) {
     std::ofstream out(path,std::ios::binary);out.write(reinterpret_cast<char*>(&file),sizeof(file));out.write(reinterpret_cast<char*>(&info),sizeof(info));out.write(static_cast<char*>(pixels),raster_w*raster_h*4);assert(out);
 }
 int main(int argc,char** argv) {
+    native_supported=true;
     assert(argc>=2);state_dir=std::filesystem::path(argv[1]);std::filesystem::create_directories(state_dir);
     {std::ofstream out(state_dir/"menu.ini");out<<"clock=1\n";}
     load_settings();assert(!clock_enabled);
@@ -34,11 +35,20 @@ int main(int argc,char** argv) {
     show_quick();visibility=1;paint_panel();snapshot(state_dir/"quick.bmp");
     activate(4);assert(!clock_enabled);
     {std::ifstream in(state_dir/"menu.ini");std::string saved((std::istreambuf_iterator<char>(in)),{});assert(saved.find("unused_preference")==std::string::npos);}
+    manager=true;settings_page=2;rpc_preview.phase=2;paint_panel();
+    assert(std::none_of(controls.begin(),controls.end(),[](const Control& c){return (c.id==160||c.id==161)&&c.enabled;}));
+    rpc_preview.phase=1;ssc_update::version="0.2.0";paint_panel();
+    assert(std::any_of(controls.begin(),controls.end(),[](const Control& c){return c.id==161&&c.enabled;}));
+    settings_page=7;paint_panel();snapshot(state_dir/"update-prompt.bmp");
+    native_supported=false;manager=false;paint_panel();snapshot(state_dir/"compatibility.bmp");
+    assert(std::none_of(controls.begin(),controls.end(),[](const Control& c){return c.id>=80&&c.id<=94;}));
+    assert(std::any_of(controls.begin(),controls.end(),[](const Control& c){return c.id==160&&c.enabled;}));
+    native_supported=true;ssc_update::version.clear();rpc_preview.phase=0;
     // Verify the preview against the supported game's palette leaf function without starting it.
     if(argc>3){
         HMODULE module=LoadLibraryExA(argv[3],nullptr,DONT_RESOLVE_DLL_REFERENCES);assert(module);
         using Palette=float*(__cdecl*)(uintptr_t,float*,float,float,unsigned char,unsigned char);
-        auto native=reinterpret_cast<Palette>(reinterpret_cast<uintptr_t>(module)+0x151f50);
+        auto native=reinterpret_cast<Palette>(reinterpret_cast<uintptr_t>(module)+0x1523a0);
         float max_error=0;
         for(int i=0;i<4096;++i)for(float lift:{.1f,.2f}){float phase=float(i)/4096,out[3]{};native(0,out,phase*255, lift,0,1);auto preview=rainbow_rgb(phase,lift);
             for(int k=0;k<3;++k)max_error=std::max(max_error,std::abs(out[k]-preview[k]));}

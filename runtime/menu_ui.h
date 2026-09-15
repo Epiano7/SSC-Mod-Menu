@@ -108,7 +108,9 @@ void live_hud_wheel(int delta,int hovered_item){if(hud_drag>=0){finish_hud_drag(
 void activate(int id) {
     if(id!=120&&id!=121)rpc_editing=false;
     if(id!=104)sound_search_editing=false;
-    if(id==1)close_menu();
+    if(id==160){if(!native_supported||rpc_preview.phase==1)ssc_update::check(state_dir);dirty=true;}
+    else if(id==161){if(!native_supported||rpc_preview.phase==1)ssc_update::apply();dirty=true;}
+    else if(id==1)close_menu();
     else if(id==3)show_manager();
     else if(id==4){ssc_hud::enabled=false;sound_requested=false;cosmetic_requested=false;rpc_requested=false;clock_enabled=false;save();}
     else if(id==5)show_quick();
@@ -321,15 +323,16 @@ void text(int x,int y,const wchar_t* value,COLORREF color=ink,bool title=false,i
         cursor+=gw; // Preserve native advances; do not round each glyph or add tracking.
     }
 }
-void button(int id,int x,int y,int w,int h,const wchar_t* label,bool selected=false) {
-    controls.push_back({id,x,y,w,h,true});bool focus=hovered==id||keyboard_focus==id;
+void button(int id,int x,int y,int w,int h,const wchar_t* label,bool selected=false,bool enabled=true) {
+    controls.push_back({id,x,y,w,h,enabled});bool focus=enabled&&(hovered==id||keyboard_focus==id);
     COLORREF base=selected?RGB(27,106,196):RGB(33,57,88);
     if(focus)base=RGB(46,121,193);
-    if(pressed==id)base=RGB(26,81,133);
+    if(enabled&&pressed==id)base=RGB(26,81,133);
+    if(!enabled)base=RGB(22,35,51);
     polygon(x,y,w,h,base);rectangle(x+8,y+1,w-16,1,focus?cyan:RGB(63,91,132));
     if(focus)rectangle(x+8,y+h-2,w-16,2,cyan);
     int size=15;while(size>11&&text_width(label,size)>w-28)--size;
-    text(x+14,y+(h-size)/2,label,ink,false,size);
+    text(x+14,y+(h-size)/2,label,enabled?ink:muted,false,size);
 }
 void toggle(int id,int x,int y,bool enabled) {button(id,x,y,94,36,enabled?L"ON":L"OFF",enabled);rectangle(x+70,y+10,10,16,enabled?RGB(99,239,173):muted);}
 void finish_canvas() {
@@ -348,7 +351,13 @@ void paint_panel() {
     rectangle(4,82,panel_w-8,2,RGB(48,135,208));
     text(26,24,L"SSC MOD MENU",ink,true);text(26,58,manager?L"MODULE SETTINGS":L"QUICK MENU",muted);
     button(1,panel_w-60,23,36,36,L"X");
-    if(!manager) {
+    if(!native_supported){
+        text(26,116,L"GAME UPDATE DETECTED",cyan);
+        text(26,156,L"Modules are paused until a compatible mod update.",muted,false,14);
+        text(26,209,ssc_update::message.c_str(),ink,false,14);
+        button(160,26,270,250,42,L"CHECK FOR UPDATES",false,!ssc_update::process);
+        button(161,294,270,310,42,L"UPDATE AND RESTART",true,ssc_update::available());
+    } else if(!manager) {
         const wchar_t* names[]={L"SOUND REPLACER",L"COSMETICS",L"DISCORD PRESENCE",L"HUD EDITOR"};
         const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled};const int ids[]={80,81,83,86};
         for(int i=0;i<4;++i){int y=100+i*64;rectangle(20,y,600,56,RGB(16,37,62));text(32,y+20,names[i]);toggle(ids[i],350,y+10,enabled[i]);button(91+i,456,y+10,146,36,L"SETTINGS");}
@@ -404,20 +413,28 @@ void paint_panel() {
             text(266,388,L"SHOW ELAPSED TIME",ink);toggle(84,986,378,rpc_timer);
             text(266,444,L"SHOW SSC RATING WHEN RANKED",ink);toggle(85,986,434,rpc_rating);
 
+        } else if(settings_page==7){
+            text(266,111,L"UPDATE AVAILABLE",ink,true);
+            text(266,180,ssc_update::message.c_str(),cyan);
+            text(266,238,L"Download, install and restart Skillshot City.",muted);
+            button(161,266,308,340,48,L"UPDATE AND RESTART",true,ssc_update::available()&&rpc_preview.phase==1);
+            button(1,630,308,180,48,L"LATER");
         } else if(settings_page==6){
             text(266,111,L"HUD EDITOR",ink,true);toggle(86,986,106,ssc_hud::enabled);
             button(146,266,188,300,48,L"EDIT HUD");button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.0-beta.1",cyan);
+            text(266,157,L"0.1.0-dev",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
-            text(282,314,L"Supported game build: September 12, 2026",muted);
+            text(282,314,L"Supported game build: September 15, 2026",muted);
             text(282,343,L"Game updates may require a newer version of SSC Mod Menu.",muted);
             text(266,414,L"UPDATES");
-            text(266,455,L"In-app updates coming soon.",muted);
-            text(266,496,L"Releases: github.com/Epiano7/SSC-Mod-Menu",muted);
+            text(266,455,ssc_update::message.c_str(),muted,false,14);
+            button(160,266,492,260,40,L"CHECK FOR UPDATES",false,!ssc_update::process&&rpc_preview.phase==1);
+            button(161,542,492,340,40,L"UPDATE AND RESTART",true,ssc_update::available()&&rpc_preview.phase==1);
+
             text(266,578,L"Unofficial mod client. Not affiliated with the game developer.",muted,false,14);
 
         }

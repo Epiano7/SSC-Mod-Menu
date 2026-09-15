@@ -39,32 +39,32 @@ template<int Index> void __cdecl draw(uintptr_t object){
 // Hook only validated call sites. Renderer hooks forward 14/20 native arguments.
 struct Hook {uintptr_t call,target;int item;unsigned stack_bytes;bool map_root=false;bool fade=false;};
 inline constexpr Hook hooks[]={
- {0x3b388b,0x434100,0,0},{0x3b3897,0x435450,1,0},
- {0x3b340e,0x41dee0,2,0,true},{0x3b3769,0x41dee0,2,0,true},
- {0x1a7443,0x1a7500,3,0},
- {0x423e63,0x3b4160,5,0},
- {0x3b3c21,0x4055a0,6,0},
- {0x3b3be2,0x414990,7,0},
- {0x3b3bb0,0x3e51c0,8,0},{0x3b3bc6,0x408700,8,0},
+ {0x3b38cb,0x434200,0,0},{0x3b38d7,0x435550,1,0},
+ {0x3b344e,0x41dff0,2,0,true},{0x3b37a9,0x41dff0,2,0,true},
+ {0x1a7893,0x1a7950,3,0},
+ {0x423f73,0x3b41a0,5,0},
+ {0x3b3c61,0x4055d0,6,0},
+ {0x3b3c22,0x414aa0,7,0},
+ {0x3b3bf0,0x3e51d0,8,0},{0x3b3c06,0x408730,8,0},
  // These draws are called from the map routine but are not part of the map.
- {0x423e0f,0x410e30,-1,0},{0x423e28,0x412cd0,-1,0},
- {0x423e53,0x3e4630,-1,0},{0x423e78,0x413f50,-1,0},
+ {0x423f1f,0x410f50,-1,0},{0x423f38,0x412df0,-1,0},
+ {0x423f63,0x3e4640,-1,0},{0x423f88,0x414060,-1,0},
  // Timer icon and its three text branches inside the round/player renderer.
- {0x3b6a9b,0x47e6a0,4,128},{0x3b6cc4,0x4799d0,4,80},
- {0x3b6d6f,0x4799d0,4,80},{0x3b6e05,0x4799d0,4,80},
- {0x435577,0x443200,-2,32,false,true},
- {0x3e52c6,0x443200,-2,32,false,true},
- {0x4056b0,0x443200,-2,32,false,true},
- {0x408cfe,0x443200,-2,32,false,true},
- {0x414a88,0x443200,-2,32,false,true},
- {0x41dffe,0x443200,-2,32,false,true},
- {0x3b4390,0x443200,-2,32,false,true},
- {0x3b560e,0x443200,-2,32,false,true},
- {0x3e4748,0x443200,-2,32,false,true},
- {0x41109e,0x443200,-2,32,false,true},
- {0x412e9c,0x443200,-2,32,false,true},
- {0x4140ef,0x443200,-2,32,false,true},
- {0x43473b,0x443200,-2,32,false,true}
+ {0x3b6adb,0x47faf0,4,128},{0x3b6d04,0x47ae20,4,80},
+ {0x3b6daf,0x47ae20,4,80},{0x3b6e45,0x47ae20,4,80},
+ {0x435677,0x443300,-2,32,false,true},
+ {0x3e52d6,0x443300,-2,32,false,true},
+ {0x4056e0,0x443300,-2,32,false,true},
+ {0x408d2e,0x443300,-2,32,false,true},
+ {0x414b98,0x443300,-2,32,false,true},
+ {0x41e10e,0x443300,-2,32,false,true},
+ {0x3b43d0,0x443300,-2,32,false,true},
+ {0x3b5648,0x443300,-2,32,false,true},
+ {0x3e4758,0x443300,-2,32,false,true},
+ {0x4111be,0x443300,-2,32,false,true},
+ {0x412fbc,0x443300,-2,32,false,true},
+ {0x4141ff,0x443300,-2,32,false,true},
+ {0x43483a,0x443300,-2,32,false,true}
 };
 inline uintptr_t game_base=0;
 inline bool changed(const Item& item){return item.scale!=1||item.x!=item.home_x||item.y!=item.home_y;}
@@ -103,7 +103,7 @@ inline void fade_rectangle(const Item& item,float& x,float& y,float& w,float& h,
 }
 inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,float w,float h,float feather,char global){
  if(editing&&active_item>=0)return std::abs(alpha);
- const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+0x443200);
+ const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+0x443300);
  if(enabled&&active_item>=0&&view_w>0&&view_h>0){const auto& a=items[active_item];
   if(measured[active_item]){x=a.x*view_w;y=a.y*view_h;w=a.w*a.scale*view_w;h=a.h*a.scale*view_h;feather*=a.scale;}
   else fade_rectangle(a,x,y,w,h,feather);

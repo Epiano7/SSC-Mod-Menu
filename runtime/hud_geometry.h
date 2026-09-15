@@ -48,16 +48,16 @@ inline bool writable_slot(uintptr_t address){MEMORY_BASIC_INFORMATION info{};ret
 inline bool start_capture(){
  if(!game_base||!capture_frame||game_base!=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))return false;
  if(capture_depth){++capture_depth;return true;}
- auto b=reinterpret_cast<BeginProc*>(game_base+0xdd4700);auto v2=reinterpret_cast<Vertex2Proc*>(game_base+0xdd4790);auto v3=reinterpret_cast<Vertex3Proc*>(game_base+0xdd4770);
+ auto b=reinterpret_cast<BeginProc*>(game_base+0xdde708);auto v2=reinterpret_cast<Vertex2Proc*>(game_base+0xdde798);auto v3=reinterpret_cast<Vertex3Proc*>(game_base+0xdde780);
  if(!writable_slot(reinterpret_cast<uintptr_t>(b))||!writable_slot(reinterpret_cast<uintptr_t>(v2))||!writable_slot(reinterpret_cast<uintptr_t>(v3))||!*b||!*v2||!*v3)return false;
  native_begin=*b;native_vertex2=*v2;native_vertex3=*v3;
  *b=capture_begin;*v2=capture_v2;*v3=capture_v3;capture_depth=1;return true;
 }
 inline void stop_capture(){
  if(!capture_depth||--capture_depth)return;
- *reinterpret_cast<BeginProc*>(game_base+0xdd4700)=native_begin;
- *reinterpret_cast<Vertex2Proc*>(game_base+0xdd4790)=native_vertex2;
- *reinterpret_cast<Vertex3Proc*>(game_base+0xdd4770)=native_vertex3;
+ *reinterpret_cast<BeginProc*>(game_base+0xdde708)=native_begin;
+ *reinterpret_cast<Vertex2Proc*>(game_base+0xdde798)=native_vertex2;
+ *reinterpret_cast<Vertex3Proc*>(game_base+0xdde780)=native_vertex3;
  primitive_capture=false;
 }
 inline void apply_bounds(int index,const Bounds& bounds){

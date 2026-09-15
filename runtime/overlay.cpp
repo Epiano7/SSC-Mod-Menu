@@ -16,8 +16,10 @@
 #include "cosmetic_adapter.h"
 #include "presence_source.h"
 #include "hud_editor.h"
+#include "update_module.h"
 
 namespace {
+bool native_supported=false;
 #include "menu_ui.h"
 
 bool attach_sound() {
@@ -66,7 +68,14 @@ void render(HDC dc) {
     static ULONGLONG diagnostics_at=0;
     if(developer_tools&&now-diagnostics_at>15000){diagnostics_at=now;char report[160];snprintf(report,sizeof(report),"Draw diagnostics: rainbow=%u audio=%u",ssc_names::cosmetic_draws.load(),ssc_sound::substituted.load());log(report);}
     static ULONGLONG presence_at=0;
-    if(now-presence_at>=1000){presence_at=now;rpc_preview=ssc_rpc::sample_steam(rpc_rating);static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested,rpc_id,rpc_timer,rpc_preview);if(opened)dirty=true;}
+    if(now-presence_at>=1000){presence_at=now;rpc_preview=native_supported?ssc_rpc::sample_steam(rpc_rating):ssc_rpc::Snapshot{};static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested,rpc_id,rpc_timer,rpc_preview);if(opened)dirty=true;}
+    static ULONGLONG update_at=0;
+    if(now-update_at>=1000){update_at=now;
+        if(native_supported&&rpc_preview.phase==1&&!ssc_update::checked)ssc_update::check(state_dir);
+        if(ssc_update::poll(window,rpc_preview.phase==1||!native_supported))dirty=true;
+        if(rpc_preview.phase!=1&&manager&&settings_page==7&&opened)close_menu(true);
+        if(rpc_preview.phase==1&&ssc_update::available()&&!ssc_update::notified&&!opened){ssc_update::notified=true;opened=true;show_manager(7);}
+    }
     RECT hud_client{};GetClientRect(window,&hud_client);if(ssc_hud::finish_frame(hud_client.right,hud_client.bottom,now)&&ssc_hud::editing)dirty=true;
     advance_animation(seconds);
     if(window!=game_window||(!opened&&visibility==0.f&&modal_visibility==0.f&&!clock_enabled))return;
@@ -160,8 +169,8 @@ BOOL WINAPI swap_hook(HDC dc) {render(dc);return original_swap(dc);}
 bool accepted_build() {
     wchar_t path[32768];if(!GetModuleFileNameW(nullptr,path,32768)) return false;
     std::ifstream in(std::filesystem::path(path),std::ios::binary|std::ios::ate);
-    if(!in||in.tellg()!=15221248) return false;
-    in.seekg(0);std::vector<unsigned char> bytes(15221248);in.read(reinterpret_cast<char*>(bytes.data()),bytes.size());if(!in) return false;
+    if(!in||in.tellg()!=15261184) return false;
+    in.seekg(0);std::vector<unsigned char> bytes(15261184);in.read(reinterpret_cast<char*>(bytes.data()),bytes.size());if(!in) return false;
     BCRYPT_ALG_HANDLE algorithm=nullptr;unsigned char digest[32];
     if(BCryptOpenAlgorithmProvider(&algorithm,BCRYPT_SHA256_ALGORITHM,nullptr,0)<0) return false;
     BCRYPT_HASH_HANDLE hash=nullptr;
@@ -171,7 +180,7 @@ bool accepted_build() {
     if(hash) BCryptDestroyHash(hash);
     BCryptCloseAlgorithmProvider(algorithm,0);if(result<0) return false;
     char hex[65];for(int i=0;i<32;++i) std::sprintf(hex+i*2,"%02X",digest[i]);
-    return std::string(hex)=="34D8809E646C36E595FDB9DF072E09B31EA35108DEFF3B32EF40451695D05307";
+    return std::string(hex)=="11760857A577DFC2DCA0836614A250EBA31B309249DCC02F4D304A8A075A388A";
 }
 bool attach_swap() {
     auto base=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));
@@ -214,8 +223,9 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     if(n&&n<32768) state_dir=path;
     else {n=GetEnvironmentVariableW(L"LOCALAPPDATA",path,32768);if(!n||n>=32768)return;state_dir=std::filesystem::path(path)/L"SkillshotCityMod";}
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
-    if(!accepted_build()) {log("Unsupported executable; runtime inactive");return;}
+    native_supported=accepted_build();
     load_settings();
+    if(!native_supported){ssc_hud::enabled=false;cosmetic_requested=false;sound_requested=false;rpc_requested=false;log("Unsupported executable; compatibility menu only");log(attach_swap()?"Compatibility menu attached; Right Shift opens updater":"Compatibility menu unavailable");return;}
     ssc_names::cosmetics=cosmetic_requested;
     ssc_names::attached=ssc_names::attach();log(ssc_names::attached?"Tab and overhead name adapters attached":"Name adapters unavailable");
     try {
