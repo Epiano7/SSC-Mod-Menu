@@ -57,7 +57,7 @@ int main(){
  weapon.x=0;ssc_hud::constrain(weapon);auto edge=ssc_hud::transform(weapon);assert(std::abs(edge[0]*(2*.9f-1)+edge[12]+1)<.00001f);
  // Resize and move the native hover rectangle with the visible HUD; the old
  // location no longer fades it, while the new location does.
- weapon.x=.1f;weapon.y=.2f;weapon.scale=3;ssc_hud::active_item=7;ssc_hud::game_base=reinterpret_cast<U>(native_fade)-0x443390;
+ weapon.x=.1f;weapon.y=.2f;weapon.scale=3;ssc_hud::active_item=7;ssc_hud::game_base=reinterpret_cast<U>(native_fade)-0x444640;
  ssc_hud::fade_w=1000;ssc_hud::fade_h=600;ssc_hud::view_w=2560;ssc_hud::view_h=1440;
  mouse_x=940;mouse_y=535;assert(ssc_hud::fade_hook(0,1,900,500,80,70,30,0)==1);
  mouse_x=120;mouse_y=140;assert(ssc_hud::fade_hook(0,1,900,500,80,70,30,0)==.2f);
@@ -91,7 +91,7 @@ int main(){
  // Exercise the actual bridge on the native 18-argument batch entry.
  unsigned batch_index=31;assert(ssc_hud::hooks[batch_index].item==-3);
  assert(VirtualProtect(stub,4096,PAGE_READWRITE,&old));std::memcpy(stub+2,&batch_index,4);assert(VirtualProtect(stub,4096,PAGE_EXECUTE_READ,&old));FlushInstructionCache(GetCurrentProcess(),stub,4096);
- ssc_hud::game_base=reinterpret_cast<U>(native_batch)-0x1bfae0;ssc_hud::active_item=6;ssc_hud::capture_frame=true;ssc_hud::view_w=1000;ssc_hud::view_h=600;ssc_hud::queued_frame[6]={};
+ ssc_hud::game_base=reinterpret_cast<U>(native_batch)-0x1bfb20;ssc_hud::active_item=6;ssc_hud::capture_frame=true;ssc_hud::view_w=1000;ssc_hud::view_h=600;ssc_hud::queued_frame[6]={};
  auto batch=reinterpret_cast<decltype(&native_batch)>(stub);assert(batch(1,2,3,4,5,880,20,110,60,0,0,1,1,1,1,1,1,1)==9.25f);
  assert(ssc_hud::active_item==6&&ssc_hud::queued_frame[6].points==4&&std::abs(ssc_hud::queued_frame[6].left-.88f)<.0001f);
  assert(glGetError()==GL_NO_ERROR);

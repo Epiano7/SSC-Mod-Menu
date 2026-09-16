@@ -39,43 +39,43 @@ template<int Index> void __cdecl draw(uintptr_t object){
 // Hook only validated call sites. Renderer hooks forward 14/20 native arguments.
 struct Hook {uintptr_t call,target;int item;unsigned stack_bytes;bool map_root=false;bool fade=false;};
 inline constexpr Hook hooks[]={
- {0x3b395b,0x434290,0,0},{0x3b3967,0x4355e0,1,0},
- {0x3b34de,0x41e080,2,0,true},{0x3b3839,0x41e080,2,0,true},
- {0x1a7893,0x1a7950,3,0},
- {0x424003,0x3b4230,5,0},
- {0x3b3cf1,0x405660,6,0,true},
- {0x3b3cb2,0x414b30,7,0},
- {0x3b3c80,0x3e5260,8,0},{0x3b3c96,0x4087c0,8,0},
+ {0x3b4c05,0x435540,0,0},{0x3b4c11,0x436890,1,0},
+ {0x3b478c,0x41f330,2,0,true},{0x3b4ae3,0x41f330,2,0,true},
+ {0x1a78c3,0x1a7980,3,0},
+ {0x4252b3,0x3b54e0,5,0},
+ {0x3b4fa0,0x406910,6,0,true},
+ {0x3b4f61,0x415de0,7,0},
+ {0x3b4f2f,0x3e6510,8,0},{0x3b4f45,0x409a70,8,0},
  // These draws are called from the map routine but are not part of the map.
- {0x423faf,0x410fe0,-1,0},{0x423fc8,0x412e80,-1,0},
- {0x423ff3,0x3e46d0,-1,0},{0x424018,0x4140f0,-1,0},
+ {0x42525f,0x412290,-1,0},{0x425278,0x414130,-1,0},
+ {0x4252a3,0x3e5980,-1,0},{0x4252c8,0x4153a0,-1,0},
  // Timer icon and its three text branches inside the round/player renderer.
- {0x3b6b6b,0x47fce0,4,128},{0x3b6d94,0x47b010,4,80},
- {0x3b6e3f,0x47b010,4,80},{0x3b6ed5,0x47b010,4,80},
- {0x435707,0x443390,-2,32,false,true},
- {0x3e5366,0x443390,-2,32,false,true},
- {0x405770,0x443390,-2,32,false,true},
- {0x408dbe,0x443390,-2,32,false,true},
- {0x414c28,0x443390,-2,32,false,true},
- {0x41e19e,0x443390,-2,32,false,true},
- {0x3b4460,0x443390,-2,32,false,true},
- {0x3b56d8,0x443390,-2,32,false,true},
- {0x3e47e8,0x443390,-2,32,false,true},
- {0x41124e,0x443390,-2,32,false,true},
- {0x41304c,0x443390,-2,32,false,true},
- {0x41428f,0x443390,-2,32,false,true},
- {0x4348ca,0x443390,-2,32,false,true},
- {0x1c2516,0x1bfae0,-3,112},
- {0x1c2611,0x1bfae0,-3,112},
- {0x1c3b38,0x1bfae0,-3,112},
- {0x1c3c91,0x1bfae0,-3,112},
- {0x1c3db7,0x1bfae0,-3,112},
- {0x1c4e59,0x1bfae0,-3,112},
- {0x1c4f46,0x1bfae0,-3,112},
- {0x47fdf9,0x1bfae0,-3,112},
- {0x48156f,0x1bfae0,-3,112},
+ {0x3b7e1b,0x481200,4,128},{0x3b8044,0x47c530,4,80},
+ {0x3b80ef,0x47c530,4,80},{0x3b8185,0x47c530,4,80},
+ {0x4369b7,0x444640,-2,32,false,true},
+ {0x3e6616,0x444640,-2,32,false,true},
+ {0x406a20,0x444640,-2,32,false,true},
+ {0x40a06e,0x444640,-2,32,false,true},
+ {0x415ed8,0x444640,-2,32,false,true},
+ {0x41f44e,0x444640,-2,32,false,true},
+ {0x3b5710,0x444640,-2,32,false,true},
+ {0x3b6988,0x444640,-2,32,false,true},
+ {0x3e5a98,0x444640,-2,32,false,true},
+ {0x4124fe,0x444640,-2,32,false,true},
+ {0x4142fc,0x444640,-2,32,false,true},
+ {0x41553f,0x444640,-2,32,false,true},
+ {0x435b7a,0x444640,-2,32,false,true},
+ {0x1c2556,0x1bfb20,-3,112},
+ {0x1c2651,0x1bfb20,-3,112},
+ {0x1c3b78,0x1bfb20,-3,112},
+ {0x1c3cd1,0x1bfb20,-3,112},
+ {0x1c3df7,0x1bfb20,-3,112},
+ {0x1c4e99,0x1bfb20,-3,112},
+ {0x1c4f86,0x1bfb20,-3,112},
+ {0x481319,0x1bfb20,-3,112},
+ {0x482a8f,0x1bfb20,-3,112},
  // Screen-wide progress strips share the currency function, but are not counters.
- {0x405b0b,0x47fce0,-1,128},{0x405c38,0x47fce0,-1,128},{0x405d69,0x480460,-1,120}
+ {0x406dbb,0x481200,-1,128},{0x406ee8,0x481200,-1,128},{0x407019,0x481980,-1,120}
 };
 inline uintptr_t game_base=0;
 inline bool changed(const Item& item){return item.scale!=1||item.x!=item.home_x||item.y!=item.home_y;}
@@ -117,11 +117,11 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
  // Native mouse coordinates use the game's logical canvas, not the GL viewport.
  int width=fade_w?fade_w:view_w,height=fade_h?fade_h:view_h;
  if(game_base==reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
-  width=*reinterpret_cast<const int*>(game_base+0xfa1750);height=*reinterpret_cast<const int*>(game_base+0xfa1754);
+  width=*reinterpret_cast<const int*>(game_base+0xfa2750);height=*reinterpret_cast<const int*>(game_base+0xfa2754);
  }
  if(width<=0||height<=0){width=view_w;height=view_h;}
  if(editing&&active_item>=0)return std::abs(alpha);
- const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+0x443390);
+ const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+0x444640);
  // Move only the proximity test away; preserve native global/status opacity.
  if(!hover_fade)return original(object,alpha,-1000000.f,-1000000.f,0,0,std::max(1.f,feather),global);
  if(enabled&&active_item>=0&&width>0&&height>0){const auto& a=items[active_item];

@@ -10,8 +10,8 @@ namespace SSCMods.Setup {
         public static Package Package() {
 #if MENU_ALPHA
             var assembly=Assembly.GetExecutingAssembly();
-            var package=new Package {RuntimeValidated=true,GameSize=15266304,
-                GameHash="69FA3DA048D4A96DA2F2BA382F973EDA68E09B3DFF929593537EE112EF4E7898"};
+            var package=new Package {RuntimeValidated=true,GameSize=15272960,
+                GameHash="959319A3592DE2AED18E398C425FCC79D784ED038DAFD138B361A7D219F56D5E"};
             foreach(var name in new[]{"opengl32.dll","runtime.dll"}) {
                 using(var stream=assembly.GetManifestResourceStream(name))
                 using(var bytes=new MemoryStream()) {

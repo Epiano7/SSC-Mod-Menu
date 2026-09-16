@@ -44,18 +44,18 @@ int main(){
     auto world=reinterpret_cast<uintptr_t>(VirtualAlloc(nullptr,0xc000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));
     auto actor=reinterpret_cast<uintptr_t>(VirtualAlloc(nullptr,0x3460,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));assert(base&&world&&actor);
     auto put=[](uintptr_t at,auto value){std::memcpy(reinterpret_cast<void*>(at),&value,sizeof(value));};
-    put(base+0xfa235c,1);assert(native_fallback(base).details=="Main menu");
-    put(base+0xfa235c,2);put(base+0xdda5d0,world);put(world+0x128,6);put(world+0x480,1);put(world+0x3e0,3);
-    put(world+0xa5b8,actor);put(world+0xa5c0,actor+0x3460);put(base+0xe11de8,actor);put(base+0xe0e380,0);
+    put(base+0xfa335c,1);assert(native_fallback(base).details=="Main menu");
+    put(base+0xfa335c,2);put(base+0xddb5d0,world);put(world+0x128,6);put(world+0x480,1);put(world+0x3e0,3);
+    put(world+0xa5b8,actor);put(world+0xa5c0,actor+0x3460);put(base+0xe12de8,actor);put(base+0xe0f380,0);
     put(actor+0x81,static_cast<unsigned char>(1));put(actor+0x858,7);put(actor+0x350,-1);
     auto sampled=native_fallback(base);assert(sampled.details=="BR Solos - Round 2"&&sampled.state=="Level 7");
     put(actor+0x6e8,uint64_t(7));put(actor+0x270,static_cast<unsigned char>(1));put(actor+0xa9c,481);put(actor+0x204,2);
-    put(base+0xfa6684,25.f);put(base+0xfa6688,25.f);put(base+0xdf4040,1);put(base+0xdf48e4,4554.f);put(base+0xdf48e0,41.f);put(base+0xfa6658,5);
+    put(base+0xfa7684,25.f);put(base+0xfa7688,25.f);put(base+0xdf5040,1);put(base+0xdf58e4,4554.f);put(base+0xdf58e0,41.f);put(base+0xfa7658,5);
     sample_rating(base,sampled);assert(sampled.state=="Ranked | SSC rating: 4554 | Level 7");
     put(world+0x2f4,static_cast<unsigned char>(1));sampled=native_fallback(base);sample_rating(base,sampled);assert(sampled.state=="Level 7");
     put(actor+0x78,5);assert(native_fallback(base).state=="In game");put(actor+0x78,0);
-    put(base+0xe0e380,5);assert(native_fallback(base).state=="In game");
-    put(base+0xfa235c,1);sampled=native_fallback(base);sample_rating(base,sampled);assert(sampled.state=="Choosing a game");
+    put(base+0xe0f380,5);assert(native_fallback(base).state=="In game");
+    put(base+0xfa335c,1);sampled=native_fallback(base);sample_rating(base,sampled);assert(sampled.state=="Choosing a game");
     VirtualFree(reinterpret_cast<void*>(actor),0,MEM_RELEASE);VirtualFree(reinterpret_cast<void*>(world),0,MEM_RELEASE);VirtualFree(reinterpret_cast<void*>(base),0,MEM_RELEASE);
     // An isolated mock pipe: these tests never connect to Discord or publish an activity.
     Shared state;state.enabled=true;state.id="123456789012345678";state.snapshot=game;state.sampled=GetTickCount64();

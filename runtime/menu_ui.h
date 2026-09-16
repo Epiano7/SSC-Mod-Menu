@@ -479,7 +479,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD");button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.0-dev",cyan);
+            text(266,157,L"0.1.1",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");

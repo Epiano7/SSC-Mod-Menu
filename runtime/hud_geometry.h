@@ -83,18 +83,18 @@ inline void capture_cached_quad(){
  capture_vertex(0,0,0);capture_vertex(1,0,0);capture_vertex(1,1,0);capture_vertex(0,1,0);primitive_capture=false;
 }
 inline __attribute__((noinline)) void APIENTRY capture_call_list(GLuint list){
- if(reinterpret_cast<uintptr_t>(__builtin_return_address(0))==game_base+0x47a4b7)capture_cached_quad();
+ if(reinterpret_cast<uintptr_t>(__builtin_return_address(0))==game_base+0x47b9d7)capture_cached_quad();
  native_call_list(list);
 }
 inline bool writable_slot(uintptr_t address){MEMORY_BASIC_INFORMATION info{};return VirtualQuery(reinterpret_cast<void*>(address),&info,sizeof(info))&&info.State==MEM_COMMIT&&(info.Protect&(PAGE_READWRITE|PAGE_EXECUTE_READWRITE));}
 inline bool start_capture(){
  if(!game_base||!capture_frame||game_base!=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))return false;
  if(capture_depth){++capture_depth;return true;}
- auto b=reinterpret_cast<BeginProc*>(game_base+0xde0710);auto v2=reinterpret_cast<Vertex2Proc*>(game_base+0xde07a0);auto v3=reinterpret_cast<Vertex3Proc*>(game_base+0xde0788);
- auto c4=reinterpret_cast<Color4Proc*>(game_base+0xde0690);auto c3=reinterpret_cast<Color3Proc*>(game_base+0xde0838);auto end=reinterpret_cast<EndProc*>(game_base+0xde06b8);
+ auto b=reinterpret_cast<BeginProc*>(game_base+0xde1710);auto v2=reinterpret_cast<Vertex2Proc*>(game_base+0xde17a0);auto v3=reinterpret_cast<Vertex3Proc*>(game_base+0xde1788);
+ auto c4=reinterpret_cast<Color4Proc*>(game_base+0xde1690);auto c3=reinterpret_cast<Color3Proc*>(game_base+0xde1838);auto end=reinterpret_cast<EndProc*>(game_base+0xde16b8);
  if(!writable_slot(reinterpret_cast<uintptr_t>(c4))||!writable_slot(reinterpret_cast<uintptr_t>(c3))||!writable_slot(reinterpret_cast<uintptr_t>(end))||!*c4||!*c3||!*end)return false;
  if(!writable_slot(reinterpret_cast<uintptr_t>(b))||!writable_slot(reinterpret_cast<uintptr_t>(v2))||!writable_slot(reinterpret_cast<uintptr_t>(v3))||!*b||!*v2||!*v3)return false;
- auto list=reinterpret_cast<CallListProc*>(game_base+0xde0670);
+ auto list=reinterpret_cast<CallListProc*>(game_base+0xde1670);
  if(!writable_slot(reinterpret_cast<uintptr_t>(list))||!*list)return false;
  native_call_list=*list;*list=capture_call_list;
  native_color4=*c4;native_color3=*c3;native_end=*end;*c4=capture_color4;*c3=capture_color3;*end=capture_end;
@@ -103,13 +103,13 @@ inline bool start_capture(){
 }
 inline void stop_capture(){
  if(!capture_depth||--capture_depth)return;
- *reinterpret_cast<CallListProc*>(game_base+0xde0670)=native_call_list;
- *reinterpret_cast<Color4Proc*>(game_base+0xde0690)=native_color4;
- *reinterpret_cast<Color3Proc*>(game_base+0xde0838)=native_color3;
- *reinterpret_cast<EndProc*>(game_base+0xde06b8)=native_end;
- *reinterpret_cast<BeginProc*>(game_base+0xde0710)=native_begin;
- *reinterpret_cast<Vertex2Proc*>(game_base+0xde07a0)=native_vertex2;
- *reinterpret_cast<Vertex3Proc*>(game_base+0xde0788)=native_vertex3;
+ *reinterpret_cast<CallListProc*>(game_base+0xde1670)=native_call_list;
+ *reinterpret_cast<Color4Proc*>(game_base+0xde1690)=native_color4;
+ *reinterpret_cast<Color3Proc*>(game_base+0xde1838)=native_color3;
+ *reinterpret_cast<EndProc*>(game_base+0xde16b8)=native_end;
+ *reinterpret_cast<BeginProc*>(game_base+0xde1710)=native_begin;
+ *reinterpret_cast<Vertex2Proc*>(game_base+0xde17a0)=native_vertex2;
+ *reinterpret_cast<Vertex3Proc*>(game_base+0xde1788)=native_vertex3;
  primitive_capture=false;
 }
 inline void apply_bounds(int index,const Bounds& bounds){
@@ -128,7 +128,7 @@ inline void apply_bounds(int index,const Bounds& bounds){
 inline void capture_queued_rectangle(const unsigned char* stack){
  if(active_item<0||!capture_frame||freeze_bounds||!stack)return;
  int width=view_w,height=view_h;
- if(game_base==reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){width=*reinterpret_cast<const int*>(game_base+0xfa1750);height=*reinterpret_cast<const int*>(game_base+0xfa1754);}
+ if(game_base==reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){width=*reinterpret_cast<const int*>(game_base+0xfa2750);height=*reinterpret_cast<const int*>(game_base+0xfa2754);}
  if(width<=0||height<=0)return;
  if(active_item==2){GLint stencil=GL_ALWAYS;glGetIntegerv(GL_STENCIL_FUNC,&stencil);if(glIsEnabled(GL_STENCIL_TEST)&&stencil!=GL_ALWAYS)return;}
  auto value=[&](int argument){float v;std::memcpy(&v,stack+8*(argument-1),4);return v;};
