@@ -25,6 +25,7 @@ ssc_hud_bridge:
  movq %rax, 0xf8(%rsp)
  movl %r10d, %ecx
  leaq 0x180(%rsp), %rdx
+ leaq 0x250(%rsp), %r8
  call ssc_hud_before
  movq %rax, 0x168(%rsp)
  movl 0x180(%rsp), %ecx

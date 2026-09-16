@@ -43,7 +43,7 @@ inline constexpr Hook hooks[]={
  {0x3b344e,0x41dff0,2,0,true},{0x3b37a9,0x41dff0,2,0,true},
  {0x1a7893,0x1a7950,3,0},
  {0x423f73,0x3b41a0,5,0},
- {0x3b3c61,0x4055d0,6,0},
+ {0x3b3c61,0x4055d0,6,0,true},
  {0x3b3c22,0x414aa0,7,0},
  {0x3b3bf0,0x3e51d0,8,0},{0x3b3c06,0x408730,8,0},
  // These draws are called from the map routine but are not part of the map.
@@ -64,7 +64,18 @@ inline constexpr Hook hooks[]={
  {0x4111be,0x443300,-2,32,false,true},
  {0x412fbc,0x443300,-2,32,false,true},
  {0x4141ff,0x443300,-2,32,false,true},
- {0x43483a,0x443300,-2,32,false,true}
+ {0x43483a,0x443300,-2,32,false,true},
+ {0x1c2516,0x1bfae0,-3,112},
+ {0x1c2611,0x1bfae0,-3,112},
+ {0x1c3b38,0x1bfae0,-3,112},
+ {0x1c3c91,0x1bfae0,-3,112},
+ {0x1c3db7,0x1bfae0,-3,112},
+ {0x1c4e59,0x1bfae0,-3,112},
+ {0x1c4f46,0x1bfae0,-3,112},
+ {0x47fc09,0x1bfae0,-3,112},
+ {0x48137f,0x1bfae0,-3,112},
+ // Screen-wide progress strips share the currency function, but are not counters.
+ {0x405a7b,0x47faf0,-1,128},{0x405ba8,0x47faf0,-1,128},{0x405cd9,0x480270,-1,120}
 };
 inline uintptr_t game_base=0;
 inline bool changed(const Item& item){return item.scale!=1||item.x!=item.home_x||item.y!=item.home_y;}
@@ -74,7 +85,7 @@ struct Scope {unsigned stack_bytes;bool active;bool root;const float* previous;G
 static_assert(sizeof(Scope)<=0xa0);
 inline void begin(Scope& scope,const Hook& hook){
  scope={};scope.stack_bytes=hook.stack_bytes;scope.previous=map_projection;scope.previous_item=active_item;
- if(hook.fade)return;
+ if(hook.fade||hook.item==-3)return;
  active_item=hook.item;
  if(hook.item>=0&&capture_frame&&(!measured[hook.item]||editing||enabled))scope.capture=start_capture();
  if(!enabled)return;
@@ -122,7 +133,7 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
  return result;
 }
 extern "C" void ssc_hud_bridge();
-extern "C" __attribute__((used,noinline)) uintptr_t ssc_hud_before(unsigned index,Scope* scope){begin(*scope,hooks[index]);return hooks[index].fade?reinterpret_cast<uintptr_t>(fade_hook):game_base+hooks[index].target;}
+extern "C" __attribute__((used,noinline)) uintptr_t ssc_hud_before(unsigned index,Scope* scope,const unsigned char* stack){begin(*scope,hooks[index]);if(hooks[index].item==-3)capture_queued_rectangle(stack);return hooks[index].fade?reinterpret_cast<uintptr_t>(fade_hook):game_base+hooks[index].target;}
 extern "C" __attribute__((used,noinline)) void ssc_hud_after(Scope* scope){end(*scope);}
 inline bool attach(){
  const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));

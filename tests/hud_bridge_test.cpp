@@ -15,6 +15,9 @@ static double __cdecl native(U a,double b,float c,U d,U e,U f,U g,U h,U i,U j,U 
  const U stack[]={e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t};for(U x=0;x<16;++x)assert(stack[x]==x+5);
  return 123.875;
 }
+static float __cdecl native_batch(U a,U b,U c,U d,U e,float x,float y,float w,float h,float u,float v,float du,float dv,float r,float g,float blue,float alpha,float alpha2){
+ assert(a==1&&b==2&&c==3&&d==4&&e==5&&x==880&&y==20&&w==110&&h==60&&u==0&&v==0&&du==1&&dv==1&&r==1&&g==1&&blue==1&&alpha==1&&alpha2==1);return 9.25f;
+}
 static void matrix_is(const std::array<float,16>& expected){float actual[16];glGetFloatv(GL_PROJECTION_MATRIX,actual);for(int i=0;i<16;++i)assert(std::abs(actual[i]-expected[i])<.00001f);}
 static float mouse_x=0,mouse_y=0;static int fade_calls=0;
 static float __cdecl native_fade(U,float alpha,float x,float y,float w,float h,float feather,char){++fade_calls;if(!ssc_hud::hover_fade){assert(x==-1000000.f&&y==-1000000.f&&w==0&&h==0);return alpha*.75f;}assert(std::abs(x-100)<.01f&&std::abs(y-120)<.01f&&std::abs(w-240)<.01f&&std::abs(h-210)<.01f&&feather==90);return mouse_x>=x&&mouse_x<=x+w&&mouse_y>=y&&mouse_y<=y+h?alpha*.2f:alpha;}
@@ -76,6 +79,21 @@ int main(){
  ssc_hud::active_item=8;ssc_hud::measured_frame[8]={};glDisable(GL_TEXTURE_2D);glEnable(GL_STENCIL_TEST);glStencilFunc(GL_EQUAL,0,255);
  ssc_hud::capture_begin(GL_QUADS);for(auto xy:std::array<std::array<float,2>,4>{{{300,500},{700,500},{700,580},{300,580}}})ssc_hud::capture_v3(xy[0],xy[1],0);ssc_hud::capture_end();assert(ssc_hud::measured_frame[8].points==4);glDisable(GL_STENCIL_TEST);
 
+ // Cached sprite lists must contribute their transformed unit quad on every
+ // calibration pass, even after the native list has already been compiled.
+ ssc_hud::active_item=7;ssc_hud::measured_frame[7]={};ssc_hud::capture_frame=true;
+ glColor4f(1,1,1,1);glMatrixMode(GL_MODELVIEW);glPushMatrix();glTranslatef(840,500,0);glScalef(150,80,1);
+ ssc_hud::capture_cached_quad();glPopMatrix();
+ auto cached=ssc_hud::measured_frame[7];assert(cached.points==4&&std::abs(cached.left-.84f)<.0001f&&std::abs(cached.right-.99f)<.0001f&&std::abs(cached.bottom-580.f/600)<.0001f);
+ // Empty fills must not drag the bounds toward the origin.
+ ssc_hud::primitive_bounds={0,0,0,.02f,4};ssc_hud::primitive_visible=true;ssc_hud::commit_primitive();assert(ssc_hud::measured_frame[7].left==cached.left);
+
+ // Exercise the actual bridge on the native 18-argument batch entry.
+ unsigned batch_index=31;assert(ssc_hud::hooks[batch_index].item==-3);
+ assert(VirtualProtect(stub,4096,PAGE_READWRITE,&old));std::memcpy(stub+2,&batch_index,4);assert(VirtualProtect(stub,4096,PAGE_EXECUTE_READ,&old));FlushInstructionCache(GetCurrentProcess(),stub,4096);
+ ssc_hud::game_base=reinterpret_cast<U>(native_batch)-0x1bfae0;ssc_hud::active_item=6;ssc_hud::capture_frame=true;ssc_hud::view_w=1000;ssc_hud::view_h=600;ssc_hud::queued_frame[6]={};
+ auto batch=reinterpret_cast<decltype(&native_batch)>(stub);assert(batch(1,2,3,4,5,880,20,110,60,0,0,1,1,1,1,1,1,1)==9.25f);
+ assert(ssc_hud::active_item==6&&ssc_hud::queued_frame[6].points==4&&std::abs(ssc_hud::queued_frame[6].left-.88f)<.0001f);
  assert(glGetError()==GL_NO_ERROR);
  wglMakeCurrent(nullptr,nullptr);wglDeleteContext(rc);ReleaseDC(window,dc);DestroyWindow(window);UnregisterClassW(cls.lpszClassName,cls.hInstance);VirtualFree(stub,0,MEM_RELEASE);
  std::puts("PASS: real HUD bridge mixed register/16 stack arguments, floating return, independent map/round/timer transforms and unrelated draw isolation");
