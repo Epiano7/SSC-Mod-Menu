@@ -46,9 +46,9 @@ int main(){
  ssc_hud::reset();ssc_hud::game_base=0;ssc_hud::view_w=1000;ssc_hud::view_h=600;
  glMatrixMode(GL_PROJECTION);glLoadIdentity();glOrtho(0,1000,600,0,-1,1);glMatrixMode(GL_MODELVIEW);
  auto& weapon=ssc_hud::items[7];weapon.x=0;weapon.y=.2f;ssc_hud::measured[7]=false;ssc_hud::measured_frame[7]={};
- ssc_hud::native_begin=glBegin;ssc_hud::native_vertex3=glVertex3f;
+ ssc_hud::native_end=glEnd;ssc_hud::native_color4=glColor4f;ssc_hud::native_color3=glColor3f;ssc_hud::native_begin=glBegin;ssc_hud::native_vertex3=glVertex3f;
  ssc_hud::Scope weapon_scope;ssc_hud::begin(weapon_scope,ssc_hud::hooks[7]);
- ssc_hud::capture_begin(GL_QUADS);ssc_hud::capture_v3(900,500,0);ssc_hud::capture_v3(980,500,0);ssc_hud::capture_v3(980,570,0);ssc_hud::capture_v3(900,570,0);glEnd();ssc_hud::end(weapon_scope);
+ ssc_hud::capture_begin(GL_QUADS);ssc_hud::capture_v3(900,500,0);ssc_hud::capture_v3(980,500,0);ssc_hud::capture_v3(980,570,0);ssc_hud::capture_v3(900,570,0);ssc_hud::capture_end();ssc_hud::end(weapon_scope);
  auto b=ssc_hud::measured_frame[7];assert(b.points==4);ssc_hud::apply_bounds(7,b);
  assert(std::abs(weapon.home_x-.9f)<.00001f&&std::abs(weapon.w-.08f)<.00001f&&std::abs(weapon.x-.07f)<.00001f);
  weapon.x=0;ssc_hud::constrain(weapon);auto edge=ssc_hud::transform(weapon);assert(std::abs(edge[0]*(2*.9f-1)+edge[12]+1)<.00001f);
@@ -63,11 +63,19 @@ int main(){
  // Untextured padding must not expand the currency box. Visible glyph/icon
  // quads do count, and later content can grow without shifting the rendering.
  ssc_hud::active_item=6;ssc_hud::editing=true;ssc_hud::enabled=false;ssc_hud::measured_frame[6]={};
- glDisable(GL_TEXTURE_2D);ssc_hud::capture_begin(GL_QUADS);ssc_hud::capture_v3(0,0,0);ssc_hud::capture_v3(1000,600,0);glEnd();assert(ssc_hud::measured_frame[6].points==0);
- glEnable(GL_TEXTURE_2D);ssc_hud::capture_begin(GL_QUADS);ssc_hud::capture_v3(880,20,0);ssc_hud::capture_v3(990,80,0);glEnd();
- auto tight=ssc_hud::measured_frame[6];assert(tight.points==2&&std::abs(tight.left-.88f)<.0001f&&std::abs(tight.right-.99f)<.0001f);
+ glDisable(GL_TEXTURE_2D);glColor4f(1,1,1,1);ssc_hud::capture_begin(GL_QUADS);ssc_hud::capture_color4(1,1,1,0);ssc_hud::capture_v3(0,0,0);ssc_hud::capture_v3(1000,0,0);ssc_hud::capture_v3(1000,600,0);ssc_hud::capture_v3(0,600,0);ssc_hud::capture_end();assert(ssc_hud::measured_frame[6].points==0);
+ glEnable(GL_TEXTURE_2D);ssc_hud::capture_begin(GL_QUADS);ssc_hud::capture_color4(1,1,1,1);ssc_hud::capture_v3(880,20,0);ssc_hud::capture_v3(990,20,0);ssc_hud::capture_v3(990,80,0);ssc_hud::capture_v3(880,80,0);ssc_hud::capture_end();
+ auto tight=ssc_hud::measured_frame[6];assert(tight.points==4&&std::abs(tight.left-.88f)<.0001f&&std::abs(tight.right-.99f)<.0001f);
  ssc_hud::apply_bounds(6,tight);assert(std::abs(ssc_hud::items[6].w-.11f)<.0001f);
  tight.left=.8f;ssc_hud::apply_bounds(6,tight);assert(std::abs(ssc_hud::items[6].w-.19f)<.0001f);
+ ssc_hud::measured_frame[6]={};ssc_hud::capture_begin(GL_QUADS);
+ ssc_hud::capture_color4(1,1,1,0);for(auto xy:std::array<std::array<float,2>,4>{{{0,0},{1000,0},{1000,600},{0,600}}})ssc_hud::capture_v3(xy[0],xy[1],0);
+ ssc_hud::capture_color3(1,1,1);for(auto xy:std::array<std::array<float,2>,4>{{{880,20},{990,20},{990,80},{880,80}}})ssc_hud::capture_v3(xy[0],xy[1],0);
+ ssc_hud::capture_end();assert(ssc_hud::measured_frame[6].points==4&&std::abs(ssc_hud::measured_frame[6].left-.88f)<.0001f);
+ // Non-map backgrounds can be untextured and stencil-clipped; still measure them.
+ ssc_hud::active_item=8;ssc_hud::measured_frame[8]={};glDisable(GL_TEXTURE_2D);glEnable(GL_STENCIL_TEST);glStencilFunc(GL_EQUAL,0,255);
+ ssc_hud::capture_begin(GL_QUADS);for(auto xy:std::array<std::array<float,2>,4>{{{300,500},{700,500},{700,580},{300,580}}})ssc_hud::capture_v3(xy[0],xy[1],0);ssc_hud::capture_end();assert(ssc_hud::measured_frame[8].points==4);glDisable(GL_STENCIL_TEST);
+
  assert(glGetError()==GL_NO_ERROR);
  wglMakeCurrent(nullptr,nullptr);wglDeleteContext(rc);ReleaseDC(window,dc);DestroyWindow(window);UnregisterClassW(cls.lpszClassName,cls.hInstance);VirtualFree(stub,0,MEM_RELEASE);
  std::puts("PASS: real HUD bridge mixed register/16 stack arguments, floating return, independent map/round/timer transforms and unrelated draw isolation");

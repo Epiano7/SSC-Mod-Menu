@@ -15,6 +15,20 @@ using Vertex3Proc=void(APIENTRY*)(GLfloat,GLfloat,GLfloat);
 inline BeginProc native_begin=nullptr;
 inline Vertex2Proc native_vertex2=nullptr;
 inline Vertex3Proc native_vertex3=nullptr;
+using Color4Proc=void(APIENTRY*)(GLfloat,GLfloat,GLfloat,GLfloat);
+using Color3Proc=void(APIENTRY*)(GLfloat,GLfloat,GLfloat);
+using EndProc=void(APIENTRY*)();
+inline Color4Proc native_color4=nullptr;
+inline Color3Proc native_color3=nullptr;
+inline EndProc native_end=nullptr;
+inline float capture_alpha=1;
+inline Bounds primitive_bounds{};
+inline bool primitive_visible=false;
+inline unsigned primitive_vertices=0,primitive_size=0;
+inline void commit_primitive(){
+ if(primitive_visible&&primitive_bounds.points&&active_item>=0){auto& out=measured_frame[active_item];const auto& b=primitive_bounds;out.left=std::min(out.left,b.left);out.top=std::min(out.top,b.top);out.right=std::max(out.right,b.right);out.bottom=std::max(out.bottom,b.bottom);out.points+=b.points;}
+ primitive_bounds={};primitive_visible=false;primitive_vertices=0;
+}
 inline bool primitive_capture=false;
 inline GLfloat capture_model[16],capture_projection[16];
 inline void accumulate(int index,float x,float y){
@@ -22,28 +36,35 @@ inline void accumulate(int index,float x,float y){
  const auto& item=items[index];
  if(enabled){x=item.home_x+(x-item.x)/item.scale;y=item.home_y+(y-item.y)/item.scale;}
  if(x<-.5f||x>1.5f||y<-.5f||y>1.5f)return;
- auto& b=measured_frame[index];b.left=std::min(b.left,x);b.right=std::max(b.right,x);b.top=std::min(b.top,y);b.bottom=std::max(b.bottom,y);++b.points;
+ auto& b=primitive_bounds;b.left=std::min(b.left,x);b.right=std::max(b.right,x);b.top=std::min(b.top,y);b.bottom=std::max(b.bottom,y);++b.points;
 }
 inline void capture_vertex(float x,float y,float z){
  if(!primitive_capture||active_item<0)return;
  const float in[]={x,y,z,1};float world[4]{},clip[4]{};
  for(int r=0;r<4;++r)for(int c=0;c<4;++c)world[r]+=capture_model[c*4+r]*in[c];
  for(int r=0;r<4;++r)for(int c=0;c<4;++c)clip[r]+=capture_projection[c*4+r]*world[c];
+ if(capture_alpha>0)primitive_visible=true;
  if(std::abs(clip[3])>.00001f)accumulate(active_item,(clip[0]/clip[3]+1)*.5f,(1-clip[1]/clip[3])*.5f);
+ if(++primitive_vertices==primitive_size)commit_primitive();
 }
 inline void APIENTRY capture_begin(GLenum mode){
+ primitive_bounds={};primitive_visible=false;primitive_vertices=0;primitive_size=mode==GL_QUADS?4:mode==GL_TRIANGLES?3:mode==GL_LINES?2:0;
  primitive_capture=active_item>=0&&(!measured[active_item]||editing||enabled)&&primitive_count[active_item]<256;
  if(primitive_capture){
-  // Currency has no panel background: only its textured glyphs/icons count.
-  if(active_item==6&&!glIsEnabled(GL_TEXTURE_2D))primitive_capture=false;
-  GLfloat color[4];glGetFloatv(GL_CURRENT_COLOR,color);if(color[3]<=0)primitive_capture=false;
+  GLfloat color[4];glGetFloatv(GL_CURRENT_COLOR,color);capture_alpha=color[3];
   GLint stencil=GL_ALWAYS;glGetIntegerv(GL_STENCIL_FUNC,&stencil);
   // The map's stencil mask gives its visible bounds. Ignore the clipped world
   // geometry beneath it, which can extend far beyond the minimap rectangle.
-  if(glIsEnabled(GL_STENCIL_TEST)&&stencil!=GL_ALWAYS)primitive_capture=false;
+  if(active_item==2&&glIsEnabled(GL_STENCIL_TEST)&&stencil!=GL_ALWAYS)primitive_capture=false;
   else if(primitive_capture){++primitive_count[active_item];glGetFloatv(GL_MODELVIEW_MATRIX,capture_model);glGetFloatv(GL_PROJECTION_MATRIX,capture_projection);}
  }
  native_begin(mode);
+}
+inline void APIENTRY capture_color4(GLfloat r,GLfloat g,GLfloat b,GLfloat a){capture_alpha=a;native_color4(r,g,b,a);}
+inline void APIENTRY capture_color3(GLfloat r,GLfloat g,GLfloat b){capture_alpha=1;native_color3(r,g,b);}
+inline void APIENTRY capture_end(){
+ if(primitive_capture&&!primitive_size)commit_primitive();
+ primitive_capture=false;native_end();
 }
 inline void APIENTRY capture_v2(GLfloat x,GLfloat y){capture_vertex(x,y,0);native_vertex2(x,y);}
 inline void APIENTRY capture_v3(GLfloat x,GLfloat y,GLfloat z){capture_vertex(x,y,z);native_vertex3(x,y,z);}
@@ -52,12 +73,18 @@ inline bool start_capture(){
  if(!game_base||!capture_frame||game_base!=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))return false;
  if(capture_depth){++capture_depth;return true;}
  auto b=reinterpret_cast<BeginProc*>(game_base+0xdde708);auto v2=reinterpret_cast<Vertex2Proc*>(game_base+0xdde798);auto v3=reinterpret_cast<Vertex3Proc*>(game_base+0xdde780);
+ auto c4=reinterpret_cast<Color4Proc*>(game_base+0xdde690);auto c3=reinterpret_cast<Color3Proc*>(game_base+0xdde848);auto end=reinterpret_cast<EndProc*>(game_base+0xdde6b0);
+ if(!writable_slot(reinterpret_cast<uintptr_t>(c4))||!writable_slot(reinterpret_cast<uintptr_t>(c3))||!writable_slot(reinterpret_cast<uintptr_t>(end))||!*c4||!*c3||!*end)return false;
  if(!writable_slot(reinterpret_cast<uintptr_t>(b))||!writable_slot(reinterpret_cast<uintptr_t>(v2))||!writable_slot(reinterpret_cast<uintptr_t>(v3))||!*b||!*v2||!*v3)return false;
+ native_color4=*c4;native_color3=*c3;native_end=*end;*c4=capture_color4;*c3=capture_color3;*end=capture_end;
  native_begin=*b;native_vertex2=*v2;native_vertex3=*v3;
  *b=capture_begin;*v2=capture_v2;*v3=capture_v3;capture_depth=1;return true;
 }
 inline void stop_capture(){
  if(!capture_depth||--capture_depth)return;
+ *reinterpret_cast<Color4Proc*>(game_base+0xdde690)=native_color4;
+ *reinterpret_cast<Color3Proc*>(game_base+0xdde848)=native_color3;
+ *reinterpret_cast<EndProc*>(game_base+0xdde6b0)=native_end;
  *reinterpret_cast<BeginProc*>(game_base+0xdde708)=native_begin;
  *reinterpret_cast<Vertex2Proc*>(game_base+0xdde798)=native_vertex2;
  *reinterpret_cast<Vertex3Proc*>(game_base+0xdde780)=native_vertex3;
