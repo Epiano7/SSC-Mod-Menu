@@ -60,7 +60,7 @@ namespace SSCMods.Setup {
         readonly ToolTip tip=new ToolTip();
         readonly Package package;
         readonly bool production;
-        bool busy;Point dragOrigin;bool dragging;
+        bool busy,launchReady;Point dragOrigin;bool dragging;
         public bool Busy {get{return busy;}}
         public SetupWindow(string root,bool uninstall):this(root,uninstall,Release.Package()){production=true;}
         internal SetupWindow(string root,bool uninstall,Package payload){
@@ -86,11 +86,11 @@ namespace SSCMods.Setup {
             repair.LinkClicked+=(s,e)=>Execute(2);Controls.Add(repair);
             tip.SetToolTip(repair,"Restore mod files or install if missing. Keeps your settings.");
             status.Name="status";status.SetBounds(24,160,436,42);status.ForeColor=Theme.Cyan;Controls.Add(status);
-            action.Name="action";action.Text="INSTALL";action.Selected=true;action.SetBounds(24,216,180,40);action.Click+=(s,e)=>Execute(0);Controls.Add(action);
+            action.Name="action";action.Text="INSTALL";action.Selected=true;action.SetBounds(24,216,180,40);action.Click+=(s,e)=>{if(launchReady)Launch();else Execute(0);};Controls.Add(action);
             remove.Name="remove";remove.Text="UNINSTALL";remove.SetBounds(222,216,180,40);remove.Click+=(s,e)=>Execute(1);Controls.Add(remove);
             close.Name="close";close.Text="CLOSE";close.SetBounds(476,216,100,40);close.Click+=(s,e)=>Close();Controls.Add(close);
             AcceptButton=action;CancelButton=close;
-            folder.TextChanged+=(s,e)=>{if(busy)return;action.Enabled=remove.Enabled=false;status.Text="Checking game folder...";debounce.Stop();debounce.Start();};
+            folder.TextChanged+=(s,e)=>{if(busy)return;launchReady=false;action.Enabled=remove.Enabled=false;status.Text="Checking game folder...";debounce.Stop();debounce.Start();};
             debounce.Tick+=(s,e)=>{debounce.Stop();Check();};
             FormClosing+=(s,e)=>{if(busy)e.Cancel=true;};
             Shown+=(s,e)=>Check();
@@ -100,7 +100,7 @@ namespace SSCMods.Setup {
         void SetBusy(bool value){busy=value;folder.Enabled=browse.Enabled=repair.Enabled=close.Enabled=!value;action.Enabled=remove.Enabled=false;UseWaitCursor=value;}
         void Status(string value,bool error=false){status.Text=value;status.ForeColor=error?Color.FromArgb(255,196,99):Theme.Cyan;tip.SetToolTip(status,value);}
         async void Check(){
-            if(busy)return;debounce.Stop();SetBusy(true);Status("Checking game folder...");
+            if(busy)return;launchReady=false;debounce.Stop();SetBusy(true);Status("Checking game folder...");
             try{
                 string path=folder.Text;
                 if(String.IsNullOrWhiteSpace(path)){path=await System.Threading.Tasks.Task.Run(()=>Engine.Discover());folder.Text=path;}
@@ -113,6 +113,17 @@ namespace SSCMods.Setup {
                 SetBusy(false);action.Text=owned?"UPDATE":"INSTALL";action.Enabled=ready;remove.Enabled=owned;
                 Status(ready?"Compatible game found":message,!ready);
             }catch(Exception error){SetBusy(false);Status(error.Message,true);}
+        }
+        void Launch(){
+            if(busy)return;
+            try{
+                string root=Path.GetFullPath(folder.Text);
+                if(!Engine.HasInstallation(root))throw new IOException("Install the mod before launching.");
+                string steam=Engine.Discover();
+                bool steamGame=!String.IsNullOrEmpty(steam)&&String.Equals(root.TrimEnd('\\'),Path.GetFullPath(steam).TrimEnd('\\'),StringComparison.OrdinalIgnoreCase);
+                Process.Start(new ProcessStartInfo(steamGame?"steam://rungameid/308600":Path.Combine(root,"SkillshotCity.exe")){UseShellExecute=true,WorkingDirectory=root});
+                Status("Launching Skillshot City...");
+            }catch(Exception error){Status(error.Message,true);}
         }
         public void RefreshInspection(){Check();}
         async void Execute(int operation){
@@ -133,7 +144,7 @@ namespace SSCMods.Setup {
                 else if(operation==1){var retained=await System.Threading.Tasks.Task.Run(()=>Engine.Uninstall(path));message=retained.Count==0?"SSC Mod Menu uninstalled.":"Some changed files were kept.";}
                 else {await System.Threading.Tasks.Task.Run(()=>{if(operation==2)Engine.Repair(path,package);else Engine.InstallOrUpdate(path,package);});message=operation==2?"Repair complete. Settings kept.":"SSC Mod Menu is ready.";}
                 SetBusy(false);Status(message);
-                bool owned=File.Exists(Path.Combine(path,Engine.ManifestName));action.Text=owned?"UPDATE":"INSTALL";action.Enabled=true;remove.Enabled=owned;
+                bool owned=File.Exists(Path.Combine(path,Engine.ManifestName));launchReady=owned&&operation!=1;action.Text=launchReady?"LAUNCH":owned?"UPDATE":"INSTALL";action.Enabled=true;remove.Enabled=owned;
             }catch(Exception error){SetBusy(false);Status(error.Message,true);}
         }
     }

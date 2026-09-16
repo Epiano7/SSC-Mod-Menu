@@ -23,7 +23,7 @@ public static class InstallerUiTests {
             Check(Find(w,"action").Enabled&&Find(w,"action").Text=="INSTALL","clean folder selects Install");Shot(w,Path.Combine(parent,"install.png"));
             Check(!Find(w,"remove").Enabled&&Find(w,"repair").Visible&&Find(w,"repair").Enabled,"Repair available without mod; Uninstall unavailable");
             Click(w,"action");Check(File.Exists(Path.Combine(root,Engine.ManifestName)),"Install button writes package: "+Find(w,"status").Text);
-            SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());w.RefreshInspection();Wait(w);Check(Find(w,"action").Enabled&&Find(w,"action").Text=="UPDATE","installed folder selects Update");Shot(w,Path.Combine(parent,"update.png"));
+            Check(Find(w,"action").Text=="LAUNCH","Install offers Launch");SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());w.RefreshInspection();Wait(w);Check(Find(w,"action").Enabled&&Find(w,"action").Text=="UPDATE","installed folder selects Update");Shot(w,Path.Combine(parent,"update.png"));
             Click(w,"action");Check(Find(w,"status").Text=="SSC Mod Menu is ready.","Update completes with success state");
             Check(Find(w,"remove").Enabled,"same installer offers Uninstall");Shot(w,Path.Combine(parent,"uninstall.png"));
             File.WriteAllText(Path.Combine(root,"opengl32.dll"),"Edited");Click(w,"remove");Check(File.Exists(Path.Combine(root,"opengl32.dll"))&&Find(w,"status").Text=="Some changed files were kept.","Uninstall preserves changed files and explains partial result");
