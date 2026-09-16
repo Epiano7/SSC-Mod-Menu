@@ -1,0 +1,1 @@
+Synthetic 440 Hz sine wave, 0.2 seconds, stereo 22050 Hz, encoded as 64 kbps MP3 with LAME. Generated for the audio import regression test; contains no game or third-party audio.

@@ -10,7 +10,7 @@ Future downloads will have a direct installer link here. Launch through Steam an
 
 ## Modules
 
-- **Sound Replacer:** import PCM WAV replacements, match volume and restore originals. Restart to apply. Replacement files must match the original sample rate and channel count.
+- **Sound Replacer:** import WAV or MP3 replacements, match volume and restore originals. Sample rate and mono/stereo conversion are automatic. Restart to apply. Identical sounds share one replacement; import lists the affected names and asks before proceeding. MP3 decoding uses Windows Media Foundation.
 - **Cosmetics:** local animated rainbow-name styling using the native palette and verified local account identity.
 - **Discord Presence:** game status, available round/level details, elapsed time and ranked SSC rating. Uses the bundled Discord application; no user token is needed.
 - **HUD Editor:** reposition and resize nine HUD groups, with saved layouts, resets and 25-600% scaling. Groups include minimap, version/FPS, timer, round/players, money/syringes, weapons/ammo, health/skills, team roster and event feed.

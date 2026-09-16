@@ -1,5 +1,5 @@
 #pragma once
-#include "audio_pcm.h"
+#include "audio_import.h"
 #include <map>
 #include <atomic>
 #include <cstring>
@@ -32,18 +32,18 @@ inline std::wstring readable(const std::filesystem::path& path){
     return result;
 }
 inline void initialize(const std::filesystem::path& game,const std::filesystem::path& state,bool enabled){
-    active=enabled;folder=state/L"sounds";entries.clear();replacements.clear();std::map<std::string,unsigned> counts;
+    active=enabled;folder=state/L"sounds";entries.clear();replacements.clear();
     std::error_code ec;
     for(const auto& file:std::filesystem::directory_iterator(game/L"data/sounds",ec)){
         if(file.path().extension()!=L".wav")continue;
         try{auto wave=ssc_audio::read(file.path());if(wave.bits!=8&&wave.bits!=16)continue;
             auto key=fingerprint(wave.raw.data(),wave.raw.size(),format(wave),wave.rate);if(key.empty())continue;
             Entry entry{file.path(),readable(file.path()),key,wave.rate,wave.channels,wave.bits,false};
-            entry.imported=std::filesystem::is_regular_file(folder/(key+".wav"),ec);entries.push_back(entry);++counts[key];
+            entry.imported=std::filesystem::is_regular_file(folder/(key+".wav"),ec);entries.push_back(entry);
         }catch(const std::exception&){}
     }
     std::sort(entries.begin(),entries.end(),[](const Entry& a,const Entry& b){return a.label<b.label;});
-    for(auto& e:entries){if(counts[e.key]!=1){e.key.clear();continue;}if(!active||!e.imported)continue;
+    for(auto& e:entries){if(!active||!e.imported)continue;
         try{auto replacement=ssc_audio::read(folder/(e.key+".wav"));if(replacement.rate==e.rate&&replacement.channels==e.channels&&replacement.bits==16)replacements.emplace(e.key,std::move(replacement));}catch(const std::exception&){}
     }
     status=L"Changes apply after restarting the game";
@@ -57,16 +57,21 @@ inline void __cdecl buffer_data(unsigned buffer,int fmt,const void* bytes,int le
 }
 inline void import_selected(HWND owner,bool match){
     if(selection>=entries.size())return;
-    const auto& e=entries[selection];if(e.key.empty()){status=L"Duplicate original audio: replacement is ambiguous";return;}
-    wchar_t selected[32768]={};OPENFILENAMEW dialog{};dialog.lStructSize=sizeof(dialog);dialog.hwndOwner=owner;dialog.lpstrFilter=L"PCM WAV audio\0*.wav\0\0";dialog.lpstrFile=selected;dialog.nMaxFile=32768;dialog.Flags=OFN_FILEMUSTEXIST|OFN_PATHMUSTEXIST|OFN_NOCHANGEDIR;dialog.lpstrTitle=L"Import replacement audio (PCM WAV)";
+    const auto& e=entries[selection];
+    std::wstring shared;
+    for(const auto& other:entries)if(other.key==e.key){if(!shared.empty())shared+=L", ";shared+=other.label;}
+    size_t count=std::count_if(entries.begin(),entries.end(),[&](const Entry& other){return other.key==e.key;});
+    if(count>1&&MessageBoxW(owner,(L"These sounds share identical audio: " + shared + L".\n\nImporting replaces all of them. Continue?").c_str(),L"Shared sound",MB_OKCANCEL|MB_ICONINFORMATION)!=IDOK)return;
+    wchar_t selected[32768]={};OPENFILENAMEW dialog{};dialog.lStructSize=sizeof(dialog);dialog.hwndOwner=owner;dialog.lpstrFilter=L"Audio files\0*.wav;*.mp3\0WAV audio\0*.wav\0MP3 audio\0*.mp3\0\0";dialog.lpstrFile=selected;dialog.nMaxFile=32768;dialog.Flags=OFN_FILEMUSTEXIST|OFN_PATHMUSTEXIST|OFN_NOCHANGEDIR;dialog.lpstrTitle=L"Import replacement audio";
     if(!GetOpenFileNameW(&dialog))return;
     try{
-        auto reference=ssc_audio::read(e.path),source=ssc_audio::read(selected);auto prepared=ssc_audio::prepare(reference,source,match);
+        auto reference=ssc_audio::read(e.path),source=ssc_audio::read_import(selected,reference);auto prepared=ssc_audio::prepare(reference,source,match);
         std::filesystem::create_directories(folder);auto dest=folder/(e.key+".wav"),temp=folder/(e.key+".tmp");
         // Imports always target our private directory, never the original or selected source.
         if(std::filesystem::equivalent(e.path,selected))throw std::runtime_error("Choose your replacement, not the original game sound");
         ssc_audio::write(temp,prepared.wave);if(!MoveFileExW(temp.c_str(),dest.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))throw std::runtime_error("Could not commit imported sound");
-        entries[selection].imported=true;status=prepared.limited?L"Imported; peak limited. Restart game to apply.":L"Imported. Restart game to apply.";
+        for(auto& other:entries)if(other.key==e.key)other.imported=true;
+        status=prepared.limited?L"Imported; peak limited. Restart game to apply.":L"Imported. Restart game to apply.";
     }catch(const std::exception& ex){std::string message=ex.what();status.assign(message.begin(),message.end());}
 }
 inline void preview_original(){
@@ -82,6 +87,6 @@ inline void remove_selected(){
     if(selection>=entries.size()||entries[selection].key.empty())return;
     std::error_code ec;
     std::filesystem::remove(folder/(entries[selection].key+".wav"),ec);
-    if(ec){status=L"Could not remove imported sound";return;}entries[selection].imported=false;status=L"Original restored on next game restart";
+    if(ec){status=L"Could not remove imported sound";return;}for(auto& other:entries)if(other.key==entries[selection].key)other.imported=false;status=L"Original restored on next game restart";
 }
 }

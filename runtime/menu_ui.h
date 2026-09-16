@@ -181,7 +181,13 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     }
     if(message==WM_KEYUP&&menu_key)return 0;
     if(message==WM_KEYUP&&wp==VK_ESCAPE&&suppress_escape_up){suppress_escape_up=false;return 0;}
-    if(message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wp))close_menu(true);
+    if(message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wp)){
+        // Keep the current panel and unfinished text edits across Alt+Tab,
+        // but release gestures whose mouse/key-up may go to another app.
+        finish_hud_drag();ReleaseCapture();pressed=hovered=0;
+        suppress_escape_up=false;dirty=true;
+        return CallWindowProcW(previous_proc,window,message,wp,lp);
+    }
     if(ssc_hud::editing){
         if(message==WM_SETCURSOR){SetCursor(LoadCursor(nullptr,IDC_ARROW));return TRUE;}
         if(message==WM_KEYDOWN&&wp==VK_ESCAPE){suppress_escape_up=true;close_menu(true);return 0;}
@@ -416,7 +422,7 @@ void paint_panel() {
             button(170,266,604,300,40,L"WELCOME GUIDE");
         } else if(settings_page==3) {
             text(266,111,L"SOUND REPLACER",ink,true);toggle(80,986,106,sound_requested);
-            text(266,152,L"PCM WAV replacements / restart game to apply changes",muted);
+            text(266,152,L"WAV / MP3 imports. Restart game to apply changes.",muted);
             if(sound_results.empty()&&sound_query.empty())filter_sounds();
             std::wstring query=L"SEARCH: "+sound_query+(sound_search_editing?L"_":L"");button(104,266,187,540,36,query.c_str(),sound_search_editing);
             button(100,822,187,120,36,L"PREVIOUS");button(101,958,187,128,36,L"NEXT");
@@ -426,7 +432,7 @@ void paint_panel() {
                 auto& e=ssc_sound::entries[ssc_sound::selection];std::wstring info=e.label+L" / "+std::to_wstring(e.rate)+L" Hz / "+std::to_wstring(e.channels)+L" ch";
                 text(266,490,info.c_str(),cyan,false,14);
             }
-            button(102,266,518,242,40,L"IMPORT WAV");button(103,526,518,242,40,L"RESTORE ORIGINAL");
+            button(102,266,518,242,40,L"IMPORT AUDIO");button(103,526,518,242,40,L"RESTORE ORIGINAL");
             text(792,518,L"MATCH LEVEL",muted,false,12);toggle(82,982,520,match_sound_level);
             text(266,578,ssc_sound::status.c_str(),ink,false,13);
             button(105,266,613,280,38,L"PREVIEW ORIGINAL",false,ssc_sound::selection<ssc_sound::entries.size());
