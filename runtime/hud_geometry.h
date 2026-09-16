@@ -18,6 +18,7 @@ inline Vertex3Proc native_vertex3=nullptr;
 inline bool primitive_capture=false;
 inline GLfloat capture_model[16],capture_projection[16];
 inline void accumulate(int index,float x,float y){
+ if(index==6)return;
  if(index<0||index>=int(items.size())||!std::isfinite(x)||!std::isfinite(y))return;
  const auto& item=items[index];
  if(enabled){x=item.home_x+(x-item.x)/item.scale;y=item.home_y+(y-item.y)/item.scale;}

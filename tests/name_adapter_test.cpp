@@ -47,6 +47,7 @@ int main(){
     auto invoke=[&](){return test_score_call((void*)1,2,3,(void*)4,5,6,7,8,.5f,10,11,12,13,14,r);};
     put(r+0x2c,2);assert(invoke()==42&&rr==6&&gg==7&&bb==8&&aa==.5f&&pp==14);
     put(r+0x2c,0);ssc_names::cosmetics=true;put(base+0xf9ee04,2.5f);put(base+0xf9f860,.5f);invoke();assert(pp==.25f&&rr==6);
+    ssc_names::rainbow=false;ssc_names::solid_rgb=0x336699;invoke();assert(pp==-1&&std::abs(rr-.2f)<.0001f&&std::abs(gg-.4f)<.0001f&&std::abs(bb-.6f)<.0001f&&aa==.5f);ssc_names::rainbow=true;
     put(a+0x3460+0x7c4,0);invoke();assert(pp==.25f);
     put(base+0xe0c390,1);invoke();assert(pp==14);put(base+0xe0c390,0);
     ssc_names::native_predicate=consume;std::array<unsigned char,32> owned{};

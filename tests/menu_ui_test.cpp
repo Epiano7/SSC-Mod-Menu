@@ -32,7 +32,7 @@ int main(int argc,char** argv) {
     visibility=.4f;assert(hit(panel_x+int(1030*draw_scale),panel_y+int(123*draw_scale))==0);visibility=1;
     layout_panel(800,600);assert(panel_x>=0&&panel_y>=0&&panel_x+panel_w*draw_scale<=800&&panel_y+panel_h*draw_scale<=600);
     snapshot(state_dir/"settings.bmp");settings_page=1;paint_panel();snapshot(state_dir/"interface.bmp");settings_page=2;paint_panel();snapshot(state_dir/"about.bmp");assert(std::none_of(controls.begin(),controls.end(),[](const Control& c){return c.id==41;}));
-    show_quick();visibility=1;paint_panel();snapshot(state_dir/"quick.bmp");
+    activate(170);visibility=1;paint_panel();assert(controls.size()==1&&controls[0].id==171);snapshot(state_dir/"welcome.bmp");activate(171);assert(welcome_seen&&!opened);welcome_seen=false;load_settings();assert(welcome_seen);opened=true;show_quick();visibility=1;paint_panel();snapshot(state_dir/"quick.bmp");
     activate(4);assert(!clock_enabled);
     {std::ifstream in(state_dir/"menu.ini");std::string saved((std::istreambuf_iterator<char>(in)),{});assert(saved.find("unused_preference")==std::string::npos);}
     manager=true;settings_page=2;rpc_preview.phase=2;paint_panel();

@@ -10,6 +10,8 @@ inline Predicate native_predicate=nullptr;
 inline Overhead native_overhead=nullptr;
 inline Draw native_draw=nullptr;
 inline std::atomic<bool> cosmetics{false};
+inline bool rainbow=true;inline unsigned solid_rgb=0x55ccff;
+inline void solid(float& r,float& g,float& b,float& phase){if(!rainbow){r=float((solid_rgb>>16)&255)/255;g=float((solid_rgb>>8)&255)/255;b=float(solid_rgb&255)/255;phase=-1;}}
 inline std::atomic<unsigned> cosmetic_draws{0};
 inline bool attached=false;
 inline uintptr_t image_base=0;
@@ -101,7 +103,7 @@ inline void __cdecl local_widget(uintptr_t widget,float p2,void* p3,void* p4,cha
     native_widget(widget,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13);
 }
 inline float __cdecl widget_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
-    if(drawing_local_widget&&cosmetics.load()&&local_account(reinterpret_cast<uintptr_t>(name))&&native_phase(phase))++cosmetic_draws;
+    if(drawing_local_widget&&cosmetics.load()&&local_account(reinterpret_cast<uintptr_t>(name))&&native_phase(phase)){++cosmetic_draws;solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 inline void __cdecl overhead(uintptr_t actor,float alpha,unsigned char p3,uintptr_t p4,unsigned char p5,unsigned char p6){
@@ -111,7 +113,7 @@ inline void __cdecl overhead(uintptr_t actor,float alpha,unsigned char p3,uintpt
 inline float __cdecl draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
     if(!cosmetics.load())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
     auto identity=identify(drawing_actor);
-    if(cosmetics.load()&&identity.local)++cosmetic_draws;
+    if(cosmetics.load()&&identity.local){++cosmetic_draws;solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 extern "C" float __cdecl ssc_score_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase,uintptr_t row){
@@ -119,7 +121,11 @@ extern "C" float __cdecl ssc_score_draw(void* renderer,float x,float y,void* nam
     int slot=-1;uintptr_t world=0,first=0,last=0;
     Identity identity;
     if(read(row+0x2c,slot)&&slot>=0&&read(image_base+0xdd85d0,world)&&read(world+0xa5b8,first)&&read(world+0xa5c0,last)&&last>=first&&size_t(slot)<(last-first)/0x3460)identity=identify(first+size_t(slot)*0x3460);
-    if(cosmetics.load()&&identity.local&&native_phase(phase))++cosmetic_draws;
+    if(cosmetics.load()&&identity.local&&native_phase(phase)){++cosmetic_draws;solid(r,g,b,phase);}
+    return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
+}
+inline float __cdecl account_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
+    if(cosmetics.load()&&local_account(reinterpret_cast<uintptr_t>(name))){if(rainbow)native_phase(phase);else solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 inline bool attach(){
@@ -130,6 +136,19 @@ inline bool attach(){
     // Whitelist presentation calls only. Do not hook the predicate globally:
     // 5fb3b0/5fd316/6834a3/6b6db7 also service pass-related UI/cache logic.
     const Site sites[]={
+        {0x413cf4,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x413d78,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x434f96,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x4350bc,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x61afc4,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6347b7,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6a31ec,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6a3474,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6a3692,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9d84ff,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9a3bb7,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9a3d5b,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+
         {0x3381a9,0x83e9a0,reinterpret_cast<uintptr_t>(overhead)},
         {0x83ee42,0x3a4d80,reinterpret_cast<uintptr_t>(predicate)},
         {0x413b0c,0x3a4d80,reinterpret_cast<uintptr_t>(predicate)},

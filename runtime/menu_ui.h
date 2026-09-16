@@ -8,10 +8,11 @@ bool opened=false,clock_enabled=false,dirty=true,save_failed=false,suppress_esca
 bool animations=true,sound_requested=false,cosmetic_requested=false,match_sound_level=true;
 bool rpc_requested=false,rpc_timer=true,rpc_rating=true,rpc_editing=false,rpc_select_all=false,rpc_error=false;
 std::string rpc_id=ssc_rpc::bundled_application_id;std::wstring rpc_buffer;ssc_rpc::Snapshot rpc_preview;
+int sound_wheel_remainder=0;
 bool sound_search_editing=false;std::wstring sound_query;size_t sound_page=0;std::vector<size_t> sound_results;
 void filter_sounds(){sound_results.clear();auto query=sound_query;std::transform(query.begin(),query.end(),query.begin(),towlower);for(size_t i=0;i<ssc_sound::entries.size();++i){auto label=ssc_sound::entries[i].label;std::transform(label.begin(),label.end(),label.begin(),towlower);if(label.find(query)!=std::wstring::npos)sound_results.push_back(i);}sound_page=0;dirty=true;}
 int settings_page=0,ui_scale=100;
-bool manager=false;
+bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buffer;
 constexpr int canvas_w=1120,canvas_h=720;
 float raster_scale=1.f;int raster_w=canvas_w,raster_h=canvas_h;
 int panel_w=540,panel_h=384,panel_x=24,panel_y=40;
@@ -42,7 +43,7 @@ void save() {
     auto path=state_dir/L"menu.ini",temp=state_dir/L"menu.ini.tmp";
     std::ofstream out(temp);
     out<<"hud_enabled="<<ssc_hud::enabled<<"\n";for(const auto& item:ssc_hud::items){out<<"hud_box_"<<item.key<<"="<<item.home_x<<","<<item.home_y<<","<<item.w<<","<<item.h<<"\n";out<<"hud_"<<item.key<<"="<<item.x<<","<<item.y<<","<<item.scale<<"\n";}
-    out<<"schema=2\nclock="<<clock_enabled
+    out<<"cosmetic_rainbow="<<ssc_names::rainbow<<"\ncosmetic_rgb="<<ssc_names::solid_rgb<<"\n";out<<"welcome_seen="<<welcome_seen<<"\n";out<<"schema=2\nclock="<<clock_enabled
        <<"\nsound_requested="<<sound_requested<<"\ncosmetic_requested="<<cosmetic_requested<<"\nmatch_sound_level="<<match_sound_level
        <<"\nrpc_requested="<<rpc_requested<<"\nrpc_id="<<rpc_id<<"\nrpc_timer="<<rpc_timer<<"\nrpc_rating="<<rpc_rating
        <<"\nanimations="<<animations<<"\nui_scale="<<ui_scale<<"\n";out.close();
@@ -73,7 +74,10 @@ void load_settings() {
         if(key.rfind("hud_",0)==0){for(auto& item:ssc_hud::items)if(key==std::string("hud_")+item.key){float x,y,z;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f%c",&x,&y,&z,&extra)==3){item.x=x;item.y=y;item.scale=z;ssc_hud::constrain(item);}}continue;}
         if(key=="rpc_id"){if(value.empty()||ssc_rpc::valid_id(value))rpc_id=value.empty()?ssc_rpc::bundled_application_id:value;continue;}
         try {size_t used=0;number=std::stoi(value,&used);if(used!=value.size())continue;}catch(...){continue;}
-        if(key=="schema")version2=number==2;
+        if(key=="cosmetic_rainbow")ssc_names::rainbow=number!=0;
+        else if(key=="cosmetic_rgb"&&number>=0&&number<=0xffffff)ssc_names::solid_rgb=unsigned(number);
+        else if(key=="welcome_seen")welcome_seen=number==1;
+        else if(key=="schema")version2=number==2;
         else if(key=="clock")clock_enabled=number==1;
         else if(key=="sound_requested")sound_requested=number==1;
         else if(key=="cosmetic_requested")cosmetic_requested=number==1;
@@ -92,7 +96,7 @@ void advance_animation(float seconds) {
     if(!animations){visibility=goal;modal_visibility=manager&&opened?1.f:0.f;}
     else {float delta=std::max(0.f,std::min(seconds,.05f))/(opened?.18f:.14f);visibility=std::max(0.f,std::min(1.f,visibility+(opened?delta:-delta)));float modal_goal=manager&&opened?1.f:0.f;modal_visibility=modal_goal>modal_visibility?std::min(modal_goal,modal_visibility+delta):std::max(modal_goal,modal_visibility-delta);}
 }
-void close_menu(bool immediate=false) {if(ssc_hud::editing){ssc_hud::editing=false;save();}finish_hud_drag();opened=false;dirty=true;pressed=0;keyboard_focus=0;cancel_edit();if(immediate){visibility=0;modal_visibility=0;}ReleaseCapture();log("Menu closed");}
+void close_menu(bool immediate=false) {if(manager&&settings_page==8){welcome_seen=true;save();}if(ssc_hud::editing){ssc_hud::editing=false;save();}finish_hud_drag();opened=false;dirty=true;pressed=0;keyboard_focus=0;cancel_edit();if(immediate){visibility=0;modal_visibility=0;}ReleaseCapture();log("Menu closed");}
 void show_manager(int page=-1) {finish_hud_drag();ReleaseCapture();cancel_edit();manager=true;modal_visibility=0;settings_page=page;visibility=animations?0.f:1.f;dirty=true;hovered=pressed=keyboard_focus=0;controls.clear();}
 void show_quick() {finish_hud_drag();ReleaseCapture();cancel_edit();manager=false;visibility=animations?0.f:1.f;dirty=true;hovered=pressed=keyboard_focus=0;controls.clear();}
 void start_live_hud(){finish_hud_drag();ReleaseCapture();cancel_edit();ssc_hud::enabled=true;ssc_hud::editing=true;ssc_hud::capture_frame=true;opened=true;manager=false;visibility=1;modal_visibility=0;controls.clear();pressed=hovered=keyboard_focus=0;dirty=true;save();}
@@ -110,6 +114,13 @@ void activate(int id) {
     if(id!=104)sound_search_editing=false;
     if(id==160){if(!native_supported||rpc_preview.phase==1)ssc_update::check(state_dir);dirty=true;}
     else if(id==161){if(!native_supported||rpc_preview.phase==1)ssc_update::apply();dirty=true;}
+    else if(id==180||id==181){ssc_names::rainbow=id==180;color_editing=false;save();}
+    else if(id>=182&&id<=187){const unsigned colors[]={0xffffff,0x55ccff,0xff66cc,0x66ee99,0xffbb44,0xff6655};ssc_names::solid_rgb=colors[id-182];ssc_names::rainbow=false;save();}
+    else if(id==188){wchar_t value[8];swprintf(value,8,L"%06X",ssc_names::solid_rgb);color_buffer=value;color_editing=true;dirty=true;}
+    else if(id==189){if(color_buffer.size()==6){ssc_names::solid_rgb=std::stoul(color_buffer,nullptr,16);ssc_names::rainbow=false;color_editing=false;save();}}
+    else if(id==170){opened=true;show_manager(8);}
+    else if(id==171){welcome_seen=true;save();close_menu();}
+    else if(id==105){ssc_sound::preview_original();dirty=true;}
     else if(id==1)close_menu();
     else if(id==3)show_manager();
     else if(id==4){ssc_hud::enabled=false;sound_requested=false;cosmetic_requested=false;rpc_requested=false;clock_enabled=false;save();}
@@ -149,6 +160,7 @@ int hit(int x,int y) {
     return 0;
 }
 LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
+    if(opened&&manager&&settings_page==3&&message==WM_MOUSEWHEEL){POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(window,&p);float x=(p.x-panel_x)/draw_scale,y=(p.y-panel_y)/draw_scale;if(x>=266&&x<=1086&&y>=187&&y<=452){sound_wheel_remainder+=GET_WHEEL_DELTA_WPARAM(wp);int steps=sound_wheel_remainder/WHEEL_DELTA;sound_wheel_remainder%=WHEEL_DELTA;int last=std::max(0,int(sound_results.size())-5);sound_page=size_t(std::clamp(int(sound_page)-steps,0,last));dirty=true;return 0;}}
     const bool menu_key=wp==VK_RSHIFT||(wp==VK_SHIFT&&((lp>>16)&255)==0x36);
     if(message==WM_KEYDOWN&&menu_key) {
         if(!(lp&(1LL<<30))) {
@@ -182,6 +194,12 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         if(message==WM_INPUT)return DefWindowProcW(window,message,wp,lp);
     }
     if(opened||visibility>0.f) {
+        if(opened&&color_editing&&manager&&settings_page==4){
+            if(message==WM_KEYDOWN&&wp==VK_ESCAPE){color_editing=false;dirty=true;return 0;}
+            if(message==WM_KEYDOWN&&wp==VK_RETURN){activate(189);return 0;}
+            if(message==WM_KEYDOWN&&wp=='A'&&(GetKeyState(VK_CONTROL)&0x8000)){color_buffer.clear();dirty=true;return 0;}
+            if(message==WM_CHAR){wchar_t c=towupper(wchar_t(wp));if(c==8){if(!color_buffer.empty())color_buffer.pop_back();}else if(((c>=L'0'&&c<=L'9')||(c>=L'A'&&c<=L'F'))&&color_buffer.size()<6)color_buffer+=c;dirty=true;return 0;}
+        }
         if(opened&&rpc_editing){
             if(message==WM_KEYDOWN&&wp==VK_ESCAPE){rpc_editing=false;rpc_error=false;dirty=true;suppress_escape_up=true;return 0;}
             if(message==WM_KEYDOWN&&wp==VK_RETURN){activate(121);return 0;}
@@ -197,7 +215,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
             if(message==WM_CHAR){wchar_t c=static_cast<wchar_t>(wp);if(c==8){if(!sound_query.empty())sound_query.pop_back();}else if(c>=32&&c<127&&sound_query.size()<48)sound_query.push_back(c);filter_sounds();return 0;}
         }
         if(message==WM_SETCURSOR){SetCursor(LoadCursor(nullptr,IDC_ARROW));return TRUE;}
-        if(message==WM_KEYDOWN&&wp==VK_ESCAPE){finish_hud_drag();ReleaseCapture();suppress_escape_up=true;if(manager&&opened&&settings_page>=0){settings_page=-1;dirty=true;controls.clear();}else if(manager&&opened)show_quick();else close_menu();return 0;}
+        if(message==WM_KEYDOWN&&wp==VK_ESCAPE){finish_hud_drag();ReleaseCapture();suppress_escape_up=true;if(manager&&opened&&settings_page==8){close_menu();}else if(manager&&opened&&settings_page>=0){settings_page=-1;dirty=true;controls.clear();}else if(manager&&opened)show_quick();else close_menu();return 0;}
         if(opened&&message==WM_KEYDOWN&&wp==VK_TAB&&!(lp&(1LL<<30))) {
             std::vector<int> ids;for(auto& c:controls)if(c.enabled)ids.push_back(c.id);
             auto it=std::find(ids.begin(),ids.end(),keyboard_focus);int n=int(ids.size());
@@ -323,7 +341,7 @@ void text(int x,int y,const wchar_t* value,COLORREF color=ink,bool title=false,i
         cursor+=gw; // Preserve native advances; do not round each glyph or add tracking.
     }
 }
-void button(int id,int x,int y,int w,int h,const wchar_t* label,bool selected=false,bool enabled=true) {
+void button(int id,int x,int y,int w,int h,const wchar_t* label,bool selected=false,bool enabled=true,bool centered=false) {
     controls.push_back({id,x,y,w,h,enabled});bool focus=enabled&&(hovered==id||keyboard_focus==id);
     COLORREF base=selected?RGB(27,106,196):RGB(33,57,88);
     if(focus)base=RGB(46,121,193);
@@ -332,7 +350,7 @@ void button(int id,int x,int y,int w,int h,const wchar_t* label,bool selected=fa
     polygon(x,y,w,h,base);rectangle(x+8,y+1,w-16,1,focus?cyan:RGB(63,91,132));
     if(focus)rectangle(x+8,y+h-2,w-16,2,cyan);
     int size=15;while(size>11&&text_width(label,size)>w-28)--size;
-    text(x+14,y+(h-size)/2,label,enabled?ink:muted,false,size);
+    text(centered?x+(w-text_width(label,size))/2:x+14,y+(h-size)/2,label,enabled?ink:muted,false,size);
 }
 void toggle(int id,int x,int y,bool enabled) {button(id,x,y,94,36,enabled?L"ON":L"OFF",enabled);rectangle(x+70,y+10,10,16,enabled?RGB(99,239,173):muted);}
 void finish_canvas() {
@@ -350,18 +368,27 @@ void paint_panel() {
     rectangle(0,0,panel_w,panel_h,RGB(8,21,41));rectangle(4,4,panel_w-8,78,RGB(18,41,72));
     rectangle(4,82,panel_w-8,2,RGB(48,135,208));
     text(26,24,L"SSC MOD MENU",ink,true);text(26,58,manager?L"MODULE SETTINGS":L"QUICK MENU",muted);
-    button(1,panel_w-60,23,36,36,L"X");
+    if(!(manager&&settings_page==8))button(1,panel_w-60,23,36,36,L"X");
     if(!native_supported){
         text(26,116,L"GAME UPDATE DETECTED",cyan);
         text(26,156,L"Modules are paused until a compatible mod update.",muted,false,14);
         text(26,209,ssc_update::message.c_str(),ink,false,14);
         button(160,26,270,250,42,L"CHECK FOR UPDATES",false,!ssc_update::process);
         button(161,294,270,310,42,L"UPDATE AND RESTART",true,ssc_update::available());
+    } else if(manager&&settings_page==8){
+        text(50,125,L"WELCOME TO SSC MOD MENU",ink,true);
+        text(50,200,L"Press RIGHT SHIFT to open the mod menu.");
+        text(50,244,L"Toggle modules there, or open Settings to customize them.",muted);
+        text(50,328,L"The mod is installed in your Steam game folder.");
+        text(50,372,L"Launch Skillshot City through Steam as usual.",muted);
+        text(50,416,L"You do not need to run the installer again.",muted);
+        text(50,512,L"Reopen this guide from Interface > Welcome guide.",muted);
+        button(171,410,610,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
         const wchar_t* names[]={L"SOUND REPLACER",L"COSMETICS",L"DISCORD PRESENCE",L"HUD EDITOR"};
         const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled};const int ids[]={80,81,83,86};
         for(int i=0;i<4;++i){int y=100+i*64;rectangle(20,y,600,56,RGB(16,37,62));text(32,y+20,names[i]);toggle(ids[i],350,y+10,enabled[i]);button(91+i,456,y+10,146,36,L"SETTINGS");}
-        button(3,20,374,366,42,L"ALL MODULES >",true);button(4,402,374,218,42,L"DISABLE ALL");
+        button(3,20,374,366,42,L"ALL MODULES",true,true,true);button(4,402,374,218,42,L"DISABLE ALL");
         if(save_failed)text(24,425,L"Could not save settings",RGB(247,191,83));
     } else {
         button(10,24,108,192,44,L"MODULES",settings_page==-1||settings_page>=3);
@@ -380,6 +407,7 @@ void paint_panel() {
             text(266,326,L"UI SCALE");button(50,266,368,190,44,L"85%",ui_scale==85);button(51,470,368,190,44,L"100%",ui_scale==100);button(52,674,368,190,44,L"115%",ui_scale==115);
             text(266,454,L"RIGHT SHIFT",cyan);text(450,454,L"Open / close quick menu");text(266,494,L"ESCAPE",cyan);text(450,494,L"Back to quick menu, then close");
             text(266,550,L"TAB / ENTER",cyan);text(450,550,L"Focus controls / activate");
+            button(170,266,604,300,40,L"WELCOME GUIDE");
         } else if(settings_page==3) {
             text(266,111,L"SOUND REPLACER",ink,true);toggle(80,986,106,sound_requested);
             text(266,152,L"PCM WAV replacements / restart game to apply changes",muted);
@@ -395,13 +423,19 @@ void paint_panel() {
             button(102,266,518,242,40,L"IMPORT WAV");button(103,526,518,242,40,L"RESTORE ORIGINAL");
             text(792,518,L"MATCH LEVEL",muted,false,12);toggle(82,982,520,match_sound_level);
             text(266,578,ssc_sound::status.c_str(),ink,false,13);
-            if(!ssc_sound::attached)text(266,619,L"Audio adapter unavailable",muted,false,13);
+            button(105,266,613,280,38,L"PREVIEW ORIGINAL",false,ssc_sound::selection<ssc_sound::entries.size());
         } else if(settings_page==4) {
             text(266,111,L"COSMETICS",ink,true);toggle(81,986,106,cosmetic_requested);
             if(!ssc_names::attached)text(266,160,L"Unavailable on this game version",RGB(247,191,83));
-            text(266,337,L"ANIMATED PREVIEW");
+            button(180,266,198,250,42,L"RAINBOW",ssc_names::rainbow);button(181,534,198,250,42,L"SOLID COLOR",!ssc_names::rainbow);
+            const wchar_t* labels[]={L"WHITE",L"CYAN",L"PINK",L"GREEN",L"GOLD",L"CORAL"};
+            for(int i=0;i<6;++i)button(182+i,266+i*136,266,126,36,labels[i]);
+            wchar_t hex[16];swprintf(hex,16,L"#%06X",ssc_names::solid_rgb);auto label=color_editing?L"#"+color_buffer+L"_":std::wstring(hex);
+            button(188,266,328,240,40,label.c_str(),color_editing);button(189,520,328,140,40,L"APPLY",false,color_editing&&color_buffer.size()==6);
+            text(266,409,L"PREVIEW",muted);
             float phase=0;ssc_names::native_phase(phase);
-            text(282,409,L"Example player",ink,true,0,phase);
+            auto rgb=ssc_names::solid_rgb;auto color=RGB((rgb>>16)&255,(rgb>>8)&255,rgb&255);
+            text(282,455,L"Example player",color,true,0,ssc_names::rainbow?phase:-1);
 
         } else if(settings_page==5) {
             text(266,111,L"DISCORD PRESENCE",ink,true);toggle(83,986,106,rpc_requested);

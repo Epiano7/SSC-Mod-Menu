@@ -71,6 +71,7 @@ void render(HDC dc) {
     if(now-presence_at>=1000){presence_at=now;rpc_preview=native_supported?ssc_rpc::sample_steam(rpc_rating):ssc_rpc::Snapshot{};static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested,rpc_id,rpc_timer,rpc_preview);if(opened)dirty=true;}
     static ULONGLONG update_at=0;
     if(now-update_at>=1000){update_at=now;
+        if(native_supported&&rpc_preview.phase==1&&!welcome_seen&&!opened){opened=true;show_manager(8);}
         if(native_supported&&rpc_preview.phase==1&&!ssc_update::checked)ssc_update::check(state_dir);
         if(ssc_update::poll(window,rpc_preview.phase==1||!native_supported))dirty=true;
         if(rpc_preview.phase!=1&&manager&&settings_page==7&&opened)close_menu(true);

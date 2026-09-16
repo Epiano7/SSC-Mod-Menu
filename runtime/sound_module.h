@@ -2,6 +2,7 @@
 #include "audio_pcm.h"
 #include <map>
 #include <atomic>
+#include <cstring>
 #include <commdlg.h>
 namespace ssc_sound {
 using BufferData=void(__cdecl*)(unsigned,int,const void*,int,int);
@@ -67,6 +68,15 @@ inline void import_selected(HWND owner,bool match){
         ssc_audio::write(temp,prepared.wave);if(!MoveFileExW(temp.c_str(),dest.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))throw std::runtime_error("Could not commit imported sound");
         entries[selection].imported=true;status=prepared.limited?L"Imported; peak limited. Restart game to apply.":L"Imported. Restart game to apply.";
     }catch(const std::exception& ex){std::string message=ex.what();status.assign(message.begin(),message.end());}
+}
+inline void preview_original(){
+    if(selection>=entries.size())return;
+    using Play=BOOL(WINAPI*)(LPCWSTR,HMODULE,DWORD);
+    static HMODULE winmm=LoadLibraryW(L"winmm.dll");
+    Play play=nullptr;auto address=winmm?GetProcAddress(winmm,"PlaySoundW"):nullptr;static_assert(sizeof(play)==sizeof(address));std::memcpy(&play,&address,sizeof(play));
+    // Asynchronous filename playback owns its data; always use the original path.
+    if(play&&play(entries[selection].path.c_str(),nullptr,0x00020000|0x0001|0x0002))status=L"Playing original: "+entries[selection].label;
+    else status=L"Could not preview original sound";
 }
 inline void remove_selected(){
     if(selection>=entries.size()||entries[selection].key.empty())return;

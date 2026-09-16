@@ -101,17 +101,27 @@ inline void fade_rectangle(const Item& item,float& x,float& y,float& w,float& h,
  y=(y-item.home_y*view_h)*item.scale+item.y*view_h;
  w*=item.scale;h*=item.scale;feather*=item.scale;
 }
+inline int fade_w=0,fade_h=0;
 inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,float w,float h,float feather,char global){
+ // Native mouse coordinates use the game's logical canvas, not the GL viewport.
+ int width=fade_w?fade_w:view_w,height=fade_h?fade_h:view_h;
+ if(game_base==reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
+  width=*reinterpret_cast<const int*>(game_base+0xf9f750);height=*reinterpret_cast<const int*>(game_base+0xf9f754);
+ }
+ if(width<=0||height<=0){width=view_w;height=view_h;}
+ // Currency's renderer also emits unrelated screen-wide geometry. Its native
+ // interaction rectangle is the authoritative bound for this group.
+ if(active_item==6&&width>0&&height>0&&capture_frame&&!freeze_bounds){
+  measured_frame[6]={x/width,y/height,(x+w)/width,(y+h)/height,2};
+ }
  if(editing&&active_item>=0)return std::abs(alpha);
  const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+0x443300);
- if(enabled&&active_item>=0&&view_w>0&&view_h>0){const auto& a=items[active_item];
-  if(measured[active_item]){x=a.x*view_w;y=a.y*view_h;w=a.w*a.scale*view_w;h=a.h*a.scale*view_h;feather*=a.scale;}
-  else fade_rectangle(a,x,y,w,h,feather);
+ if(enabled&&active_item>=0&&width>0&&height>0){const auto& a=items[active_item];
+  if(measured[active_item]){x=a.x*width;y=a.y*height;w=a.w*a.scale*width;h=a.h*a.scale*height;feather*=a.scale;}
+  else {x=(x-a.home_x*width)*a.scale+a.x*width;y=(y-a.home_y*height)*a.scale+a.y*height;w*=a.scale;h*=a.scale;feather*=a.scale;}
  }
  float result=original(object,alpha,x,y,w,h,feather,global);
- // The native status renderer shares opacity between timer and round counts.
- // Test the two relocated rectangles separately, never the empty space between.
- if(enabled&&active_item==5&&measured[4]){const auto& t=items[4];result=std::min(result,original(object,alpha,t.x*view_w,t.y*view_h,t.w*t.scale*view_w,t.h*t.scale*view_h,native_feather*t.scale,global));}
+ if(enabled&&active_item==5&&measured[4]){const auto& t=items[4];result=std::min(result,original(object,alpha,t.x*width,t.y*height,t.w*t.scale*width,t.h*t.scale*height,native_feather*t.scale,global));}
  return result;
 }
 extern "C" void ssc_hud_bridge();
