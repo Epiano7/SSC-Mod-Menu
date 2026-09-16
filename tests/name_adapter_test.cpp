@@ -36,8 +36,8 @@ int main(){
     std::vector<unsigned char> image(0x1000000),world(0xc000),actors(5*0x3460),row(0xd0);
     auto base=(uintptr_t)image.data(),w=(uintptr_t)world.data(),a=(uintptr_t)actors.data(),r=(uintptr_t)row.data();
     ssc_names::image_base=base;ssc_names::native_draw=capture;
-    put(base+0xdd85d0,w);put(w+0xa5b8,a);put(w+0xa5c0,a+actors.size());put(w+0xbf48,a);
-    put(base+0xe0c390,0);put(base+0xe0fdf8,a);small_string(base+0xdf2040,"OwnerAccount");small_string(a+0x6d8,"owneraccount");
+    put(base+0xdda5d0,w);put(w+0xa5b8,a);put(w+0xa5c0,a+actors.size());put(w+0xbf48,a);
+    put(base+0xe0e380,0);put(base+0xe11de8,a);small_string(base+0xdf4030,"OwnerAccount");small_string(a+0x6d8,"owneraccount");
     put(base+0xf984b4,2);put(w+0x190,0);put(w+0x28c,2);
     for(int i=0;i<5;++i){put(a+i*0x3460+0x78,i);put<unsigned char>(a+i*0x3460+0x81,1);put(a+i*0x3460+0x7c4,i==0?0:1);}
     put(a+0x3460+0x7c4,0);assert(ssc_names::identify(a).local);assert(!ssc_names::identify(a+0x3460).local);
@@ -46,10 +46,10 @@ int main(){
     small_string(a+0x6d8,"OtherAccount");assert(!ssc_names::identify(a).local);small_string(a+0x6d8,"OwnerAccount");put(a+0x3460+0x7c4,1);
     auto invoke=[&](){return test_score_call((void*)1,2,3,(void*)4,5,6,7,8,.5f,10,11,12,13,14,r);};
     put(r+0x2c,2);assert(invoke()==42&&rr==6&&gg==7&&bb==8&&aa==.5f&&pp==14);
-    put(r+0x2c,0);ssc_names::cosmetics=true;put(base+0xf9ee04,2.5f);put(base+0xf9f860,.5f);invoke();assert(pp==.25f&&rr==6);
+    put(r+0x2c,0);ssc_names::cosmetics=true;put(base+0xfa0e04,2.5f);put(base+0xfa1860,.5f);invoke();assert(pp==.25f&&rr==6);
     ssc_names::rainbow=false;ssc_names::solid_rgb=0x336699;invoke();assert(pp==-1&&std::abs(rr-.2f)<.0001f&&std::abs(gg-.4f)<.0001f&&std::abs(bb-.6f)<.0001f&&aa==.5f);ssc_names::rainbow=true;
     put(a+0x3460+0x7c4,0);invoke();assert(pp==.25f);
-    put(base+0xe0c390,1);invoke();assert(pp==14);put(base+0xe0c390,0);
+    put(base+0xe0e380,1);invoke();assert(pp==14);put(base+0xe0e380,0);
     ssc_names::native_predicate=consume;std::array<unsigned char,32> owned{};
     small_string((uintptr_t)owned.data(),"OWNERACCOUNT");
     assert(!ssc_names::unambiguous_event_account((uintptr_t)owned.data()));
@@ -58,6 +58,6 @@ int main(){
     small_string((uintptr_t)owned.data(),"OtherAccount");assert(ssc_names::predicate(nullptr,3,owned.data())==0);
     native_result=1;assert(ssc_names::predicate(nullptr,3,owned.data())==1);native_result=0;
     ssc_names::cosmetics=false;small_string((uintptr_t)owned.data(),"OwnerAccount");assert(ssc_names::predicate(nullptr,3,owned.data())==0);
-    float phase=.75f;put(base+0xf9ee04,3.4e38f);put(base+0xf9f860,3.4e38f);assert(!ssc_names::native_phase(phase)&&phase==.75f);
+    float phase=.75f;put(base+0xfa0e04,3.4e38f);put(base+0xfa1860,3.4e38f);assert(!ssc_names::native_phase(phase)&&phase==.75f);
     std::cout<<"PASS: name bridge, multiplayer own-slot/account identity, spectating, display-name collision, owned-string consumption, native effect preservation and disable\n";
 }

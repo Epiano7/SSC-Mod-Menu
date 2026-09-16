@@ -170,8 +170,8 @@ BOOL WINAPI swap_hook(HDC dc) {render(dc);return original_swap(dc);}
 bool accepted_build() {
     wchar_t path[32768];if(!GetModuleFileNameW(nullptr,path,32768)) return false;
     std::ifstream in(std::filesystem::path(path),std::ios::binary|std::ios::ate);
-    if(!in||in.tellg()!=15261184) return false;
-    in.seekg(0);std::vector<unsigned char> bytes(15261184);in.read(reinterpret_cast<char*>(bytes.data()),bytes.size());if(!in) return false;
+    if(!in||in.tellg()!=15266304) return false;
+    in.seekg(0);std::vector<unsigned char> bytes(15266304);in.read(reinterpret_cast<char*>(bytes.data()),bytes.size());if(!in) return false;
     BCRYPT_ALG_HANDLE algorithm=nullptr;unsigned char digest[32];
     if(BCryptOpenAlgorithmProvider(&algorithm,BCRYPT_SHA256_ALGORITHM,nullptr,0)<0) return false;
     BCRYPT_HASH_HANDLE hash=nullptr;
@@ -181,7 +181,7 @@ bool accepted_build() {
     if(hash) BCryptDestroyHash(hash);
     BCryptCloseAlgorithmProvider(algorithm,0);if(result<0) return false;
     char hex[65];for(int i=0;i<32;++i) std::sprintf(hex+i*2,"%02X",digest[i]);
-    return std::string(hex)=="11760857A577DFC2DCA0836614A250EBA31B309249DCC02F4D304A8A075A388A";
+    return std::string(hex)=="69FA3DA048D4A96DA2F2BA382F973EDA68E09B3DFF929593537EE112EF4E7898";
 }
 bool attach_swap() {
     auto base=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));

@@ -483,7 +483,7 @@ void paint_panel() {
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
-            text(282,314,L"Supported game build: September 15, 2026",muted);
+            text(282,314,L"Supported game build: September 16, 2026",muted);
             text(282,343,L"Game updates may require a newer version of SSC Mod Menu.",muted);
             text(266,414,L"UPDATES");
             text(266,455,ssc_update::message.c_str(),muted,false,14);

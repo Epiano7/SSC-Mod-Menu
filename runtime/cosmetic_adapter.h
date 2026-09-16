@@ -52,20 +52,20 @@ inline bool account_string(uintptr_t object,std::string& value){
 }
 inline bool local_account(uintptr_t account){
     std::string own,candidate;
-    return account_string(image_base+0xdf2040,own)&&account_string(account,candidate)&&own==candidate;
+    return account_string(image_base+0xdf4030,own)&&account_string(account,candidate)&&own==candidate;
 }
 inline bool native_phase(float& phase){
     float speed=0,time=0;
-    if(!read(image_base+0xf9ee04,speed)||!read(image_base+0xf9f860,time)||!std::isfinite(time)||!std::isfinite(speed))return false;
+    if(!read(image_base+0xfa0e04,speed)||!read(image_base+0xfa1860,time)||!std::isfinite(time)||!std::isfinite(speed))return false;
     float candidate=std::fmod(time*speed,1.f);if(!std::isfinite(candidate))return false;if(candidate<0)candidate+=1.f;phase=candidate;return true;
 }
 inline Identity identify(uintptr_t actor){
     Identity answer;uintptr_t world=0,first=0,last=0,registry=0;int slot=-1,kind=-1,local_slot=-1;unsigned char active=0;
-    if(!read(image_base+0xdd85d0,world)||!world||!read(world+0xa5b8,first)||!read(world+0xa5c0,last)||!first||last<first||(last-first)%0x3460||(last-first)/0x3460>2048)return answer;
+    if(!read(image_base+0xdda5d0,world)||!world||!read(world+0xa5b8,first)||!read(world+0xa5c0,last)||!first||last<first||(last-first)%0x3460||(last-first)/0x3460>2048)return answer;
     if(actor<first||actor>=last||(actor-first)%0x3460||!read(actor+0x78,slot)||slot<0||uintptr_t(slot)!=(actor-first)/0x3460||!read(actor+0x7c4,kind)||!read(actor+0x81,active)||!active)return answer;
     // e03370 is used by the native own-player formatter; bf48 may be spectated.
-    answer.local=kind==0&&read(image_base+0xe0c390,local_slot)&&slot==local_slot&&
-        read(image_base+0xe0fdf8,registry)&&registry==first&&local_account(actor+0x6d8);
+    answer.local=kind==0&&read(image_base+0xe0e380,local_slot)&&slot==local_slot&&
+        read(image_base+0xe11de8,registry)&&registry==first&&local_account(actor+0x6d8);
     return answer;
 }
 inline unsigned char __cdecl predicate(void* context,int id,void* owned_string){
@@ -79,11 +79,11 @@ inline unsigned char __cdecl predicate(void* context,int id,void* owned_string){
 // belongs to the local actor and no other actor is displaying that same key.
 inline bool unambiguous_event_account(uintptr_t text){
     std::string own_key,candidate;
-    if(!account_string(image_base+0xdf2040,own_key)||!account_string(text,candidate)||own_key!=candidate)return false;
+    if(!account_string(image_base+0xdf4030,own_key)||!account_string(text,candidate)||own_key!=candidate)return false;
     uintptr_t world=0,first=0,last=0;int slot=-1;
-    if(!read(image_base+0xdd85d0,world)||!read(world+0xa5b8,first)||!read(world+0xa5c0,last)||
+    if(!read(image_base+0xdda5d0,world)||!read(world+0xa5b8,first)||!read(world+0xa5c0,last)||
        !first||last<first||(last-first)%0x3460||(last-first)/0x3460>2048||
-       !read(image_base+0xe0c390,slot)||slot<0||size_t(slot)>=(last-first)/0x3460)return false;
+       !read(image_base+0xe0e380,slot)||slot<0||size_t(slot)>=(last-first)/0x3460)return false;
     const auto own=first+size_t(slot)*0x3460;
     if(!identify(own).local)return false;
     for(auto p=first;p<last;p+=0x3460){unsigned char active=0;
@@ -120,7 +120,7 @@ extern "C" float __cdecl ssc_score_draw(void* renderer,float x,float y,void* nam
     if(!cosmetics.load())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
     int slot=-1;uintptr_t world=0,first=0,last=0;
     Identity identity;
-    if(read(row+0x2c,slot)&&slot>=0&&read(image_base+0xdd85d0,world)&&read(world+0xa5b8,first)&&read(world+0xa5c0,last)&&last>=first&&size_t(slot)<(last-first)/0x3460)identity=identify(first+size_t(slot)*0x3460);
+    if(read(row+0x2c,slot)&&slot>=0&&read(image_base+0xdda5d0,world)&&read(world+0xa5b8,first)&&read(world+0xa5c0,last)&&last>=first&&size_t(slot)<(last-first)/0x3460)identity=identify(first+size_t(slot)*0x3460);
     if(cosmetics.load()&&identity.local&&native_phase(phase)){++cosmetic_draws;solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
@@ -130,42 +130,42 @@ inline float __cdecl account_draw(void* renderer,float x,float y,void* name,floa
 }
 inline bool attach(){
     image_base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
-    native_predicate=reinterpret_cast<Predicate>(image_base+0x3a4d80);native_overhead=reinterpret_cast<Overhead>(image_base+0x83e9a0);native_draw=reinterpret_cast<Draw>(image_base+0x47ae20);
-    native_widget=reinterpret_cast<Widget>(image_base+0x990ed0);
+    native_predicate=reinterpret_cast<Predicate>(image_base+0x3a4e10);native_overhead=reinterpret_cast<Overhead>(image_base+0x83f580);native_draw=reinterpret_cast<Draw>(image_base+0x47b010);
+    native_widget=reinterpret_cast<Widget>(image_base+0x991ad0);
     struct Site{uint32_t call,target;uintptr_t hook;};
     // Whitelist presentation calls only. Do not hook the predicate globally:
     // 5fb3b0/5fd316/6834a3/6b6db7 also service pass-related UI/cache logic.
     const Site sites[]={
-        {0x413cf4,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x413d78,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x434f96,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x4350bc,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x61afc4,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6347b7,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6a31ec,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6a3474,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6a3692,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9d84ff,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9a3bb7,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9a3d5b,0x47ae20,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x413d84,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x413e08,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x435026,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x43514c,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x61bbf4,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6353e7,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6a3e1c,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6a40a4,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6a42c2,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9d90ff,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9a47b7,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9a495b,0x47b010,reinterpret_cast<uintptr_t>(account_draw)},
 
-        {0x3381a9,0x83e9a0,reinterpret_cast<uintptr_t>(overhead)},
-        {0x83ee42,0x3a4d80,reinterpret_cast<uintptr_t>(predicate)},
-        {0x413b0c,0x3a4d80,reinterpret_cast<uintptr_t>(predicate)},
-        {0x433a65,0x3a4d80,reinterpret_cast<uintptr_t>(predicate)},
-        {0x434e92,0x3a4d80,reinterpret_cast<uintptr_t>(predicate)},
-        {0x61ac6c,0x3a4d80,reinterpret_cast<uintptr_t>(predicate)},
-        {0x63447e,0x3a4d80,reinterpret_cast<uintptr_t>(predicate)},
-        {0x6a1699,0x3a4d80,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9d8461,0x3a4d80,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9a3ae9,0x3a4d80,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x9a3c93,0x3a4d80,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x6015b1,0x990ed0,reinterpret_cast<uintptr_t>(local_widget)},
-        {0x993365,0x47ae20,reinterpret_cast<uintptr_t>(widget_draw)},
-        {0x83f6f7,0x47ae20,reinterpret_cast<uintptr_t>(draw)},
-        {0x83f783,0x47ae20,reinterpret_cast<uintptr_t>(draw)},
-        {0x43054d,0x47ae20,reinterpret_cast<uintptr_t>(ssc_score_bridge)},
-        {0x4305d2,0x47ae20,reinterpret_cast<uintptr_t>(ssc_score_bridge)}};
+        {0x338229,0x83f580,reinterpret_cast<uintptr_t>(overhead)},
+        {0x83fa22,0x3a4e10,reinterpret_cast<uintptr_t>(predicate)},
+        {0x413b9c,0x3a4e10,reinterpret_cast<uintptr_t>(predicate)},
+        {0x433af5,0x3a4e10,reinterpret_cast<uintptr_t>(predicate)},
+        {0x434f22,0x3a4e10,reinterpret_cast<uintptr_t>(predicate)},
+        {0x61b89c,0x3a4e10,reinterpret_cast<uintptr_t>(predicate)},
+        {0x6350ae,0x3a4e10,reinterpret_cast<uintptr_t>(predicate)},
+        {0x6a22c9,0x3a4e10,reinterpret_cast<uintptr_t>(predicate)},
+        {0x9d9061,0x3a4e10,reinterpret_cast<uintptr_t>(predicate)},
+        {0x9a46e9,0x3a4e10,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x9a4893,0x3a4e10,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x6021e1,0x991ad0,reinterpret_cast<uintptr_t>(local_widget)},
+        {0x993f65,0x47b010,reinterpret_cast<uintptr_t>(widget_draw)},
+        {0x8402d7,0x47b010,reinterpret_cast<uintptr_t>(draw)},
+        {0x840363,0x47b010,reinterpret_cast<uintptr_t>(draw)},
+        {0x4305dd,0x47b010,reinterpret_cast<uintptr_t>(ssc_score_bridge)},
+        {0x430662,0x47b010,reinterpret_cast<uintptr_t>(ssc_score_bridge)}};
     for(auto site:sites){auto p=reinterpret_cast<unsigned char*>(image_base+site.call);int32_t relative;std::memcpy(&relative,p+1,4);if(p[0]!=0xe8||image_base+site.call+5+relative!=image_base+site.target)return false;}
     unsigned char* bridge=nullptr;
     for(uintptr_t distance=0x10000;distance<0x60000000&&!bridge;distance+=0x10000){uintptr_t address=(image_base+distance)&~uintptr_t(0xffff);bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>(address),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));}
