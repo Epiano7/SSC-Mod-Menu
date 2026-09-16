@@ -17,7 +17,7 @@ static double __cdecl native(U a,double b,float c,U d,U e,U f,U g,U h,U i,U j,U 
 }
 static void matrix_is(const std::array<float,16>& expected){float actual[16];glGetFloatv(GL_PROJECTION_MATRIX,actual);for(int i=0;i<16;++i)assert(std::abs(actual[i]-expected[i])<.00001f);}
 static float mouse_x=0,mouse_y=0;static int fade_calls=0;
-static float __cdecl native_fade(U,float alpha,float x,float y,float w,float h,float feather,char){++fade_calls;assert(std::abs(x-100)<.01f&&std::abs(y-120)<.01f&&std::abs(w-240)<.01f&&std::abs(h-210)<.01f&&feather==90);return mouse_x>=x&&mouse_x<=x+w&&mouse_y>=y&&mouse_y<=y+h?alpha*.2f:alpha;}
+static float __cdecl native_fade(U,float alpha,float x,float y,float w,float h,float feather,char){++fade_calls;if(!ssc_hud::hover_fade){assert(x==-1000000.f&&y==-1000000.f&&w==0&&h==0);return alpha*.75f;}assert(std::abs(x-100)<.01f&&std::abs(y-120)<.01f&&std::abs(w-240)<.01f&&std::abs(h-210)<.01f&&feather==90);return mouse_x>=x&&mouse_x<=x+w&&mouse_y>=y&&mouse_y<=y+h?alpha*.2f:alpha;}
 int main(){
  // Exercise the real machine bridge with mixed register and all 16 stack arguments.
  auto stub=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));assert(stub);
@@ -59,6 +59,15 @@ int main(){
  mouse_x=940;mouse_y=535;assert(ssc_hud::fade_hook(0,1,900,500,80,70,30,0)==1);
  mouse_x=120;mouse_y=140;assert(ssc_hud::fade_hook(0,1,900,500,80,70,30,0)==.2f);
  ssc_hud::editing=true;assert(ssc_hud::fade_hook(0,1,900,500,80,70,30,0)==1&&fade_calls==2);ssc_hud::editing=false;
+ ssc_hud::hover_fade=false;assert(ssc_hud::fade_hook(0,1,900,500,80,70,30,0)==.75f);ssc_hud::hover_fade=true;
+ // Untextured padding must not expand the currency box. Visible glyph/icon
+ // quads do count, and later content can grow without shifting the rendering.
+ ssc_hud::active_item=6;ssc_hud::editing=true;ssc_hud::enabled=false;ssc_hud::measured_frame[6]={};
+ glDisable(GL_TEXTURE_2D);ssc_hud::capture_begin(GL_QUADS);ssc_hud::capture_v3(0,0,0);ssc_hud::capture_v3(1000,600,0);glEnd();assert(ssc_hud::measured_frame[6].points==0);
+ glEnable(GL_TEXTURE_2D);ssc_hud::capture_begin(GL_QUADS);ssc_hud::capture_v3(880,20,0);ssc_hud::capture_v3(990,80,0);glEnd();
+ auto tight=ssc_hud::measured_frame[6];assert(tight.points==2&&std::abs(tight.left-.88f)<.0001f&&std::abs(tight.right-.99f)<.0001f);
+ ssc_hud::apply_bounds(6,tight);assert(std::abs(ssc_hud::items[6].w-.11f)<.0001f);
+ tight.left=.8f;ssc_hud::apply_bounds(6,tight);assert(std::abs(ssc_hud::items[6].w-.19f)<.0001f);
  assert(glGetError()==GL_NO_ERROR);
  wglMakeCurrent(nullptr,nullptr);wglDeleteContext(rc);ReleaseDC(window,dc);DestroyWindow(window);UnregisterClassW(cls.lpszClassName,cls.hInstance);VirtualFree(stub,0,MEM_RELEASE);
  std::puts("PASS: real HUD bridge mixed register/16 stack arguments, floating return, independent map/round/timer transforms and unrelated draw isolation");

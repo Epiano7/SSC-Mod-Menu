@@ -18,7 +18,6 @@ inline Vertex3Proc native_vertex3=nullptr;
 inline bool primitive_capture=false;
 inline GLfloat capture_model[16],capture_projection[16];
 inline void accumulate(int index,float x,float y){
- if(index==6)return;
  if(index<0||index>=int(items.size())||!std::isfinite(x)||!std::isfinite(y))return;
  const auto& item=items[index];
  if(enabled){x=item.home_x+(x-item.x)/item.scale;y=item.home_y+(y-item.y)/item.scale;}
@@ -33,13 +32,16 @@ inline void capture_vertex(float x,float y,float z){
  if(std::abs(clip[3])>.00001f)accumulate(active_item,(clip[0]/clip[3]+1)*.5f,(1-clip[1]/clip[3])*.5f);
 }
 inline void APIENTRY capture_begin(GLenum mode){
- primitive_capture=active_item>=0&&(!measured[active_item]||editing)&&primitive_count[active_item]<256;
+ primitive_capture=active_item>=0&&(!measured[active_item]||editing||enabled)&&primitive_count[active_item]<256;
  if(primitive_capture){
+  // Currency has no panel background: only its textured glyphs/icons count.
+  if(active_item==6&&!glIsEnabled(GL_TEXTURE_2D))primitive_capture=false;
+  GLfloat color[4];glGetFloatv(GL_CURRENT_COLOR,color);if(color[3]<=0)primitive_capture=false;
   GLint stencil=GL_ALWAYS;glGetIntegerv(GL_STENCIL_FUNC,&stencil);
   // The map's stencil mask gives its visible bounds. Ignore the clipped world
   // geometry beneath it, which can extend far beyond the minimap rectangle.
   if(glIsEnabled(GL_STENCIL_TEST)&&stencil!=GL_ALWAYS)primitive_capture=false;
-  else {++primitive_count[active_item];glGetFloatv(GL_MODELVIEW_MATRIX,capture_model);glGetFloatv(GL_PROJECTION_MATRIX,capture_projection);}
+  else if(primitive_capture){++primitive_count[active_item];glGetFloatv(GL_MODELVIEW_MATRIX,capture_model);glGetFloatv(GL_PROJECTION_MATRIX,capture_projection);}
  }
  native_begin(mode);
 }
@@ -81,7 +83,7 @@ inline bool finish_frame(int width,int height,ULONGLONG now){
  }
  if(view_w&&view_h&&(width!=view_w||height!=view_h))measured.fill(false);
  view_w=width;view_h=height;
- capture_frame=now-capture_at>=(editing?150u:1000u);
+ capture_frame=now-capture_at>=(editing?150u:250u);
  if(capture_frame)capture_at=now;
  return changed_bounds;
 }

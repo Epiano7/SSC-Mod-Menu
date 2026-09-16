@@ -11,7 +11,7 @@ inline std::array<Item,9> items={{{L"Team roster","team",.76f,.02f,.23f,.13f,.76
 {L"Money / syringes","currency",.91f,.022f,.085f,.07f,.91f,.022f,1},
 {L"Weapons / ammo","weapons",.83f, .78f,.16f,.19f,.83f,.78f,1},
 {L"Health / skills","health",.38f,.81f,.24f,.17f,.38f,.81f,1}}};
-inline bool enabled=false,attached=false;
+inline bool enabled=false,attached=false,hover_fade=true;
 inline int selected=0;
 inline void constrain(Item& item){
     if(!std::isfinite(item.scale))item.scale=1;
@@ -76,7 +76,7 @@ inline void begin(Scope& scope,const Hook& hook){
  scope={};scope.stack_bytes=hook.stack_bytes;scope.previous=map_projection;scope.previous_item=active_item;
  if(hook.fade)return;
  active_item=hook.item;
- if(hook.item>=0&&capture_frame&&(!measured[hook.item]||editing))scope.capture=start_capture();
+ if(hook.item>=0&&capture_frame&&(!measured[hook.item]||editing||enabled))scope.capture=start_capture();
  if(!enabled)return;
  const bool modified=hook.item>=0&&changed(items[hook.item]);
  const bool root_needed=hook.map_root&&(changed(items[2])||changed(items[4])||changed(items[5]));
@@ -109,13 +109,10 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
   width=*reinterpret_cast<const int*>(game_base+0xf9f750);height=*reinterpret_cast<const int*>(game_base+0xf9f754);
  }
  if(width<=0||height<=0){width=view_w;height=view_h;}
- // Currency's renderer also emits unrelated screen-wide geometry. Its native
- // interaction rectangle is the authoritative bound for this group.
- if(active_item==6&&width>0&&height>0&&capture_frame&&!freeze_bounds){
-  measured_frame[6]={x/width,y/height,(x+w)/width,(y+h)/height,2};
- }
  if(editing&&active_item>=0)return std::abs(alpha);
  const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+0x443300);
+ // Move only the proximity test away; preserve native global/status opacity.
+ if(!hover_fade)return original(object,alpha,-1000000.f,-1000000.f,0,0,std::max(1.f,feather),global);
  if(enabled&&active_item>=0&&width>0&&height>0){const auto& a=items[active_item];
   if(measured[active_item]){x=a.x*width;y=a.y*height;w=a.w*a.scale*width;h=a.h*a.scale*height;feather*=a.scale;}
   else {x=(x-a.home_x*width)*a.scale+a.x*width;y=(y-a.home_y*height)*a.scale+a.y*height;w*=a.scale;h*=a.scale;feather*=a.scale;}

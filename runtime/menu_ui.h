@@ -42,7 +42,7 @@ void save() {
     if(state_dir.empty())return;
     auto path=state_dir/L"menu.ini",temp=state_dir/L"menu.ini.tmp";
     std::ofstream out(temp);
-    out<<"hud_enabled="<<ssc_hud::enabled<<"\n";for(const auto& item:ssc_hud::items){out<<"hud_box_"<<item.key<<"="<<item.home_x<<","<<item.home_y<<","<<item.w<<","<<item.h<<"\n";out<<"hud_"<<item.key<<"="<<item.x<<","<<item.y<<","<<item.scale<<"\n";}
+    out<<"hud_hover_fade="<<ssc_hud::hover_fade<<"\n";out<<"hud_enabled="<<ssc_hud::enabled<<"\n";for(const auto& item:ssc_hud::items){out<<"hud_box_"<<item.key<<"="<<item.home_x<<","<<item.home_y<<","<<item.w<<","<<item.h<<"\n";out<<"hud_"<<item.key<<"="<<item.x<<","<<item.y<<","<<item.scale<<"\n";}
     out<<"cosmetic_rainbow="<<ssc_names::rainbow<<"\ncosmetic_rgb="<<ssc_names::solid_rgb<<"\n";out<<"welcome_seen="<<welcome_seen<<"\n";out<<"schema=2\nclock="<<clock_enabled
        <<"\nsound_requested="<<sound_requested<<"\ncosmetic_requested="<<cosmetic_requested<<"\nmatch_sound_level="<<match_sound_level
        <<"\nrpc_requested="<<rpc_requested<<"\nrpc_id="<<rpc_id<<"\nrpc_timer="<<rpc_timer<<"\nrpc_rating="<<rpc_rating
@@ -69,6 +69,7 @@ void load_settings() {
     while(std::getline(in,line)) {
         auto at=line.find('=');if(at==std::string::npos)continue;
         std::string key=line.substr(0,at),value=line.substr(at+1);int number=0;
+        if(key=="hud_hover_fade"){ssc_hud::hover_fade=value!="0";continue;}
         if(key=="hud_enabled"){ssc_hud::enabled=value=="1";continue;}
         if(key.rfind("hud_box_",0)==0){for(int i=0;i<int(ssc_hud::items.size());++i)if(key==std::string("hud_box_")+ssc_hud::items[i].key){float x,y,w,h;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f,%f%c",&x,&y,&w,&h,&extra)==4&&std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&x>=-.5f&&y>=-.5f&&w>0&&h>0){ssc_hud::apply_bounds(i,{x,y,x+w,y+h,2});ssc_hud::measured[i]=false;}}continue;}
         if(key.rfind("hud_",0)==0){for(auto& item:ssc_hud::items)if(key==std::string("hud_")+item.key){float x,y,z;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f%c",&x,&y,&z,&extra)==3){item.x=x;item.y=y;item.scale=z;ssc_hud::constrain(item);}}continue;}
@@ -137,7 +138,11 @@ void activate(int id) {
     else if(id==146)start_live_hud();
     else if(id==147)close_menu(true);
     else if(id==148){auto& a=ssc_hud::items[ssc_hud::selected];a.x=a.home_x;a.y=a.home_y;a.scale=1;save();}
-    else if(id==143){ssc_hud::reset();save();}
+    else if(id==143){show_manager(10);}
+    else if(id==190){ssc_hud::reset();save();show_manager(6);}
+    else if(id==191){show_manager(6);}
+    else if(id==192){ssc_hud::hover_fade=!ssc_hud::hover_fade;save();}
+    else if(id==13){show_manager(9);}
     else if(id==144||id==145){ssc_hud::selected=(ssc_hud::selected+(id==144?int(ssc_hud::items.size())-1:1))%int(ssc_hud::items.size());dirty=true;}
     else if(id==83){rpc_requested=!rpc_requested;save();}
     else if(id==85){rpc_rating=!rpc_rating;save();}
@@ -391,9 +396,10 @@ void paint_panel() {
         button(3,20,374,366,42,L"ALL MODULES",true,true,true);button(4,402,374,218,42,L"DISABLE ALL");
         if(save_failed)text(24,425,L"Could not save settings",RGB(247,191,83));
     } else {
-        button(10,24,108,192,44,L"MODULES",settings_page==-1||settings_page>=3);
+        button(10,24,108,192,44,L"MODULES",settings_page==-1||(settings_page>=3&&settings_page<=6));
         button(11,24,166,192,44,L"INTERFACE",settings_page==1);
-        button(12,24,224,192,44,L"ABOUT",settings_page==2);
+        button(13,24,224,192,44,L"MISCELLANEOUS",settings_page==9);
+        button(12,24,282,192,44,L"ABOUT",settings_page==2);
         rectangle(238,108,1,546,RGB(38,65,101));
 
         if(settings_page==-1) {
@@ -453,6 +459,15 @@ void paint_panel() {
             text(266,238,L"Download, install and restart Skillshot City.",muted);
             button(161,266,308,340,48,L"UPDATE AND RESTART",true,ssc_update::available()&&rpc_preview.phase==1);
             button(1,630,308,180,48,L"LATER");
+        } else if(settings_page==9){
+            text(266,111,L"MISCELLANEOUS",ink,true);
+            text(282,198,L"HUD HOVER FADE");toggle(192,978,189,ssc_hud::hover_fade);
+            text(282,246,L"Fade HUD elements near your cursor.",muted);
+        } else if(settings_page==10){
+            text(266,111,L"RESET HUD LAYOUT?",ink,true);
+            text(266,194,L"Restore every HUD element's position and size?",muted);
+            button(190,266,280,300,44,L"RESET HUD LAYOUT",true);
+            button(191,586,280,180,44,L"CANCEL");
         } else if(settings_page==6){
             text(266,111,L"HUD EDITOR",ink,true);toggle(86,986,106,ssc_hud::enabled);
             button(146,266,188,300,48,L"EDIT HUD");button(143,266,254,300,40,L"RESET LAYOUT");

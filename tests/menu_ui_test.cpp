@@ -78,7 +78,7 @@ int main(int argc,char** argv) {
     hud_drag=0;hud_start_x=hud_start_y=0;hud_item_x=item.x;hud_item_y=item.y;hud_item_scale=1;hud_resize=false;move_hud(-hud_view_w*.5f,hud_view_h*.3f);assert(std::abs(item.x-.26f)<.00001f&&std::abs(item.y-.32f)<.00001f);
     finish_hud_drag();ssc_hud::reset();load_settings();assert(std::abs(item.x-.26f)<.00001f&&std::abs(item.y-.32f)<.00001f);
     hud_drag=0;hud_item_scale=1;hud_resize=true;move_hud(item.w*hud_view_w*.5f,item.h*hud_view_h*.5f);assert(std::abs(item.scale-1.5f)<.00001f);finish_hud_drag();
-    activate(86);assert(ssc_hud::enabled);activate(4);assert(!ssc_hud::enabled);activate(143);assert(item.x==item.home_x&&item.scale==1);
+    activate(86);assert(ssc_hud::enabled);activate(4);assert(!ssc_hud::enabled);activate(143);assert(settings_page==10);activate(191);assert(settings_page==6);activate(143);activate(190);assert(item.x==item.home_x&&item.scale==1);activate(192);assert(!ssc_hud::hover_fade);ssc_hud::hover_fade=true;load_settings();assert(!ssc_hud::hover_fade);activate(192);
     manager=true;settings_page=6;opened=true;hud_drag=0;item.x=.2f;
     window_proc(nullptr,WM_KEYDOWN,VK_ESCAPE,1);assert(hud_drag==-1&&settings_page==-1);ssc_hud::reset();load_settings();assert(std::abs(item.x-.2f)<.00001f);
     close_menu(true);assert(visibility==0);
