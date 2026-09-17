@@ -17,9 +17,11 @@
 #include "presence_source.h"
 #include "hud_editor.h"
 #include "update_module.h"
+#include "diagnostics.h"
 
 namespace {
 bool native_supported=false;
+bool presence_supported=false;
 #include "menu_ui.h"
 
 bool attach_sound() {
@@ -68,12 +70,12 @@ void render(HDC dc) {
     static ULONGLONG diagnostics_at=0;
     if(developer_tools&&now-diagnostics_at>15000){diagnostics_at=now;char report[160];snprintf(report,sizeof(report),"Draw diagnostics: rainbow=%u audio=%u",ssc_names::cosmetic_draws.load(),ssc_sound::substituted.load());log(report);}
     static ULONGLONG presence_at=0;
-    if(now-presence_at>=1000){presence_at=now;rpc_preview=native_supported?ssc_rpc::sample_steam(rpc_rating):ssc_rpc::Snapshot{};static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested,rpc_id,rpc_timer,rpc_preview);if(opened)dirty=true;}
+    if(now-presence_at>=1000){presence_at=now;rpc_preview=presence_supported?ssc_rpc::sample_steam(rpc_rating):ssc_rpc::Snapshot{};static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);if(opened)dirty=true;}
     static ULONGLONG update_at=0;
     if(now-update_at>=1000){update_at=now;
-        if(native_supported&&rpc_preview.phase==1&&!welcome_seen&&!opened){opened=true;show_manager(8);}
-        if(native_supported&&rpc_preview.phase==1&&!ssc_update::checked)ssc_update::check(state_dir);
-        if(ssc_update::poll(window,rpc_preview.phase==1||!native_supported))dirty=true;
+        if(presence_supported&&rpc_preview.phase==1&&!welcome_seen&&!opened){opened=true;show_manager(8);}
+        if(presence_supported&&rpc_preview.phase==1&&!ssc_update::checked)ssc_update::check(state_dir);
+        if(ssc_update::poll(window,rpc_preview.phase==1||!presence_supported))dirty=true;
         if(rpc_preview.phase!=1&&manager&&settings_page==7&&opened)close_menu(true);
         if(rpc_preview.phase==1&&ssc_update::available()&&!ssc_update::notified&&!opened){ssc_update::notified=true;opened=true;show_manager(7);}
     }
@@ -167,21 +169,17 @@ void render(HDC dc) {
     if(active_texture) active_texture(active);
 }
 BOOL WINAPI swap_hook(HDC dc) {render(dc);return original_swap(dc);}
-bool accepted_build() {
-    wchar_t path[32768];if(!GetModuleFileNameW(nullptr,path,32768)) return false;
-    std::ifstream in(std::filesystem::path(path),std::ios::binary|std::ios::ate);
-    if(!in||in.tellg()!=15272960) return false;
-    in.seekg(0);std::vector<unsigned char> bytes(15272960);in.read(reinterpret_cast<char*>(bytes.data()),bytes.size());if(!in) return false;
-    BCRYPT_ALG_HANDLE algorithm=nullptr;unsigned char digest[32];
-    if(BCryptOpenAlgorithmProvider(&algorithm,BCRYPT_SHA256_ALGORITHM,nullptr,0)<0) return false;
-    BCRYPT_HASH_HANDLE hash=nullptr;
-    NTSTATUS result=BCryptCreateHash(algorithm,&hash,nullptr,0,nullptr,0,0);
-    if(result>=0) result=BCryptHashData(hash,bytes.data(),static_cast<ULONG>(bytes.size()),0);
-    if(result>=0) result=BCryptFinishHash(hash,digest,32,0);
-    if(hash) BCryptDestroyHash(hash);
-    BCryptCloseAlgorithmProvider(algorithm,0);if(result<0) return false;
-    char hex[65];for(int i=0;i<32;++i) std::sprintf(hex+i*2,"%02X",digest[i]);
-    return std::string(hex)=="959319A3592DE2AED18E398C425FCC79D784ED038DAFD138B361A7D219F56D5E";
+void log_game_build() {
+    wchar_t path[32768];if(!GetModuleFileNameW(nullptr,path,32768))return;
+    std::ifstream in(std::filesystem::path(path),std::ios::binary);if(!in)return;
+    BCRYPT_ALG_HANDLE alg=nullptr;BCRYPT_HASH_HANDLE hash=nullptr;unsigned char digest[32];
+    if(BCryptOpenAlgorithmProvider(&alg,BCRYPT_SHA256_ALGORITHM,nullptr,0)<0)return;
+    bool ok=BCryptCreateHash(alg,&hash,nullptr,0,nullptr,0,0)>=0;char block[65536];size_t size=0;
+    while(ok&&in){in.read(block,sizeof(block));auto n=in.gcount();size+=size_t(n);if(n)ok=BCryptHashData(hash,reinterpret_cast<PUCHAR>(block),ULONG(n),0)>=0;}
+    if(ok)ok=BCryptFinishHash(hash,digest,32,0)>=0;
+    if(hash)BCryptDestroyHash(hash);
+    BCryptCloseAlgorithmProvider(alg,0);
+    if(ok){char line[160];std::snprintf(line,sizeof(line),"Game bytes=%llu SHA256=",static_cast<unsigned long long>(size));std::string value=line;for(auto c:digest){char h[3];std::snprintf(h,3,"%02X",c);value+=h;}log(value.c_str());}
 }
 bool attach_swap() {
     auto base=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));
@@ -224,16 +222,20 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     if(n&&n<32768) state_dir=path;
     else {n=GetEnvironmentVariableW(L"LOCALAPPDATA",path,32768);if(!n||n>=32768)return;state_dir=std::filesystem::path(path)/L"SkillshotCityMod";}
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
-    native_supported=accepted_build();
+    ssc_diagnostics::initialize(state_dir);
+    if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
+    log("SSC Mod Menu 0.1.2 startup");log_game_build();
+    auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
+    presence_supported=(supported&4)!=0;native_supported=true;
+    char result[128];std::snprintf(result,sizeof(result),"Compatibility: cosmetics=%d HUD=%d presence=%d scan=%llums",int((supported&1)!=0),int((supported&2)!=0),int(presence_supported),static_cast<unsigned long long>(GetTickCount64()-started));log(result);
     load_settings();
-    if(!native_supported){ssc_hud::enabled=false;cosmetic_requested=false;sound_requested=false;rpc_requested=false;log("Unsupported executable; compatibility menu only");log(attach_swap()?"Compatibility menu attached; Right Shift opens updater":"Compatibility menu unavailable");return;}
-    ssc_names::cosmetics=cosmetic_requested;
+    ssc_names::cosmetics=cosmetic_requested&&ssc_compat::supports(1);
     ssc_names::attached=ssc_names::attach();log(ssc_names::attached?"Tab and overhead name adapters attached":"Name adapters unavailable");
     try {
         wchar_t executable[32768];DWORD length=GetModuleFileNameW(nullptr,executable,32768);
         if(length&&length<32768){ssc_sound::initialize(std::filesystem::path(executable).parent_path(),state_dir,sound_requested);ssc_sound::attached=attach_sound();log(ssc_sound::attached?"Audio buffer adapter attached (WAV; restart applies changes)":"Audio adapter unavailable");}
     }catch(const std::exception&){log("Sound catalog unavailable; originals preserved");}
     ssc_hud::attached=ssc_hud::attach();log(ssc_hud::attached?"HUD draw groups attached":"HUD adapter unavailable");
-    log(attach_swap()?"Exact build accepted; SwapBuffers import attached":"SwapBuffers attachment refused");
+    log(attach_swap()?"Compatibility checks complete; SwapBuffers import attached":"SwapBuffers attachment refused");
 }
 BOOL WINAPI DllMain(HINSTANCE module,DWORD reason,LPVOID) {if(reason==DLL_PROCESS_ATTACH)DisableThreadLibraryCalls(module);return TRUE;}

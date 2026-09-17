@@ -6,7 +6,7 @@ static void snapshot(const std::filesystem::path& path) {
     std::ofstream out(path,std::ios::binary);out.write(reinterpret_cast<char*>(&file),sizeof(file));out.write(reinterpret_cast<char*>(&info),sizeof(info));out.write(static_cast<char*>(pixels),raster_w*raster_h*4);assert(out);
 }
 int main(int argc,char** argv) {
-    native_supported=true;
+    native_supported=true;presence_supported=true;
     assert(argc>=2);state_dir=std::filesystem::path(argv[1]);std::filesystem::create_directories(state_dir);
     {std::ofstream out(state_dir/"menu.ini");out<<"clock=1\n";}
     load_settings();assert(!clock_enabled);
@@ -40,10 +40,16 @@ int main(int argc,char** argv) {
     rpc_preview.phase=1;ssc_update::version="0.2.0";paint_panel();
     assert(std::any_of(controls.begin(),controls.end(),[](const Control& c){return c.id==161&&c.enabled;}));
     settings_page=7;paint_panel();snapshot(state_dir/"update-prompt.bmp");
-    native_supported=false;manager=false;paint_panel();snapshot(state_dir/"compatibility.bmp");
+    native_supported=false;presence_supported=false;manager=false;paint_panel();snapshot(state_dir/"compatibility.bmp");
     assert(std::none_of(controls.begin(),controls.end(),[](const Control& c){return c.id>=80&&c.id<=94;}));
     assert(std::any_of(controls.begin(),controls.end(),[](const Control& c){return c.id==160&&c.enabled;}));
-    native_supported=true;ssc_update::version.clear();rpc_preview.phase=0;
+    native_supported=true;presence_supported=true;ssc_update::version.clear();rpc_preview.phase=0;
+    // An unavailable module preserves its preference and cannot enter HUD edit mode.
+    ssc_compat::initialized=true;ssc_compat::available=0;ssc_hud::attached=false;
+    cosmetic_requested=true;activate(81);assert(cosmetic_requested);
+    activate(94);assert(manager&&settings_page==6&&!ssc_hud::editing);
+    manager=false;paint_panel();assert(std::none_of(controls.begin(),controls.end(),[](const Control& c){return (c.id==81||c.id==86)&&c.enabled;}));
+    ssc_compat::initialized=false;cosmetic_requested=false;manager=true;
     // Verify the preview against the supported game's palette leaf function without starting it.
     if(argc>3){
         HMODULE module=LoadLibraryExA(argv[3],nullptr,DONT_RESOLVE_DLL_REFERENCES);assert(module);

@@ -20,7 +20,7 @@ namespace SSCMods.Setup {
         public ReleaseAsset[] assets;
     }
     public static class Updater {
-        public const string CurrentVersion="0.1.1";
+        public const string CurrentVersion="0.1.2";
         const string Api="https://api.github.com/repos/Epiano7/SSC-Mod-Menu/releases/latest";
         const string Prefix="https://github.com/Epiano7/SSC-Mod-Menu/releases/download/";
         public static Version ParseVersion(string text) {

@@ -32,7 +32,9 @@ A custom HUD layout in game:
 
 ## Compatibility
 
-Installs into your Skillshot City Steam folder. Game updates may require a newer mod version.
+Installs into your Skillshot City Steam folder. Each native module checks its dependencies at startup. Updates that leave those dependencies unchanged can keep working; changed or ambiguous code pauses the affected module instead of using outdated addresses. Larger game changes may still require a mod update.
+
+If something goes wrong, open **All Modules > About > Open logs**. Startup checks are recorded in `runtime.log`; crash reports are saved under `diagnostics` when Windows allows the crash handler to run. Reports stay on your computer and are not uploaded automatically. Minidumps can contain process data, so review them before sharing.
 
 ## Credits
 - bencelot (dev of SSC) for giving feedback before this released and for making the game ofc

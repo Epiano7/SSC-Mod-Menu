@@ -1,4 +1,5 @@
 #pragma once
+#include "compatibility.h"
 #include <array>
 namespace ssc_hud {
 struct Item {const wchar_t* name;const char* key;float home_x,home_y,w,h,x,y,scale;};
@@ -38,44 +39,44 @@ template<int Index> void __cdecl draw(uintptr_t object){
 }
 // Hook only validated call sites. Renderer hooks forward 14/20 native arguments.
 struct Hook {uintptr_t call,target;int item;unsigned stack_bytes;bool map_root=false;bool fade=false;};
-inline constexpr Hook hooks[]={
- {0x3b4c05,0x435540,0,0},{0x3b4c11,0x436890,1,0},
- {0x3b478c,0x41f330,2,0,true},{0x3b4ae3,0x41f330,2,0,true},
+inline Hook hooks[]={
+ {0x3b4dab,0x4356e0,0,0},{0x3b4db7,0x436a30,1,0},
+ {0x3b492e,0x41f4d0,2,0,true},{0x3b4c89,0x41f4d0,2,0,true},
  {0x1a78c3,0x1a7980,3,0},
- {0x4252b3,0x3b54e0,5,0},
- {0x3b4fa0,0x406910,6,0,true},
- {0x3b4f61,0x415de0,7,0},
- {0x3b4f2f,0x3e6510,8,0},{0x3b4f45,0x409a70,8,0},
+ {0x425453,0x3b5680,5,0},
+ {0x3b5141,0x406ab0,6,0,true},
+ {0x3b5102,0x415f80,7,0},
+ {0x3b50d0,0x3e66b0,8,0},{0x3b50e6,0x409c10,8,0},
  // These draws are called from the map routine but are not part of the map.
- {0x42525f,0x412290,-1,0},{0x425278,0x414130,-1,0},
- {0x4252a3,0x3e5980,-1,0},{0x4252c8,0x4153a0,-1,0},
+ {0x4253ff,0x412430,-1,0},{0x425418,0x4142d0,-1,0},
+ {0x425443,0x3e5b20,-1,0},{0x425468,0x415540,-1,0},
  // Timer icon and its three text branches inside the round/player renderer.
- {0x3b7e1b,0x481200,4,128},{0x3b8044,0x47c530,4,80},
- {0x3b80ef,0x47c530,4,80},{0x3b8185,0x47c530,4,80},
- {0x4369b7,0x444640,-2,32,false,true},
- {0x3e6616,0x444640,-2,32,false,true},
- {0x406a20,0x444640,-2,32,false,true},
- {0x40a06e,0x444640,-2,32,false,true},
- {0x415ed8,0x444640,-2,32,false,true},
- {0x41f44e,0x444640,-2,32,false,true},
- {0x3b5710,0x444640,-2,32,false,true},
- {0x3b6988,0x444640,-2,32,false,true},
- {0x3e5a98,0x444640,-2,32,false,true},
- {0x4124fe,0x444640,-2,32,false,true},
- {0x4142fc,0x444640,-2,32,false,true},
- {0x41553f,0x444640,-2,32,false,true},
- {0x435b7a,0x444640,-2,32,false,true},
- {0x1c2556,0x1bfb20,-3,112},
- {0x1c2651,0x1bfb20,-3,112},
- {0x1c3b78,0x1bfb20,-3,112},
- {0x1c3cd1,0x1bfb20,-3,112},
- {0x1c3df7,0x1bfb20,-3,112},
- {0x1c4e99,0x1bfb20,-3,112},
- {0x1c4f86,0x1bfb20,-3,112},
- {0x481319,0x1bfb20,-3,112},
- {0x482a8f,0x1bfb20,-3,112},
+ {0x3b7fbb,0x481440,4,128},{0x3b81e4,0x47c770,4,80},
+ {0x3b828f,0x47c770,4,80},{0x3b8325,0x47c770,4,80},
+ {0x436b57,0x4447e0,-2,32,false,true},
+ {0x3e67b6,0x4447e0,-2,32,false,true},
+ {0x406bc0,0x4447e0,-2,32,false,true},
+ {0x40a20e,0x4447e0,-2,32,false,true},
+ {0x416078,0x4447e0,-2,32,false,true},
+ {0x41f5ee,0x4447e0,-2,32,false,true},
+ {0x3b58b0,0x4447e0,-2,32,false,true},
+ {0x3b6b28,0x4447e0,-2,32,false,true},
+ {0x3e5c38,0x4447e0,-2,32,false,true},
+ {0x41269e,0x4447e0,-2,32,false,true},
+ {0x41449c,0x4447e0,-2,32,false,true},
+ {0x4156df,0x4447e0,-2,32,false,true},
+ {0x435d1a,0x4447e0,-2,32,false,true},
+ {0x1c24df,0x1bfb20,-3,112},
+ {0x1c25da,0x1bfb20,-3,112},
+ {0x1c3b01,0x1bfb20,-3,112},
+ {0x1c3c5a,0x1bfb20,-3,112},
+ {0x1c3d80,0x1bfb20,-3,112},
+ {0x1c4e25,0x1bfb20,-3,112},
+ {0x1c4f12,0x1bfb20,-3,112},
+ {0x481559,0x1bfb20,-3,112},
+ {0x482ccf,0x1bfb20,-3,112},
  // Screen-wide progress strips share the currency function, but are not counters.
- {0x406dbb,0x481200,-1,128},{0x406ee8,0x481200,-1,128},{0x407019,0x481980,-1,120}
+ {0x406f5b,0x481440,-1,128},{0x407088,0x481440,-1,128},{0x4071b9,0x481bc0,-1,120}
 };
 inline uintptr_t game_base=0;
 inline bool changed(const Item& item){return item.scale!=1||item.x!=item.home_x||item.y!=item.home_y;}
@@ -117,11 +118,11 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
  // Native mouse coordinates use the game's logical canvas, not the GL viewport.
  int width=fade_w?fade_w:view_w,height=fade_h?fade_h:view_h;
  if(game_base==reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
-  width=*reinterpret_cast<const int*>(game_base+0xfa2750);height=*reinterpret_cast<const int*>(game_base+0xfa2754);
+  width=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfa2750));height=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfa2754));
  }
  if(width<=0||height<=0){width=view_w;height=view_h;}
  if(editing&&active_item>=0)return std::abs(alpha);
- const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+0x444640);
+ const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+ssc_compat::resolve(0x4447e0));
  // Move only the proximity test away; preserve native global/status opacity.
  if(!hover_fade)return original(object,alpha,-1000000.f,-1000000.f,0,0,std::max(1.f,feather),global);
  if(enabled&&active_item>=0&&width>0&&height>0){const auto& a=items[active_item];
@@ -136,6 +137,8 @@ extern "C" void ssc_hud_bridge();
 extern "C" __attribute__((used,noinline)) uintptr_t ssc_hud_before(unsigned index,Scope* scope,const unsigned char* stack){begin(*scope,hooks[index]);if(hooks[index].item==-3)capture_queued_rectangle(stack);return hooks[index].fade?reinterpret_cast<uintptr_t>(fade_hook):game_base+hooks[index].target;}
 extern "C" __attribute__((used,noinline)) void ssc_hud_after(Scope* scope){end(*scope);}
 inline bool attach(){
+ if(!ssc_compat::supports(2))return false;
+ for(auto& hook:hooks){hook.call=ssc_compat::resolve(uint32_t(hook.call));hook.target=ssc_compat::resolve(uint32_t(hook.target));}
  const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
  for(const auto& hook:hooks){auto p=reinterpret_cast<const unsigned char*>(base+hook.call);int32_t relative;std::memcpy(&relative,p+1,4);if(p[0]!=0xe8||base+hook.call+5+relative!=base+hook.target)return false;}
  unsigned char* bridge=nullptr;
