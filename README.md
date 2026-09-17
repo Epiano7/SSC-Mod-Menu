@@ -11,8 +11,8 @@ Run the installer and select your Skillshot City Steam folder. After installatio
 ## Current Official Modules
 
 - **Sound Replacer:** import WAV or MP3 replacements, match volume and restore originals. Sample rate and mono/stereo conversion are automatic. Requires a restart to apply. MP3 decoding uses Windows Media Foundation.
-- **Cosmetics:** local animated rainbow-name styling using the native palette and verified local account identity.
-- **Discord Presence:** game status, available round/level details, elapsed time and ranked SSC rating. No application token is required as it is bundled in by default.
+- **Cosmetics:** Customize your name with animated rainbow colors or a solid color, visible only to you.
+- **Discord Presence:** game status, available round/level details, elapsed time and ranked SSC rating. No developer setup or token is required.
 - **HUD Editor:** reposition and resize nine HUD groups, with saved layouts, resets and 25-600% scaling. Groups include minimap, version/FPS, round clock, round/players, money/syringes, weapons/ammo, healthbar/survival hearts/skills, team roster and event feed.
 
 ## Screenshots
@@ -32,7 +32,7 @@ A custom HUD layout in game:
 
 ## Compatibility
 
-The current installer targets your steam SSC instance. Game updates will most likely require an update on my side to function.
+Installs into your Skillshot City Steam folder. Game updates may require a newer mod version.
 
 ## Credits
 - bencelot (dev of SSC) for giving feedback before this released and for making the game ofc

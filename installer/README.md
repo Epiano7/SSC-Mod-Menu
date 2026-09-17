@@ -1,17 +1,17 @@
 # Installer
 
-SSC-Mod-Menu-Setup.exe is one compact, borderless Windows application. It discovers the Steam game folder and shows Install or Update according to the ownership manifest. Uninstall is next to the primary action. Repair is always visible beneath Browse; it reports an invalid folder or unsupported game version without changing files.
+Run **SSC-Mod-Menu-Setup.exe** and select your Skillshot City Steam folder. The installer detects an existing mod installation and offers **Install** or **Update**. After installation, select **Launch**, or start the game normally through Steam. You do not need to run the installer each time you play.
 
-Repair installs into a clean compatible folder, restores missing or modified owned files, and preserves settings/custom audio. It refuses unowned conflicts and unsafe manifests. Original files and the manifest remain in a uniquely named directory under SSCMods-Recovery beside the mod folder for recovery. Interrupted replacement tests cover every payload boundary.
+**Repair** is always available beneath Browse. Use it to install missing mod files or restore a damaged installation while keeping your settings and custom audio. If the folder contains conflicting files or an unsupported game version, Repair stops and explains the problem. Files replaced during repair are kept in a recovery folder beside SSCMods.
 
-Owned paths are opengl32.dll, SSCMods/runtime.dll, SSCMods/Uninstall.exe and SSCMods/install-manifest.json for compatibility with existing installs. The game executable and assets are never overwritten. Uninstall validates ownership and retains modified/unrelated files.
+**Uninstall** removes the mod's files while keeping your saved preferences, custom audio, and unrelated or modified files. The installer does not overwrite the game executable or game assets.
 
-The UI runs without administrator access. Install/Update, Repair, and Uninstall request Windows elevation only when performing an operation. File work runs asynchronously and prevents concurrent actions. The installed uninstaller stages itself outside the game folder before removal.
+The installer may ask for Windows administrator permission when installing, updating, repairing, or uninstalling.
 
 ## In-game updates
 
-The runtime checks once at a verified main menu, or manually through About. It does not automatically open an update prompt during gameplay. A compatibility-only menu survives an unsupported game update; its manual update controls remain available with Right Shift. Automatic checking is deferred when the game state cannot be verified.
+The mod checks for updates once at the main menu. You can also check manually from **About**. Automatic update prompts do not appear during gameplay.
 
-The unelevated helper checks the latest stable GitHub release, rejects drafts/prereleases/downgrades, downloads SSC-Mod-Menu-Setup.exe, and verifies the GitHub asset SHA-256 digest and size. It launches the verified installer, requests elevation if needed, and waits for a ready signal before the runtime closes the game. The installer verifies game compatibility and process identity, waits for exit, repairs/updates owned files, then returns to the unelevated helper to launch Steam app 308600. The normal installer window is not shown.
+When an update is available, choose **Update and restart**. The mod downloads and verifies the installer before closing the game, applies the update, and launches the game through Steam. The normal setup window is not shown, although Windows may ask for administrator permission.
 
-Protocol source: [GitHub release assets](https://docs.github.com/en/rest/releases/assets).
+If a game update is unsupported, **Right Shift** still opens a compatibility menu with manual update controls. Automatic checks wait until the game state can be recognized.
