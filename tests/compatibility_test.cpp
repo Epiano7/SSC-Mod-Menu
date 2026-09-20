@@ -31,7 +31,7 @@ int main(int argc,char** argv){
         auto nt=reinterpret_cast<IMAGE_NT_HEADERS64*>(disk.data()+dos->e_lfanew);std::vector<unsigned char> mapped(nt->OptionalHeader.SizeOfImage);std::memcpy(mapped.data(),disk.data(),nt->OptionalHeader.SizeOfHeaders);std::vector<Section> ranges;auto sec=IMAGE_FIRST_SECTION(nt);
         for(unsigned i=0;i<nt->FileHeader.NumberOfSections;++i){assert(sec[i].PointerToRawData+sec[i].SizeOfRawData<=disk.size());std::memcpy(mapped.data()+sec[i].VirtualAddress,disk.data()+sec[i].PointerToRawData,sec[i].SizeOfRawData);ranges.push_back({sec[i].VirtualAddress,sec[i].Misc.VirtualSize,(sec[i].Characteristics&IMAGE_SCN_MEM_EXECUTE)!=0});}
         auto now=GetTickCount64();auto result=inspect(mapped.data(),mapped.size(),ranges,report,function_specs,std::size(function_specs),binding_specs,std::size(binding_specs));
-        std::cout<<"Native compatibility groups="<<result<<" duration="<<GetTickCount64()-now<<"ms\n";assert(result==7);
+        std::cout<<"Native compatibility groups="<<result<<" duration="<<GetTickCount64()-now<<"ms\n";assert(result==15);
         for(const auto& binding:binding_specs)assert(resolve(binding.key)==binding.key);
     }
 }

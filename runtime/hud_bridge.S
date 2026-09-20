@@ -38,6 +38,13 @@ ssc_hud_bridge:
  addl $8, %eax
  jmp 1b
 2:
+ // Optional skill-icon opacity override, applied only to our copied arguments.
+ movl 0x184(%rsp), %eax
+ testl %eax, %eax
+ jz 3f
+ movss 0x188(%rsp), %xmm0
+ movss %xmm0, 0x20(%rsp,%rax)
+3:
  movq 0xf8(%rsp), %rax
  pushq %rax
  popfq

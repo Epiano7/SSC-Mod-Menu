@@ -7,6 +7,7 @@ Changed function bodies fail closed; this is not a universal ABI guarantee.
 from pathlib import Path
 import argparse, bisect, collections, re
 import pefile, capstone
+from types import SimpleNamespace
 
 parser=argparse.ArgumentParser()
 parser.add_argument('game');parser.add_argument('--root',default=str(Path(__file__).resolve().parents[1]))
@@ -15,11 +16,13 @@ md=capstone.Cs(capstone.CS_ARCH_X86,capstone.CS_MODE_64);md.detail=True
 sec=next(s for s in pe.sections if s.Name.startswith(b'.text'));code=sec.get_data();start=sec.VirtualAddress
 funcs=[e.struct for e in pe.DIRECTORY_ENTRY_EXCEPTION];begins=[e.BeginAddress for e in funcs]
 def function(a):
+ # Validated leaf helper has no PE unwind entry. Keep its entire body fingerprinted.
+ if 0x3a7aa0<=a<0x3a7b38:return SimpleNamespace(BeginAddress=0x3a7aa0,EndAddress=0x3a7b38)
  e=funcs[bisect.bisect_right(begins,a)-1]
  assert e.BeginAddress<=a<e.EndAddress,hex(a)
  return e
 dependencies=collections.defaultdict(int)
-for name,group in [('cosmetic_adapter.h',1),('hud_editor.h',2),('hud_geometry.h',2),('presence_source.h',4)]:
+for name,group in [('cosmetic_adapter.h',1),('hud_editor.h',2),('hud_geometry.h',2),('presence_source.h',4),('weapon_lab.h',8)]:
  text=(root/'runtime'/name).read_text()
  for a in re.findall(r'(?:image_base|game_base|base)\+(?:ssc_compat::resolve\()?(0x[0-9a-f]+)',text):dependencies[int(a,16)]|=group
  for a,b in re.findall(r'\{(0x[0-9a-f]+),\s*(0x[0-9a-f]+),',text):

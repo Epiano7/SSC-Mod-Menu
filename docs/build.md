@@ -13,8 +13,14 @@ Packaging requires the exact validated runtime/proxy hashes recorded in Build-In
 
 Native font/palette checks can additionally run `menu_ui_test.exe OUTPUT_DIRECTORY GAME_DIRECTORY GAME_EXE`. They read your local game installation.
 
+`text_cache_test.exe GAME_DIRECTORY` compares cached text against the reference rasterizer using the installed fonts, including scaling, clipping and animated colors. `texture_upload_test.exe` verifies allocation, updates and resizing on a hidden OpenGL window.
+
+`cooldown_adapter_test.exe GAME_EXE` checks the executable's compatibility fingerprints, then maps it without starting the game to exercise the native readiness function against synthetic player/world records. The regular test also exercises the assembly bridge and verifies that only the selected icon's opacity argument changes. The pulse state-machine test covers completion, recasting, stale observations, invalid inputs and disabled settings.
+
 
 ## Native compatibility
+
+`weapon_lab_test.exe GAME_EXE` checks bounded catalog reads and calculation edge cases, then compares the displayed-DPS formula against the fingerprinted native helper on synthetic records. Weapon Lab reads base definitions only when opened or refreshed. Its simple firing/reload model excludes bursts and added damage effects; it is not a simulation of an equipped build or real combat.
 
 `runtime/compatibility_data.h` contains short function locators, normalized full-function fingerprints, and bindings for the validated native layout. The runtime resolves them once before installing hooks. A missing/ambiguous locator, changed function body, disagreeing data references, or invalid target section pauses the dependent modules. This is conservative compatibility checking, not a guarantee that arbitrary future game ABIs are compatible.
 
@@ -28,3 +34,5 @@ python scripts/generate_compatibility.py 'C:\path\to\SkillshotCity.exe'
 The synthetic resolver tests cover moved code, changed bodies, ambiguous/missing locators, module isolation and invalid data targets. `diagnostics_test` exercises report generation without crashing the game. Installer revision checks remain strict: startup tolerance for an already installed mod does not authorize installing into an unvalidated executable.
 
 Crash diagnostics are best effort. Forced termination, fail-fast errors, or another component replacing the exception filter may prevent a report. The mod preserves the previous exception handler and does not attempt to resume a corrupted process.
+
+Weapon Lab includes editable target health/shield, manual damage/reload modifiers, up to four comparison columns and timed duel playback. `weapon_lab_test.exe GAME_EXE` also compares 20,000 synthetic health/shield cases with an isolated arithmetic block in a private mapped game image; the game is not started. No live actor or player data is used. The shield balance values are read from the running game only after compatibility checks. Calculator results currently exclude unsupported multiple-impact weapons, bursts, melee/explosives and damage-over-time weapons; Minigun has a three-impact estimate. Perks, range falloff, travel, passive recovery and defense effects are not modeled. Timing remains an estimate, rather than a verified reproduction of the firing loop.

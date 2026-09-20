@@ -15,6 +15,9 @@
 #include "sound_module.h"
 #include "cosmetic_adapter.h"
 #include "presence_source.h"
+#include "weapon_lab.h"
+#include "local_recorder.h"
+#include "recorder_source.h"
 #include "hud_editor.h"
 #include "update_module.h"
 #include "diagnostics.h"
@@ -57,6 +60,14 @@ template<class T> T gl_proc(const char* name) {
     auto p=wglGetProcAddress(name);auto v=reinterpret_cast<intptr_t>(p);
     return (v==0||v==1||v==2||v==3||v==-1)?nullptr:reinterpret_cast<T>(p);
 }
+void upload_canvas_texture() {
+    static GLuint allocated_texture=0;
+    static int allocated_w=0,allocated_h=0;
+    if(allocated_texture!=texture||allocated_w!=raster_w||allocated_h!=raster_h){
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,raster_w,raster_h,0,0x80E1,GL_UNSIGNED_BYTE,pixels);
+        allocated_texture=texture;allocated_w=raster_w;allocated_h=raster_h;
+    }else glTexSubImage2D(GL_TEXTURE_2D,0,0,0,raster_w,raster_h,0x80E1,GL_UNSIGNED_BYTE,pixels);
+}
 void render(HDC dc) {
     HWND window=WindowFromDC(dc); HGLRC context=wglGetCurrentContext();
     if(!window||!context) return;
@@ -70,16 +81,18 @@ void render(HDC dc) {
     static ULONGLONG diagnostics_at=0;
     if(developer_tools&&now-diagnostics_at>15000){diagnostics_at=now;char report[160];snprintf(report,sizeof(report),"Draw diagnostics: rainbow=%u audio=%u",ssc_names::cosmetic_draws.load(),ssc_sound::substituted.load());log(report);}
     static ULONGLONG presence_at=0;
-    if(now-presence_at>=1000){presence_at=now;rpc_preview=presence_supported?ssc_rpc::sample_steam(rpc_rating):ssc_rpc::Snapshot{};static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);if(opened)dirty=true;}
+    if(now-presence_at>=1000){presence_at=now;rpc_preview=presence_supported?ssc_rpc::sample_steam(rpc_rating):ssc_rpc::Snapshot{};static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);refresh_dynamic_panel(now,true);if(ssc_record::state().enabled){auto observed=presence_supported?ssc_rpc::native_fallback(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_rpc::Snapshot{};ssc_record::round_state(ssc_record::active_round(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),observed.phase));ssc_record::sample(observed.phase,observed.details,observed.state,now,observed.phase==2?ssc_record::sample_local_build(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_record::Json(nullptr));if(opened&&manager&&settings_page==12)dirty=true;}}
     static ULONGLONG update_at=0;
     if(now-update_at>=1000){update_at=now;
         if(presence_supported&&rpc_preview.phase==1&&!welcome_seen&&!opened){opened=true;show_manager(8);}
+        if(update_notes_due(rpc_preview.phase)){opened=true;show_manager(14);}
         if(presence_supported&&rpc_preview.phase==1&&!ssc_update::checked)ssc_update::check(state_dir);
         if(ssc_update::poll(window,rpc_preview.phase==1||!presence_supported))dirty=true;
         if(rpc_preview.phase!=1&&manager&&settings_page==7&&opened)close_menu(true);
         if(rpc_preview.phase==1&&ssc_update::available()&&!ssc_update::notified&&!opened){ssc_update::notified=true;opened=true;show_manager(7);}
     }
     RECT hud_client{};GetClientRect(window,&hud_client);if(ssc_hud::finish_frame(hud_client.right,hud_client.bottom,now)&&ssc_hud::editing)dirty=true;
+    if(opened&&manager&&settings_page==11&&ssc_lab::duel_animating()){ssc_lab::advance_duel(seconds);static ULONGLONG duel_paint_at=0;if(now-duel_paint_at>=16||!ssc_lab::duel_animating()){duel_paint_at=now;dirty=true;}}
     advance_animation(seconds);
     if(window!=game_window||(!opened&&visibility==0.f&&modal_visibility==0.f&&!clock_enabled))return;
     RECT client;GetClientRect(window,&client);int width=client.right,height=client.bottom;
@@ -142,16 +155,15 @@ void render(HDC dc) {
     glPixelStorei(GL_UNPACK_ALIGNMENT,4);glPixelStorei(GL_UNPACK_ROW_LENGTH,0);glPixelStorei(GL_UNPACK_SKIP_PIXELS,0);glPixelStorei(GL_UNPACK_SKIP_ROWS,0);
     bool menu_visible=opened||visibility>0.f;static bool was_menu=true;static int clock_second=-1;
     if(menu_visible!=was_menu){dirty=true;was_menu=menu_visible;}
-    static ULONGLONG rainbow_preview_at=0;
-    if(menu_visible&&manager&&settings_page==4&&now-rainbow_preview_at>=50){rainbow_preview_at=now;dirty=true;}
-    if(menu_visible) {if(dirty){if(ssc_hud::editing)paint_live_hud_toolbar();else paint_panel();glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,raster_w,raster_h,0,0x80E1,GL_UNSIGNED_BYTE,pixels);dirty=false;}}
+    refresh_dynamic_panel(now);
+    if(menu_visible) {if(dirty){if(ssc_hud::editing)paint_live_hud_toolbar();else paint_panel();upload_canvas_texture();dirty=false;}}
     else {
         SYSTEMTIME time;GetLocalTime(&time);
         if(dirty||clock_second!=time.wSecond) {
             clock_second=time.wSecond;prepare_canvas();std::memset(pixels,0,raster_w*raster_h*4);
             panel_w=310;panel_h=42;rectangle(0,0,panel_w,panel_h,RGB(8,21,41));
             wchar_t value[80];swprintf(value,80,L"TEST CLOCK  %02u:%02u:%02u",time.wHour,time.wMinute,time.wSecond);
-            text(12,13,value);finish_canvas();glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,raster_w,raster_h,0,0x80E1,GL_UNSIGNED_BYTE,pixels);
+            text(12,13,value);finish_canvas();upload_canvas_texture();
         }
     }
     float x=menu_visible?float(panel_x):24.f,y=menu_visible?float(panel_y):24.f;
@@ -224,9 +236,10 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
     ssc_diagnostics::initialize(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
-    log("SSC Mod Menu 0.1.2 startup");log_game_build();
+    log("SSC Mod Menu 0.1.3 startup");log_game_build();
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
     presence_supported=(supported&4)!=0;native_supported=true;
+    log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");
     char result[128];std::snprintf(result,sizeof(result),"Compatibility: cosmetics=%d HUD=%d presence=%d scan=%llums",int((supported&1)!=0),int((supported&2)!=0),int(presence_supported),static_cast<unsigned long long>(GetTickCount64()-started));log(result);
     load_settings();
     ssc_names::cosmetics=cosmetic_requested&&ssc_compat::supports(1);

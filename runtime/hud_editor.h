@@ -1,5 +1,6 @@
 #pragma once
 #include "compatibility.h"
+#include "cooldown_pulse.h"
 #include <array>
 namespace ssc_hud {
 struct Item {const wchar_t* name;const char* key;float home_x,home_y,w,h,x,y,scale;};
@@ -38,7 +39,7 @@ template<int Index> void __cdecl draw(uintptr_t object){
     GLint after=GL_MODELVIEW;glGetIntegerv(GL_MATRIX_MODE,&after);glMatrixMode(GL_PROJECTION);glLoadMatrixf(projection);glMatrixMode(after);
 }
 // Hook only validated call sites. Renderer hooks forward 14/20 native arguments.
-struct Hook {uintptr_t call,target;int item;unsigned stack_bytes;bool map_root=false;bool fade=false;};
+struct Hook {uintptr_t call,target;int item;unsigned stack_bytes;bool map_root=false;bool fade=false;bool skills_root=false;};
 inline Hook hooks[]={
  {0x3b4dab,0x4356e0,0,0},{0x3b4db7,0x436a30,1,0},
  {0x3b492e,0x41f4d0,2,0,true},{0x3b4c89,0x41f4d0,2,0,true},
@@ -46,7 +47,7 @@ inline Hook hooks[]={
  {0x425453,0x3b5680,5,0},
  {0x3b5141,0x406ab0,6,0,true},
  {0x3b5102,0x415f80,7,0},
- {0x3b50d0,0x3e66b0,8,0},{0x3b50e6,0x409c10,8,0},
+ {0x3b50d0,0x3e66b0,8,0},{0x3b50e6,0x409c10,8,0,false,false,true},
  // These draws are called from the map routine but are not part of the map.
  {0x4253ff,0x412430,-1,0},{0x425418,0x4142d0,-1,0},
  {0x425443,0x3e5b20,-1,0},{0x425468,0x415540,-1,0},
@@ -76,17 +77,23 @@ inline Hook hooks[]={
  {0x481559,0x1bfb20,-3,112},
  {0x482ccf,0x1bfb20,-3,112},
  // Screen-wide progress strips share the currency function, but are not counters.
- {0x406f5b,0x481440,-1,128},{0x407088,0x481440,-1,128},{0x4071b9,0x481bc0,-1,120}
+ {0x406f5b,0x481440,-1,128},{0x407088,0x481440,-1,128},{0x4071b9,0x481bc0,-1,120},
+ // Local skill readiness and only its icon draw (not health/background).
+ {0x40a482,0x95c3a0,-4,0},{0x40abf2,0x482b60,-5,80}
 };
 inline uintptr_t game_base=0;
 inline bool changed(const Item& item){return item.scale!=1||item.x!=item.home_x||item.y!=item.home_y;}
 #include "hud_geometry.h"
 inline thread_local const float* map_projection=nullptr;
-struct Scope {unsigned stack_bytes;bool active;bool root;const float* previous;GLfloat projection[16];int previous_item;bool capture;};
+inline thread_local float skill_pulse=0;
+inline thread_local int skill_icon=-1;
+struct Scope {unsigned stack_bytes;unsigned alpha_offset;float alpha;bool skills_root;bool active;bool root;const float* previous;GLfloat projection[16];int previous_item;bool capture;};
 static_assert(sizeof(Scope)<=0xa0);
+static_assert(offsetof(Scope,alpha_offset)==4&&offsetof(Scope,alpha)==8);
 inline void begin(Scope& scope,const Hook& hook){
- scope={};scope.stack_bytes=hook.stack_bytes;scope.previous=map_projection;scope.previous_item=active_item;
- if(hook.fade||hook.item==-3)return;
+ scope={};scope.stack_bytes=hook.stack_bytes;scope.previous=map_projection;scope.previous_item=active_item;scope.skills_root=hook.skills_root;
+ if(scope.skills_root){skill_pulse=0;skill_icon=-1;}
+ if(hook.fade||hook.item<=-3)return;
  active_item=hook.item;
  if(hook.item>=0&&capture_frame&&(!measured[hook.item]||editing||enabled))scope.capture=start_capture();
  if(!enabled)return;
@@ -103,6 +110,7 @@ inline void begin(Scope& scope,const Hook& hook){
  glMatrixMode(mode);
 }
 inline void end(Scope& scope){
+ if(scope.skills_root){skill_pulse=0;skill_icon=-1;}
  if(scope.active){GLint mode;glGetIntegerv(GL_MATRIX_MODE,&mode);glMatrixMode(GL_PROJECTION);glLoadMatrixf(scope.projection);glMatrixMode(mode);}
  if(scope.capture)stop_capture();
  active_item=scope.previous_item;map_projection=scope.previous;
@@ -130,11 +138,44 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
   else {x=(x-a.home_x*width)*a.scale+a.x*width;y=(y-a.home_y*height)*a.scale+a.y*height;w*=a.scale;h*=a.scale;feather*=a.scale;}
  }
  float result=original(object,alpha,x,y,w,h,feather,global);
+ // Reveal the whole native health/skill region, preserving its normal opacity,
+ // backgrounds, key labels and status fades instead of brightening only an icon.
+ if(active_item==8){float pulse=ssc_cooldown::tracker.reveal(GetTickCount64(),ssc_cooldown::settings);
+  if(pulse>0){float normal=original(object,alpha,-1000000.f,-1000000.f,0,0,std::max(1.f,feather),global);
+   result+=(normal-result)*pulse;}}
  if(enabled&&active_item==5&&measured[4]){const auto& t=items[4];result=std::min(result,original(object,alpha,t.x*width,t.y*height,t.w*t.scale*width,t.h*t.scale*height,native_feather*t.scale,global));}
  return result;
 }
+using Ready=bool(__cdecl*)(uintptr_t,uintptr_t);
+template<class T> inline T native_field(uintptr_t object,size_t offset){T v;std::memcpy(&v,reinterpret_cast<const void*>(object+offset),sizeof(v));return v;}
+inline bool __cdecl skill_ready_hook(uintptr_t skill,uintptr_t actor){
+    const bool ready=reinterpret_cast<Ready>(game_base+ssc_compat::resolve(0x95c3a0))(skill,actor);
+    skill_pulse=0;skill_icon=-1;
+    if(!ssc_cooldown::settings.enabled){ssc_cooldown::tracker.clear();return ready;}
+    // Arguments are native-owned records at a fingerprint-validated HUD call site.
+    // Preserve the game's result; only observe the local living player's cooldown.
+    const int local=native_field<int>(game_base+ssc_compat::resolve(0xe0f380),0);
+    if(!skill||!actor||local<0||native_field<int>(actor,0x78)!=local||native_field<unsigned char>(actor,0)!=0||
+       !native_field<unsigned char>(actor,0x81)){ssc_cooldown::tracker.clear();return ready;}
+    ssc_cooldown::Sample sample{actor,native_field<int>(skill,0),native_field<float>(skill,0x220),native_field<float>(skill,0x224),ready};
+    skill_icon=native_field<int>(skill,0x10);
+    skill_pulse=ssc_cooldown::tracker.observe(sample,GetTickCount64(),ssc_cooldown::settings);
+    return ready;
+}
+inline void prepare_skill_alpha(Scope& scope,const unsigned char* stack){
+    if(!ssc_cooldown::settings.enabled||editing||skill_pulse<=0||!stack)return;
+    int icon;float alpha;std::memcpy(&icon,stack+0x10,4);std::memcpy(&alpha,stack+0x28,4);
+    if(icon==skill_icon&&std::isfinite(alpha)&&alpha>=0&&alpha<skill_pulse){scope.alpha_offset=0x28;scope.alpha=skill_pulse;}
+    skill_pulse=0;skill_icon=-1;
+}
 extern "C" void ssc_hud_bridge();
-extern "C" __attribute__((used,noinline)) uintptr_t ssc_hud_before(unsigned index,Scope* scope,const unsigned char* stack){begin(*scope,hooks[index]);if(hooks[index].item==-3)capture_queued_rectangle(stack);return hooks[index].fade?reinterpret_cast<uintptr_t>(fade_hook):game_base+hooks[index].target;}
+extern "C" __attribute__((used,noinline)) uintptr_t ssc_hud_before(unsigned index,Scope* scope,const unsigned char* stack){
+    const auto& hook=hooks[index];begin(*scope,hook);
+    if(hook.item==-3)capture_queued_rectangle(stack);
+    if(hook.item==-4)return reinterpret_cast<uintptr_t>(skill_ready_hook);
+    // The group fade hook now restores the complete native appearance.
+    return hook.fade?reinterpret_cast<uintptr_t>(fade_hook):game_base+hook.target;
+}
 extern "C" __attribute__((used,noinline)) void ssc_hud_after(Scope* scope){end(*scope);}
 inline bool attach(){
  if(!ssc_compat::supports(2))return false;

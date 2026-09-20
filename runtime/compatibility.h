@@ -35,7 +35,7 @@ inline uint64_t fingerprint(const unsigned char* bytes,const FunctionSpec& s){
 }
 // Input is a mapped PE image. No patches are installed until resolution completes.
 inline unsigned inspect(const unsigned char* image,size_t size,const std::vector<Section>& sections,void(*report)(const char*),const FunctionSpec* specs,size_t count,const Binding* bindings,size_t binding_count){
-    initialized=true;available=7;addresses.clear();std::map<uint32_t,uint32_t> functions;
+    initialized=true;available=7;for(size_t i=0;i<count;++i)available|=specs[i].groups;addresses.clear();std::map<uint32_t,uint32_t> functions;
     auto fail=[&](unsigned groups,uint32_t key,const char* reason){available&=~groups;if(report){char line[180];std::snprintf(line,sizeof(line),"Compatibility groups=%u dependency=%08X: %s",groups,key,reason);report(line);}};
     for(size_t i=0;i<count;++i){const auto& f=specs[i];auto p=parse(f.pattern);if(p.empty()){fail(f.groups,f.key,"invalid locator");continue;}
         auto fixed=std::find_if(p.begin(),p.end(),[](int v){return v>=0;});if(fixed==p.end()){fail(f.groups,f.key,"empty locator");continue;}

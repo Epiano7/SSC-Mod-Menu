@@ -53,3 +53,32 @@ if($LASTEXITCODE) {throw 'Compatibility tests failed'}
 if($LASTEXITCODE) {throw 'Diagnostics test compilation failed'}
 & "$build/diagnostics_test.exe" "$build/diagnostics-test"
 if($LASTEXITCODE) {throw 'Diagnostics tests failed'}
+
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/text_cache_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build/text_cache_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32
+if($LASTEXITCODE) {throw 'Text cache test compilation failed'}
+& "$build/text_cache_test.exe"
+if($LASTEXITCODE) {throw 'Text cache tests failed'}
+
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/texture_upload_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build/texture_upload_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32
+if($LASTEXITCODE) {throw 'Texture upload test compilation failed'}
+& "$build/texture_upload_test.exe"
+if($LASTEXITCODE) {throw 'Texture upload tests failed'}
+
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror "$root/tests/cooldown_pulse_test.cpp" -o "$build/cooldown_pulse_test.exe"
+if($LASTEXITCODE) {throw 'Cooldown pulse test compilation failed'}
+& "$build/cooldown_pulse_test.exe"
+if($LASTEXITCODE) {throw 'Cooldown pulse tests failed'}
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror "$root/tests/cooldown_adapter_test.cpp" "$root/runtime/hud_bridge.S" -o "$build/cooldown_adapter_test.exe" -lopengl32 -lgdi32
+if($LASTEXITCODE) {throw 'Cooldown adapter test compilation failed'}
+& "$build/cooldown_adapter_test.exe"
+if($LASTEXITCODE) {throw 'Cooldown adapter tests failed'}
+
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/weapon_lab_test.cpp" "$root/tests/lab_shield_call.S" "$root/runtime/score_bridge.S" -o "$build/weapon_lab_test.exe"
+if($LASTEXITCODE) {throw 'Weapon Lab test compilation failed'}
+& "$build/weapon_lab_test.exe"
+if($LASTEXITCODE) {throw 'Weapon Lab tests failed'}
+
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/local_recorder_test.cpp" -o "$build/local_recorder_test.exe" -lbcrypt
+if($LASTEXITCODE) {throw 'Recorder test compilation failed'}
+& "$build/local_recorder_test.exe" (Join-Path $build ('recorder-test-' + [guid]::NewGuid().ToString('N')))
+if($LASTEXITCODE) {throw 'Recorder tests failed'}
