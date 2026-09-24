@@ -9,13 +9,13 @@ $build=(Resolve-Path -LiteralPath $BuildDirectory).Path
 if($LASTEXITCODE) {throw 'Proxy generation failed (Python pefile is required)'}
 & $Compiler -O2 -std=c++17 -shared -static -Wall -Wextra -Werror "-I$build" "$root/runtime/proxy_loader.cpp" "$build\proxy_stubs.S" "$build\proxy.def" -o "$build\opengl32.dll"
 if($LASTEXITCODE) {throw 'Proxy compilation failed'}
-& $Compiler -O2 -std=c++17 -shared -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/runtime/overlay.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build\runtime.dll" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32
+& $Compiler -O2 -std=c++17 -shared -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/runtime/overlay.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build\runtime.dll" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32 -lwindowscodecs
 if($LASTEXITCODE) {throw 'Runtime compilation failed'}
-& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/menu_hotkey_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build\menu_hotkey_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/menu_hotkey_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build\menu_hotkey_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32 -lwindowscodecs
 if($LASTEXITCODE) {throw 'Hotkey test compilation failed'}
 & "$build\menu_hotkey_test.exe"
 if($LASTEXITCODE) {throw 'Hotkey tests failed'}
-& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/menu_ui_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build\menu_ui_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/menu_ui_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build\menu_ui_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32 -lwindowscodecs
 if($LASTEXITCODE) {throw 'Menu UI test compilation failed'}
 & "$build\menu_ui_test.exe" "$build\ui-test-state"
 if($LASTEXITCODE) {throw 'Menu UI tests failed'}
@@ -23,7 +23,7 @@ if($LASTEXITCODE) {throw 'Menu UI tests failed'}
 if($LASTEXITCODE) {throw 'Name adapter test compilation failed'}
 & "$build\name_adapter_test.exe"
 if($LASTEXITCODE) {throw 'Name adapter tests failed'}
-& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror "$root/tests/audio_module_test.cpp" -o "$build\audio_module_test.exe" -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror "$root/tests/audio_module_test.cpp" -o "$build\audio_module_test.exe" -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32 -lwindowscodecs
 if($LASTEXITCODE) {throw 'Audio test compilation failed'}
 & "$build\audio_module_test.exe" (Join-Path $build ('audio-test-' + [guid]::NewGuid().ToString('N'))) "$root/tests/fixtures/import-tone.mp3"
 if($LASTEXITCODE) {throw 'Audio module tests failed'}
@@ -54,12 +54,12 @@ if($LASTEXITCODE) {throw 'Diagnostics test compilation failed'}
 & "$build/diagnostics_test.exe" "$build/diagnostics-test"
 if($LASTEXITCODE) {throw 'Diagnostics tests failed'}
 
-& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/text_cache_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build/text_cache_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/text_cache_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build/text_cache_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32 -lwindowscodecs
 if($LASTEXITCODE) {throw 'Text cache test compilation failed'}
 & "$build/text_cache_test.exe"
 if($LASTEXITCODE) {throw 'Text cache tests failed'}
 
-& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/texture_upload_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build/texture_upload_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/texture_upload_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build/texture_upload_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32 -lwindowscodecs
 if($LASTEXITCODE) {throw 'Texture upload test compilation failed'}
 & "$build/texture_upload_test.exe"
 if($LASTEXITCODE) {throw 'Texture upload tests failed'}
@@ -82,3 +82,27 @@ if($LASTEXITCODE) {throw 'Weapon Lab tests failed'}
 if($LASTEXITCODE) {throw 'Recorder test compilation failed'}
 & "$build/local_recorder_test.exe" (Join-Path $build ('recorder-test-' + [guid]::NewGuid().ToString('N')))
 if($LASTEXITCODE) {throw 'Recorder tests failed'}
+
+& $Compiler -O2 -fno-devirtualize -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/quick_chat_test.cpp" "$root/runtime/score_bridge.S" -o "$build/quick_chat_test.exe" -lopengl32 -lole32 -lwindowscodecs
+if($LASTEXITCODE) {throw 'Quick chat test compilation failed'}
+& "$build/quick_chat_test.exe" (Join-Path $build ('chat-test-' + [guid]::NewGuid().ToString('N')))
+if($LASTEXITCODE) {throw 'Quick chat tests failed'}
+
+& $Compiler -O2 -fno-devirtualize -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/auto_messages_test.cpp" "$root/runtime/score_bridge.S" -o "$build/auto_messages_test.exe"
+if($LASTEXITCODE) {throw 'Auto messages compilation failed'}
+& "$build/auto_messages_test.exe" (Join-Path $build ('auto-test-' + [guid]::NewGuid().ToString('N')))
+if($LASTEXITCODE) {throw 'Auto messages tests failed'}
+
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/wheel_image_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build/wheel_image_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32 -lwindowscodecs
+if($LASTEXITCODE) {throw 'Wheel image test compilation failed'}
+& "$build/wheel_image_test.exe" "$root/tests/fixtures/wheel-icon.png" (Join-Path $build ('wheel-image-' + [guid]::NewGuid().ToString('N')))
+if($LASTEXITCODE) {throw 'Wheel image tests failed'}
+
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type -fno-devirtualize "$root/tests/source_audit_test.cpp" "$root/runtime/score_bridge.S" -o "$build/source_audit_test.exe" -lbcrypt
+if($LASTEXITCODE) {throw 'Source audit compilation failed'}
+& "$build/source_audit_test.exe"
+if($LASTEXITCODE) {throw 'Source audit tests failed'}
+& $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type -fno-devirtualize "$root/tests/combat_stats_test.cpp" "$root/tests/combat_call.S" "$root/runtime/score_bridge.S" -o "$build/combat_stats_test.exe"
+if($LASTEXITCODE) {throw 'Combat stats compilation failed'}
+& "$build/combat_stats_test.exe"
+if($LASTEXITCODE) {throw 'Combat stats tests failed'}

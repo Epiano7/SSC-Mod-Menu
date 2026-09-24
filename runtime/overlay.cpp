@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include "text_editor.h"
 #include "sound_module.h"
 #include "cosmetic_adapter.h"
 #include "presence_source.h"
@@ -19,6 +20,8 @@
 #include "local_recorder.h"
 #include "recorder_source.h"
 #include "hud_editor.h"
+#include "quick_chat.h"
+#include "auto_messages_source.h"
 #include "update_module.h"
 #include "diagnostics.h"
 
@@ -80,6 +83,7 @@ void render(HDC dc) {
     ULONGLONG now=GetTickCount64();float seconds=last_frame?float(now-last_frame)/1000.f:0.f;last_frame=now;
     static ULONGLONG diagnostics_at=0;
     if(developer_tools&&now-diagnostics_at>15000){diagnostics_at=now;char report[160];snprintf(report,sizeof(report),"Draw diagnostics: rainbow=%u audio=%u",ssc_names::cosmetic_draws.load(),ssc_sound::substituted.load());log(report);}
+    ssc_auto::tick(now);
     static ULONGLONG presence_at=0;
     if(now-presence_at>=1000){presence_at=now;rpc_preview=presence_supported?ssc_rpc::sample_steam(rpc_rating):ssc_rpc::Snapshot{};static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);refresh_dynamic_panel(now,true);if(ssc_record::state().enabled){auto observed=presence_supported?ssc_rpc::native_fallback(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_rpc::Snapshot{};ssc_record::round_state(ssc_record::active_round(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),observed.phase));ssc_record::sample(observed.phase,observed.details,observed.state,now,observed.phase==2?ssc_record::sample_local_build(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_record::Json(nullptr));if(opened&&manager&&settings_page==12)dirty=true;}}
     static ULONGLONG update_at=0;
@@ -236,13 +240,14 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
     ssc_diagnostics::initialize(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
-    log("SSC Mod Menu 0.1.3 startup");log_game_build();
+    log("SSC Mod Menu 0.1.4 startup");log_game_build();
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
     presence_supported=(supported&4)!=0;native_supported=true;
     log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");
     char result[128];std::snprintf(result,sizeof(result),"Compatibility: cosmetics=%d HUD=%d presence=%d scan=%llums",int((supported&1)!=0),int((supported&2)!=0),int(presence_supported),static_cast<unsigned long long>(GetTickCount64()-started));log(result);
-    load_settings();
+    load_settings();ssc_chat::attached=ssc_chat::attach();log(ssc_chat::attached?"Custom quick chat adapter attached":"Custom quick chat unavailable");
     ssc_names::cosmetics=cosmetic_requested&&ssc_compat::supports(1);
+    ssc_combat::attached=ssc_combat::attach();log(ssc_combat::attached?"Combat event counters attached":"Combat event counters unavailable");
     ssc_names::attached=ssc_names::attach();log(ssc_names::attached?"Tab and overhead name adapters attached":"Name adapters unavailable");
     try {
         wchar_t executable[32768];DWORD length=GetModuleFileNameW(nullptr,executable,32768);

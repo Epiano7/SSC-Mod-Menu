@@ -22,11 +22,13 @@ def function(a):
  assert e.BeginAddress<=a<e.EndAddress,hex(a)
  return e
 dependencies=collections.defaultdict(int)
-for name,group in [('cosmetic_adapter.h',1),('hud_editor.h',2),('hud_geometry.h',2),('presence_source.h',4),('weapon_lab.h',8)]:
+for name,group in [('cosmetic_adapter.h',1),('hud_editor.h',2),('hud_geometry.h',2),('presence_source.h',4),('weapon_lab.h',8),('quick_chat.h',16),('auto_messages_source.h',32),('combat_stats.h',64)]:
  text=(root/'runtime'/name).read_text()
  for a in re.findall(r'(?:image_base|game_base|base)\+(?:ssc_compat::resolve\()?(0x[0-9a-f]+)',text):dependencies[int(a,16)]|=group
  for a,b in re.findall(r'\{(0x[0-9a-f]+),\s*(0x[0-9a-f]+),',text):
   if int(a,16)>4096:dependencies[int(a,16)]|=group;dependencies[int(b,16)]|=group
+# Native word wrapping used by the bounded quick-wheel center label.
+for key in [0x47ca90,0x3a4690]:dependencies[key]|=16
 assert dependencies,'Generate before wrapping native addresses in resolve()'
 refs=collections.defaultdict(list);md.detail=False;md.skipdata=True
 for a,size,mn,op in md.disasm_lite(code,start):

@@ -33,5 +33,14 @@ int main(int argc,char** argv){
     auto converted=ssc_audio::convert_import(mismatch,reference);assert(converted.rate==44100&&converted.channels==1&&converted.raw.size()==mismatch.raw.size()*2);
     auto stereo=input;stereo.channels=2;converted=ssc_audio::convert_import(stereo,reference);assert(converted.channels==1&&converted.raw.size()==stereo.raw.size()/2);
     rejected=false;try{ssc_audio::read_mp3(root/"broken.wav");}catch(...){rejected=true;}assert(rejected);
+    // Random variants have different fingerprints and may use different sample rates.
+    auto source=tone(.1),variant=tone(.15),third=tone(.18);third.rate=22050;
+    ssc_audio::write(root/"game/data/sounds/killedHuman.wav",source);ssc_audio::write(root/"game/data/sounds/killedHuman2.wav",variant);ssc_audio::write(root/"game/data/sounds/killedHuman3.wav",third);
+    ssc_sound::initialize(root/"game",root/"state",true);auto find_name=[&](const wchar_t* name){return size_t(std::find_if(ssc_sound::entries.begin(),ssc_sound::entries.end(),[&](const auto& e){return e.path.filename()==name;})-ssc_sound::entries.begin());};
+    ssc_sound::selection=find_name(L"killedHuman.wav");auto selected_key=ssc_sound::entries[ssc_sound::selection].key;ssc_audio::write(root/"state/sounds"/(selected_key+".wav"),input);
+    ssc_sound::initialize(root/"game",root/"state",true);ssc_sound::selection=find_name(L"killedHuman.wav");ssc_sound::toggle_variants();ssc_sound::set_volume(150);ssc_sound::initialize(root/"game",root/"state",true);
+    assert(ssc_sound::replacements.size()==3);for(auto name:{L"killedHuman.wav",L"killedHuman2.wav",L"killedHuman3.wav"}){auto e=ssc_sound::entries[find_name(name)];assert(ssc_sound::all_variants(e)&&ssc_sound::has_replacement(e)&&ssc_sound::clip_volume(e)==150);auto actual=ssc_sound::replacements.at(e.key);assert(actual.rate==e.rate&&actual.channels==e.channels);assert(ssc_audio::rms(ssc_audio::decode(actual))>.05);}
+    auto loud=ssc_sound::gained(tone(.9),300);for(double v:ssc_audio::decode(loud))assert(v>=-1&&v<=1);assert(ssc_audio::rms(ssc_audio::decode(ssc_sound::gained(input,0)))==0);
+    ssc_sound::selection=find_name(L"killedHuman2.wav");ssc_sound::remove_selected();ssc_sound::initialize(root/"game",root/"state",true);assert(ssc_sound::replacements.size()==1);assert(ssc_audio::read(root/"game/data/sounds/killedHuman2.wav").raw==variant.raw);
     std::cout<<"PASS: normalization, clipping ceiling, format validation, buffer substitution, unknown passthrough, disable/restart, shared audio import/removal, format conversion, corrupt compressed audio and original preservation\n";
 }

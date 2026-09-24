@@ -1,5 +1,6 @@
 #pragma once
 #include "audio_import.h"
+#include "third_party/json.hpp"
 #include <map>
 #include <atomic>
 #include <cstring>
@@ -31,6 +32,20 @@ inline std::wstring readable(const std::filesystem::path& path){
     if(!result.empty())result[0]=towupper(result[0]);
     return result;
 }
+// Verified native random-selection family: sound IDs 6, 527 and 528.
+inline std::string family(const Entry& e){auto name=e.path.filename().wstring();return name==L"killedHuman.wav"||name==L"killedHuman2.wav"||name==L"killedHuman3.wav"?"human-kill":"";}
+inline std::map<std::string,int> volume;
+inline std::map<std::string,std::string> families;
+inline int clip_volume(const Entry& e){auto f=families.find(family(e));auto it=volume.find(f==families.end()?e.key:f->second);return it==volume.end()?100:it->second;}
+inline bool all_variants(const Entry& e){auto f=family(e);auto it=families.find(f);return !f.empty()&&it!=families.end();}
+inline std::string replacement_key(const Entry& e){auto it=families.find(family(e));return it==families.end()?e.key:it->second;}
+inline bool has_replacement(const Entry& e){auto key=replacement_key(e);return std::any_of(entries.begin(),entries.end(),[&](const Entry& item){return item.key==key&&item.imported;});}
+inline bool save_options(){try{std::filesystem::create_directories(folder);auto tmp=folder/L"options.json.tmp";std::ofstream out(tmp);out<<nlohmann::json{{"schema",1},{"volume",volume},{"families",families}}.dump(2);out.close();return out&&MoveFileExW(tmp.c_str(),(folder/L"options.json").c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);}catch(...){return false;}}
+inline void load_options(){volume.clear();families.clear();try{auto file=folder/L"options.json";if(!std::filesystem::exists(file)||std::filesystem::file_size(file)>65536)return;std::ifstream input(file);nlohmann::json j;input>>j;if(j.at("schema")!=1)return;auto v=j.at("volume").get<std::map<std::string,int>>();auto f=j.at("families").get<std::map<std::string,std::string>>();for(const auto& e:entries){auto it=v.find(e.key);if(it!=v.end()&&it->second>=0&&it->second<=300)volume[e.key]=it->second;auto group=family(e);auto choice=f.find(group);if(!group.empty()&&choice!=f.end()&&choice->second==e.key&&e.imported)families[group]=e.key;}}catch(...) {}}
+inline ssc_audio::Wave gained(ssc_audio::Wave wave,int percent){if(wave.bits!=16)throw std::runtime_error("Expected 16-bit replacement");for(size_t i=0;i<wave.raw.size();i+=2){int sample=int(int16_t(ssc_audio::u16(wave.raw.data()+i)));int v=std::clamp(int(std::lround(sample*std::clamp(percent,0,300)/100.0)),-32768,32767);wave.raw[i]=uint8_t(v);wave.raw[i+1]=uint8_t(v>>8);}return wave;}
+inline ssc_audio::Wave effective_wave(const Entry& e){auto key=replacement_key(e);auto wave=ssc_audio::read(folder/(key+".wav"));ssc_audio::Wave reference{e.channels,e.rate,16,{}};wave=ssc_audio::convert_import(wave,reference);auto it=volume.find(key);return gained(std::move(wave),it==volume.end()?100:it->second);}
+inline void set_volume(int percent){if(selection>=entries.size())return;volume[replacement_key(entries[selection])]=std::clamp(percent,0,300);status=save_options()?L"Volume saved; restart game to apply":L"Could not save sound options";}
+inline void toggle_variants(){if(selection>=entries.size())return;auto& e=entries[selection];auto f=family(e);if(f.empty())return;if(all_variants(e))families.erase(f);else if(e.imported)families[f]=e.key;else return;status=save_options()?L"Variant choice saved; restart game to apply":L"Could not save sound options";}
 inline void initialize(const std::filesystem::path& game,const std::filesystem::path& state,bool enabled){
     active=enabled;folder=state/L"sounds";entries.clear();replacements.clear();
     std::error_code ec;
@@ -43,8 +58,9 @@ inline void initialize(const std::filesystem::path& game,const std::filesystem::
         }catch(const std::exception&){}
     }
     std::sort(entries.begin(),entries.end(),[](const Entry& a,const Entry& b){return a.label<b.label;});
-    for(auto& e:entries){if(!active||!e.imported)continue;
-        try{auto replacement=ssc_audio::read(folder/(e.key+".wav"));if(replacement.rate==e.rate&&replacement.channels==e.channels&&replacement.bits==16)replacements.emplace(e.key,std::move(replacement));}catch(const std::exception&){}
+    load_options();
+    for(auto& e:entries){if(!active||!has_replacement(e))continue;
+        try{replacements.emplace(e.key,effective_wave(e));}catch(const std::exception&){}
     }
     status=L"Changes apply after restarting the game";
 }
@@ -83,10 +99,14 @@ inline void preview_original(){
     if(play&&play(entries[selection].path.c_str(),nullptr,0x00020000|0x0001|0x0002))status=L"Playing original: "+entries[selection].label;
     else status=L"Could not preview original sound";
 }
+inline void preview_custom(HWND owner){
+    if(selection>=entries.size()||!has_replacement(entries[selection]))return;
+    try{auto wave=effective_wave(entries[selection]);auto file=folder/L"preview.wav";ssc_audio::write(file,wave);using Play=BOOL(WINAPI*)(LPCWSTR,HMODULE,DWORD);static HMODULE lib=LoadLibraryW(L"winmm.dll");Play play=nullptr;auto proc=lib?GetProcAddress(lib,"PlaySoundW"):nullptr;std::memcpy(&play,&proc,sizeof(play));if(!play||!play(file.c_str(),nullptr,0x20003))throw std::runtime_error("Could not preview replacement");status=L"Playing replacement";}catch(...){status=L"Could not preview replacement";}(void)owner;
+}
 inline void remove_selected(){
     if(selection>=entries.size()||entries[selection].key.empty())return;
     std::error_code ec;
     std::filesystem::remove(folder/(entries[selection].key+".wav"),ec);
-    if(ec){status=L"Could not remove imported sound";return;}for(auto& other:entries)if(other.key==entries[selection].key)other.imported=false;status=L"Original restored on next game restart";
+    if(ec){status=L"Could not remove imported sound";return;}for(auto& other:entries)if(other.key==entries[selection].key)other.imported=false;auto group=family(entries[selection]);if(all_variants(entries[selection]))families.erase(group);volume.erase(entries[selection].key);save_options();status=L"Original restored on next game restart";
 }
 }

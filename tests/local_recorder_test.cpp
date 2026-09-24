@@ -13,7 +13,7 @@ void test_source(){
  assert(ssc_record::active_round(address,2));assert(!ssc_record::active_round(address,1));assert(!ssc_record::active_round(address,3));
  put(world.data(),0x3e0,1);assert(!ssc_record::active_round(address,2));put(world.data(),0x3e0,3);
  put(world.data(),0x3c0,1.f);assert(!ssc_record::active_round(address,2));put(world.data(),0x3c0,0.f);
- put(world.data(),0x3e0,6);assert(!ssc_record::active_round(address,2));put(world.data(),0x3e0,3);
+ put(world.data(),0x3e0,6);assert(ssc_record::active_round(address,2));put(world.data(),0x3e0,7);assert(!ssc_record::active_round(address,2));put(world.data(),0x3e0,3);
  put(world.data(),0x128,0);assert(!ssc_record::active_round(address,2));put(world.data(),0x128,6);
  put(actor.data(),0x78,0);put(actor.data(),0x81,(unsigned char)1);put(actor.data(),0x350,5);put(actor.data(),0x858,7);put(actor.data(),0x138c,75.f);put(actor.data(),0x840,100.f);
  auto w=reinterpret_cast<uintptr_t>(weapons.data());put(actor.data(),0x1288,w);put(actor.data(),0x1290,w+weapons.size());std::memcpy(weapons.data()+0x48,"Fixture",7);put(weapons.data(),0x58,size_t(7));put(weapons.data(),0x60,size_t(15));

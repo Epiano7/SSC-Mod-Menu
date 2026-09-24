@@ -15,6 +15,15 @@ Run the installer and select your Skillshot City Steam folder. After installatio
 - **Discord Presence:** game status, available round/level details, elapsed time and ranked SSC rating. No developer setup or token is required.
 - **HUD Editor:** reposition and resize nine HUD groups, with saved layouts, resets and 25-600% scaling. Groups include minimap, version/FPS, round clock, round/players, money/syringes, weapons/ammo, healthbar/survival hearts/skills, team roster and event feed.
 
+## New in 0.1.4
+
+- **Custom Quick Chat:** customize wheel messages, reorder slots, choose icons or import images, and preview both wheel layouts
+- **Auto Messages:** create optional BR rules with conditions, message variables, repeat counts, and shareable codes
+- **Sound Replacer:** preview custom sounds, adjust replacement volume, and cover the three Killed Human variants with one replacement
+- **Interface:** choose quick-menu modules and edit text with a cursor, selection, and automatic saving when leaving quick-chat or rule fields
+
+Enable Auto Messages before the round starts for complete round counters. Impact damage is measured before defenses; hit events are not an accuracy percentage.
+
 ## Screenshots
 
 A custom HUD layout in game:

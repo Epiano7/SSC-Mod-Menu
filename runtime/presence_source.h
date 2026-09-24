@@ -48,10 +48,15 @@ inline std::string copy_steam_text(const char* value){
     std::string s;for(size_t i=0;i<256;++i){char c;if(!ssc_names::read(reinterpret_cast<uintptr_t>(value)+i,c))return {};if(!c)return s;s+=c;}return {};
 }
 inline std::string native_string(uintptr_t address){
-    using ssc_names::read;size_t length=0,capacity=0;uintptr_t data=address;
-    if(!read(address+16,length)||!read(address+24,capacity)||length>128||capacity<length)return {};
-    if(capacity>=16&&(!read(address,data)||!data))return {};
-    std::string value;for(size_t i=0;i<length;++i){char c;if(!read(data+i,c))return {};value+=c;}return utf8_limit(value);
+    std::array<unsigned char,32> header{};size_t length=0,capacity=0;uintptr_t data=0;
+    if(!ssc_names::read_bytes(address,header.data(),header.size()))return {};
+    std::memcpy(&length,header.data()+16,8);std::memcpy(&capacity,header.data()+24,8);
+    if(length>128||capacity<length)return {};
+    if(capacity<16)return utf8_limit(std::string(reinterpret_cast<const char*>(header.data()),length));
+    if(!length)return {};
+    std::memcpy(&data,header.data(),8);std::string value(length,'\0');
+    if(!ssc_names::read_bytes(data,value.data(),length))return {};
+    return utf8_limit(value);
 }
 inline Snapshot native_fallback(uintptr_t base){
     using ssc_names::read;Snapshot s;int session=0;double joining=0;

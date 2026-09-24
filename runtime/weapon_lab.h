@@ -87,7 +87,7 @@ inline void recompute(){
             trials[col]=simulate(target,w.hit*(guards?w.guard:1.f)*(damage_percent/100.f),w.rpm,w.magazine,w.reload*(reload_percent/100.f),allow_reload,shield_rules,miss_enabled[col]?miss_percent[col]:0,seed+unsigned(col)*1234567,w.projectiles);}}
 }
 inline void start_duel(){recompute();duel_complete=duel(trials[0],trials[1],target);duel_elapsed=duel_visual_time=0;duel_shown=true;duel_playing=true;advance_duel(0);}
-inline void begin_edit(int field){editing=field;edit_error=false;edit_buffer.clear();}
+inline void begin_edit(int field){editing=field;edit_error=false;int value=field==0?int(target.max_health):field==1?int(std::lround(100*target.shield/target.max_health)):field==2?int(target.health):field==3?damage_percent:reload_percent;edit_buffer=std::to_wstring(value);}
 inline bool commit_edit(bool recalculate=true){
     if(editing<0)return true;
     if(edit_buffer.empty()){editing=-1;return true;}
