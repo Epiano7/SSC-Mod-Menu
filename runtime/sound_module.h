@@ -32,8 +32,22 @@ inline std::wstring readable(const std::filesystem::path& path){
     if(!result.empty())result[0]=towupper(result[0]);
     return result;
 }
-// Verified native random-selection family: sound IDs 6, 527 and 528.
-inline std::string family(const Entry& e){auto name=e.path.filename().wstring();return name==L"killedHuman.wav"||name==L"killedHuman2.wav"||name==L"killedHuman3.wav"?"human-kill":"";}
+// Explicit related clips, including state-dependent alternatives. Do not infer
+// families by stripping digits: weapon names such as AK47 are independent clips.
+inline std::string family(const Entry& e){
+ auto name=e.path.stem().wstring();
+ auto numbered=[&](const wchar_t* prefix,int lo,int hi,int width=0){for(int i=lo;i<=hi;++i){auto n=std::to_wstring(i);if(width==2&&i<10)n=L"0"+n;if(name==std::wstring(prefix)+n)return true;}return false;};
+ if(name==L"killedHuman"||numbered(L"killedHuman",2,3)||numbered(L"comboKillSound",2,10))return "human-kill";
+ for(int i=1;i<=6;++i){auto engine=L"engine"+std::to_wstring(i);if(name==engine||name==engine+L"Damaged"||name==engine+L"Muffled")return "vehicle-engines";}
+ if(numbered(L"bulletHitNormal",1,6,2))return "bullet-hit-normal";
+ if(numbered(L"bulletHit",2,5,2))return "bullet-hit";
+ if(numbered(L"bulletCar",2,7,2))return "bullet-car";
+ if(numbered(L"bulletWall",2,8,2)||numbered(L"bulletWallMuffled",1,3,2))return "bullet-wall";
+ if(numbered(L"carCollision",1,3))return "car-collision";
+ if(name==L"zombieDeath"||name==L"zombieDeath2")return "zombie-death";
+ if(name==L"vehicleExplode"||name==L"vehicleExplode02")return "vehicle-explode";
+ return "";
+}
 inline std::map<std::string,int> volume;
 inline std::map<std::string,std::string> families;
 inline int clip_volume(const Entry& e){auto f=families.find(family(e));auto it=volume.find(f==families.end()?e.key:f->second);return it==volume.end()?100:it->second;}

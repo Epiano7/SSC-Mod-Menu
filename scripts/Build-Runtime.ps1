@@ -11,6 +11,11 @@ if($LASTEXITCODE) {throw 'Proxy generation failed (Python pefile is required)'}
 if($LASTEXITCODE) {throw 'Proxy compilation failed'}
 & $Compiler -O2 -std=c++17 -shared -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/runtime/overlay.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build\runtime.dll" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32 -lwindowscodecs
 if($LASTEXITCODE) {throw 'Runtime compilation failed'}
+if(-not(Test-Path -LiteralPath "$root/tests")) {
+    Write-Host 'Runtime built; local test suite is not present'
+    Get-FileHash -LiteralPath "$build/runtime.dll" -Algorithm SHA256
+    return
+}
 & $Compiler -O2 -std=c++17 -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/tests/menu_hotkey_test.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" -o "$build\menu_hotkey_test.exe" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32 -lwindowscodecs
 if($LASTEXITCODE) {throw 'Hotkey test compilation failed'}
 & "$build\menu_hotkey_test.exe"

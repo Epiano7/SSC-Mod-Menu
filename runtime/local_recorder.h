@@ -63,7 +63,7 @@ inline void stop(){auto& s=state();s.enabled=false;end_round();if(s.status==6)s.
 inline void round_state(bool active){auto& s=state();if(!s.enabled||!active){end_round();return;}if(s.active)return;
     if(!s.launched){HMODULE module=nullptr;GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&state),&module);try{std::thread(worker,&s).detach();s.launched=true;}catch(...){s.enabled=false;s.status=2;return;}}
     s.active=true;s.status=4;s.previous.clear();s.started=GetTickCount64();s.last_sample=0;s.sequence=0;
-    Json header={{"schema",1},{"event","recording_started"},{"source","native_status_1hz"},{"build","0.1.4"},{"combat_counters_available",false},{"roster_available",false},{"skill_choices_available",false},{"random_class_choice",nullptr}};
+    Json header={{"schema",1},{"event","recording_started"},{"source","native_status_1hz"},{"build","0.1.5"},{"combat_counters_available",false},{"roster_available",false},{"skill_choices_available",false},{"random_class_choice",nullptr}};
     enqueue({1,header.dump(),s.folder},true);
 }
 inline void sample(int phase,const std::string& mode,const std::string& build,ULONGLONG now,const Json& build_fields=nullptr){auto& s=state();if(!s.enabled||!s.active||phase!=2)return;

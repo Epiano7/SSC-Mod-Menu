@@ -27,7 +27,7 @@ bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buf
 bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hud::editing;}
 
 // Advance this ID when publishing a new set of release notes.
-constexpr int release_notes_id=20260924;
+constexpr int release_notes_id=20260925;
 bool show_update_notes=true;int seen_release_notes=0;
 bool update_notes_due(int phase){return presence_supported&&phase==1&&welcome_seen&&show_update_notes&&seen_release_notes!=release_notes_id&&!opened;}
 int canvas_w=1120;constexpr int canvas_h=720;
@@ -315,6 +315,8 @@ void place_caret(int id,int screen_x);
 template<class S,class Accept> bool edit_input(S& value,UINT message,WPARAM wp,size_t limit,Accept accept,HWND window){
  bool ctrl=(GetKeyState(VK_CONTROL)&0x8000)!=0,shift=(GetKeyState(VK_SHIFT)&0x8000)!=0;
  if(message==WM_KEYDOWN){
+  // WM_CHAR inserts printable input; do not let Space activate a menu button first.
+  if(wp==VK_SPACE)return true;
   if(wp==VK_LEFT||wp==VK_RIGHT||wp==VK_HOME||wp==VK_END){edit_cursor.move(value,int(wp),shift,ctrl);dirty=true;return true;}
   if(wp==VK_DELETE){edit_cursor.del(value);dirty=true;return true;}
   if(ctrl&&wp=='A'){edit_cursor.anchor=0;edit_cursor.pos=value.size();dirty=true;return true;}
@@ -663,19 +665,14 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"CUSTOM QUICK CHAT",cyan);
-        bullet(185,L"Customize wheel messages, order and icons with a live preview");
-        bullet(209,L"Import your own images; long messages wrap inside the wheel");
-        text(50,257,L"AUTO MESSAGES",cyan);
-        bullet(289,L"Create rules for round events and stat thresholds");
-        bullet(313,L"Use {variables} or [variables], conditions and shareable rule codes");
-        bullet(337,L"Includes a removable Auto-GG rule and a detached variable guide");
-        text(50,385,L"SOUND & INTERFACE",cyan);
-        bullet(417,L"Custom sound previews and per-clip volume from 0%-300%");
-        bullet(441,L"Apply a Killed Human replacement to all three sound variants");
-        bullet(465,L"Choose which modules appear in the quick menu under Interface");
-        bullet(489,L"Text cursor, selection and automatic saving when leaving text fields");
-        bullet(513,L"Fixed wheel click areas and improved round tracking");
+        text(50,153,L"0.1.5 HOTFIX",cyan);
+        bullet(201,L"Fixed Space closing text fields instead of inserting a space");
+        bullet(257,L"Related sound replacements now cover engine variants");
+        bullet(289,L"Killed Human replacements also cover kill-combo sounds");
+        bullet(321,L"Added more groups for impacts, collisions and explosions");
+        bullet(401,L"Incomplete online hit and impact-damage totals are unavailable");
+        bullet(433,L"Affected auto-message rules skip sending rather than show false totals");
+        bullet(465,L"Shots fired and projectile counts remain available");
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
@@ -775,7 +772,7 @@ void paint_panel() {
             button(102,266,454,242,36,L"IMPORT AUDIO");button(103,526,454,242,36,L"RESTORE ORIGINAL");
             text(792,464,L"MATCH LEVEL",muted,false,12);toggle(82,982,454,match_sound_level);
             text(266,640,ssc_sound::status.c_str(),ink,false,11);
-            if(ssc_sound::selection<ssc_sound::entries.size()){auto& e=ssc_sound::entries[ssc_sound::selection];text(266,514,L"USE FOR ALL VARIANTS",muted,false,13);button(487,600,500,150,36,ssc_sound::all_variants(e)?L"ON":L"OFF",ssc_sound::all_variants(e),ssc_sound::has_replacement(e)&&!ssc_sound::family(e).empty());text(792,514,L"VOLUME",muted,false,13);button(488,914,500,172,36,(std::to_wstring(ssc_sound::clip_volume(e))+L"%").c_str(),false,ssc_sound::has_replacement(e));}
+            if(ssc_sound::selection<ssc_sound::entries.size()){auto& e=ssc_sound::entries[ssc_sound::selection];text(266,514,L"ALL RELATED SOUNDS",muted,false,13);button(487,600,500,150,36,ssc_sound::all_variants(e)?L"ON":L"OFF",ssc_sound::all_variants(e),ssc_sound::has_replacement(e)&&!ssc_sound::family(e).empty());text(792,514,L"VOLUME",muted,false,13);button(488,914,500,172,36,(std::to_wstring(ssc_sound::clip_volume(e))+L"%").c_str(),false,ssc_sound::has_replacement(e));}
             button(489,566,586,280,38,L"PREVIEW CUSTOM",false,ssc_sound::selection<ssc_sound::entries.size()&&ssc_sound::has_replacement(ssc_sound::entries[ssc_sound::selection]));
             button(105,266,586,280,38,L"PREVIEW ORIGINAL",false,ssc_sound::selection<ssc_sound::entries.size());
         } else if(settings_page==4) {
@@ -936,7 +933,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.4",cyan);
+            text(266,157,L"0.1.5",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");

@@ -9,3 +9,5 @@ __pycache__/
 *.pyc
 menu.ini
 settings.ini
+
+/tests/

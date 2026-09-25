@@ -81,12 +81,19 @@ inline void diagnose(const Observation& o,uint64_t now){
   std::ofstream file(path,std::ios::app);file<<state.dump()<<"\n";
  }catch(...){}
 }
+// The client collision pass skips remotely simulated actors. Its partial contact
+// totals must not be published as complete outgoing hits or damage (including 0).
+inline void append_combat_values(Values& values,const ssc_combat::Counter& counter){
+ if(!counter.complete)return;
+ values["shotsFired"]=std::to_string(counter.totals.shots);
+ values["projectilesFired"]=std::to_string(counter.totals.projectiles);
+}
 inline void tick(uint64_t now){
  static uint64_t last=0;if(now-last<100)return;last=now;
  ssc_combat::enabled.store(enabled&&ssc_combat::attached,std::memory_order_relaxed);
  if(!enabled){engine.reset();round_tracker.reset();std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();return;}
  try{auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t actor=0,world=0;auto o=sample(base,actor,world);round_tracker.observe(o,now);
- if(ssc_combat::attached){std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::Context c;c.valid=o.valid;c.active=o.active;c.ending=o.ending;c.preparing=o.preparing;c.session=o.session;c.actor=actor;c.round=o.round;ssc_combat::counter.observe(c);if(o.valid&&ssc_combat::counter.complete){const auto& t=ssc_combat::counter.totals;o.values["shotsFired"]=std::to_string(t.shots);o.values["projectilesFired"]=std::to_string(t.projectiles);o.values["bulletHits"]=std::to_string(t.hits);o.values["playerHits"]=std::to_string(t.player_hits);o.values["npcHits"]=std::to_string(t.npc_hits);o.values["impactDamage"]=std::to_string(uint64_t(std::ceil(t.impact)));}}
+ if(ssc_combat::attached){std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::Context c;c.valid=o.valid;c.active=o.active;c.ending=o.ending;c.preparing=o.preparing;c.session=o.session;c.actor=actor;c.round=o.round;ssc_combat::counter.observe(c);if(o.valid)append_combat_values(o.values,ssc_combat::counter);}
  engine.observe(o,now);if(o.valid)engine.dispatch(now,[&](const std::string& text){return send_native(base,world,actor,text);});diagnose(o,now);}
  catch(...){enabled=false;ssc_combat::enabled=false;engine.reset();round_tracker.reset();status=L"Auto messages paused after a data error";}
 }
