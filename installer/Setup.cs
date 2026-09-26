@@ -10,14 +10,14 @@ namespace SSCMods.Setup {
         public static Package Package() {
 #if MENU_ALPHA
             var assembly=Assembly.GetExecutingAssembly();
-            var package=new Package {RuntimeValidated=true,GameSize=15273984,
-                GameHash="4184FF577BC48CC60FDDA563016D26CCB5CA443A9BCC116C04FC20FEF96B888B"};
-            foreach(var name in new[]{"opengl32.dll","runtime.dll"}) {
+            var package=new Package {RuntimeValidated=true,GameSize=15304192,
+                GameHash="435DF3E06BCC89CBBA10C2D821AF687F4DB2A1C2DBB4F6B68B8EA9D73ED10BD2"};
+            foreach(var name in new[]{"opengl32.dll","runtime.dll","AUDIO-NOTICES.txt"}) {
                 using(var stream=assembly.GetManifestResourceStream(name))
                 using(var bytes=new MemoryStream()) {
                     if(stream==null) throw new IOException("Embedded runtime is missing.");
                     stream.CopyTo(bytes);
-                    package.Files.Add(new Payload {Path=name=="runtime.dll"?"SSCMods/runtime.dll":name,Bytes=bytes.ToArray()});
+                    package.Files.Add(new Payload {Path=name=="opengl32.dll"?name:"SSCMods/"+name,Bytes=bytes.ToArray()});
                 }
             }
             package.Files.Add(new Payload {Path="SSCMods/Uninstall.exe",Bytes=File.ReadAllBytes(assembly.Location)});

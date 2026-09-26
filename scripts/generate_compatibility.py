@@ -17,7 +17,7 @@ sec=next(s for s in pe.sections if s.Name.startswith(b'.text'));code=sec.get_dat
 funcs=[e.struct for e in pe.DIRECTORY_ENTRY_EXCEPTION];begins=[e.BeginAddress for e in funcs]
 def function(a):
  # Validated leaf helper has no PE unwind entry. Keep its entire body fingerprinted.
- if 0x3a7aa0<=a<0x3a7b38:return SimpleNamespace(BeginAddress=0x3a7aa0,EndAddress=0x3a7b38)
+ if 0x3ab8c0<=a<0x3ab958:return SimpleNamespace(BeginAddress=0x3ab8c0,EndAddress=0x3ab958)
  e=funcs[bisect.bisect_right(begins,a)-1]
  assert e.BeginAddress<=a<e.EndAddress,hex(a)
  return e
@@ -28,7 +28,7 @@ for name,group in [('cosmetic_adapter.h',1),('hud_editor.h',2),('hud_geometry.h'
  for a,b in re.findall(r'\{(0x[0-9a-f]+),\s*(0x[0-9a-f]+),',text):
   if int(a,16)>4096:dependencies[int(a,16)]|=group;dependencies[int(b,16)]|=group
 # Native word wrapping used by the bounded quick-wheel center label.
-for key in [0x47ca90,0x3a4690]:dependencies[key]|=16
+for key in [0x47fa40,0x3a6860]:dependencies[key]|=16
 assert dependencies,'Generate before wrapping native addresses in resolve()'
 refs=collections.defaultdict(list);md.detail=False;md.skipdata=True
 for a,size,mn,op in md.disasm_lite(code,start):

@@ -10,7 +10,7 @@ bool rpc_requested=false,rpc_timer=true,rpc_rating=true,rpc_editing=false,rpc_se
 std::string rpc_id=ssc_rpc::bundled_application_id;std::wstring rpc_buffer;ssc_rpc::Snapshot rpc_preview;
 int sound_wheel_remainder=0;
 bool sound_search_editing=false;std::wstring sound_query;size_t sound_page=0;std::vector<size_t> sound_results;
-void filter_sounds(){sound_results.clear();auto query=sound_query;std::transform(query.begin(),query.end(),query.begin(),towlower);for(size_t i=0;i<ssc_sound::entries.size();++i){auto label=ssc_sound::entries[i].label;std::transform(label.begin(),label.end(),label.begin(),towlower);if(label.find(query)!=std::wstring::npos)sound_results.push_back(i);}sound_page=0;dirty=true;}
+void filter_sounds(){sound_results.clear();auto query=sound_query;std::transform(query.begin(),query.end(),query.begin(),towlower);for(size_t i=0;i<ssc_sound::entries.size();++i){auto label=ssc_sound::display_name(ssc_sound::entries[i]);std::transform(label.begin(),label.end(),label.begin(),towlower);if(label.find(query)!=std::wstring::npos)sound_results.push_back(i);}sound_page=0;dirty=true;}
 int settings_page=0,ui_scale=100;
 unsigned quick_mask=63;
 int quick_count(){int n=0;for(int i=0;i<6;++i)n+=(quick_mask>>i)&1;return n;}
@@ -27,7 +27,7 @@ bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buf
 bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hud::editing;}
 
 // Advance this ID when publishing a new set of release notes.
-constexpr int release_notes_id=20260925;
+constexpr int release_notes_id=20260926;
 bool show_update_notes=true;int seen_release_notes=0;
 bool update_notes_due(int phase){return presence_supported&&phase==1&&welcome_seen&&show_update_notes&&seen_release_notes!=release_notes_id&&!opened;}
 int canvas_w=1120;constexpr int canvas_h=720;
@@ -80,7 +80,7 @@ constexpr float hud_view_x=266,hud_view_y=188,hud_view_w=820,hud_view_h=461;
 int hud_drag=-1;bool hud_resize=false;float hud_start_x=0,hud_start_y=0,hud_item_x=0,hud_item_y=0,hud_item_scale=1;
 void finish_hud_drag(){ssc_hud::freeze_bounds=false;if(hud_drag>=0){hud_drag=-1;save();}}
 int hud_hit(float x,float y){
-    for(int i=int(ssc_hud::items.size())-1;i>=0;--i){auto& item=ssc_hud::items[i];float bx=hud_view_x+item.x*hud_view_w,by=hud_view_y+item.y*hud_view_h;
+    for(int i=int(ssc_hud::items.size())-1;i>=0;--i){if(!ssc_hud::available(i))continue;auto& item=ssc_hud::items[i];float bx=hud_view_x+item.x*hud_view_w,by=hud_view_y+item.y*hud_view_h;
         if(x>=bx-6&&x<=bx+item.w*item.scale*hud_view_w+6&&y>=by-6&&y<=by+item.h*item.scale*hud_view_h+6)return i;}
     return -1;
 }
@@ -151,7 +151,7 @@ void show_manager(int page=-1) {
     dirty=true;hovered=pressed=keyboard_focus=0;controls.clear();
 }
 void show_quick() {finish_hud_drag();ReleaseCapture();cancel_edit();manager=false;visibility=animations?0.f:1.f;dirty=true;hovered=pressed=keyboard_focus=0;controls.clear();}
-void start_live_hud(){finish_hud_drag();ReleaseCapture();cancel_edit();ssc_hud::enabled=true;ssc_hud::editing=true;ssc_hud::capture_frame=true;opened=true;manager=false;visibility=1;modal_visibility=0;controls.clear();pressed=hovered=keyboard_focus=0;dirty=true;save();}
+void start_live_hud(){if(!ssc_hud::available(ssc_hud::selected))ssc_hud::selected=ssc_hud::next_item(0,1);finish_hud_drag();ReleaseCapture();cancel_edit();ssc_hud::enabled=true;ssc_hud::editing=true;ssc_hud::capture_frame=true;opened=true;manager=false;visibility=1;modal_visibility=0;controls.clear();pressed=hovered=keyboard_focus=0;dirty=true;save();}
 int live_hud_hit(float x,float y){
  auto inside=[&](int i){if(!ssc_hud::visible(i,GetTickCount64()))return false;const auto& a=ssc_hud::items[i];float px=6.f/std::max(1,ssc_hud::view_w),py=6.f/std::max(1,ssc_hud::view_h);return x>=a.x-px&&x<=a.x+a.w*a.scale+px&&y>=a.y-py&&y<=a.y+a.h*a.scale+py;};
  if(inside(ssc_hud::selected))return ssc_hud::selected;
@@ -208,7 +208,7 @@ void activate(int id) {
     else if(id==339){ssc_auto::import_pending=ssc_auto::delete_pending=false;dirty=true;}
     else if(id==346){auto_guide=!auto_guide;dirty=true;}
     else if(id==460){auto_guide_page=std::max(0,auto_guide_page-1);dirty=true;}
-    else if(id==461){auto_guide_page=std::min((ssc_auto::variable_count-1)/5,auto_guide_page+1);dirty=true;}
+    else if(id==461){auto_guide_page=std::min((ssc_auto::selectable_variable_count-1)/5,auto_guide_page+1);dirty=true;}
     else if(id==347){auto_guide=false;dirty=true;}
     else if(id==348){if(chat_editing)activate(321);if(chat_editing)return;auto_rule_editor=false;ssc_auto::delete_pending=false;auto_list_page=ssc_auto::selected/6;dirty=true;}
     else if(id==349||id==350){auto_list_page=std::clamp(auto_list_page+(id==349?-1:1),0,std::max(0,(int(ssc_auto::rules.size())-1)/6));dirty=true;}
@@ -218,13 +218,13 @@ void activate(int id) {
     else if(id==405){open_dropdown(id,{L"All conditions (AND)",L"Any condition (OR)"},ssc_auto::current().any?1:0);}
     else if(id==406){open_dropdown(id,{L"1 time",L"2 times",L"3 times",L"4 times",L"5 times"},ssc_auto::current().repeats-1);}
     else if(id==407&&ssc_auto::current().conditions.size()<3){ssc_auto::current().conditions.push_back({});save();}
-    else if(id>=410&&id<413){open_dropdown(id,std::vector<std::wstring>(ssc_auto::condition_labels,ssc_auto::condition_labels+ssc_auto::condition_count),ssc_auto::current().conditions[id-410].stat);}
+    else if(id>=410&&id<413){open_dropdown(id,std::vector<std::wstring>(ssc_auto::condition_labels,ssc_auto::condition_labels+ssc_auto::selectable_condition_count),ssc_auto::current().conditions[id-410].stat);}
     else if(id>=420&&id<423){open_dropdown(id,{L"At least",L"At most",L"Equal to"},ssc_auto::current().conditions[id-420].comparison);}
     else if(id>=430&&id<433){auto& v=ssc_auto::current().conditions;v.erase(v.begin()+id-430);chat_editing=false;save();}
     else if(id==340||id==341){auto& value=ssc_auto::current().threshold;value=std::clamp(value+(id==340?-1:1)*((GetKeyState(VK_SHIFT)&0x8000)?10:1),1,1000);save();}
     else if(id==342||id==343){auto& value=ssc_auto::current().min_level;value=std::clamp(value+(id==342?-1:1),0,1000);save();}
-    else if(id==344){open_dropdown(id,std::vector<std::wstring>(ssc_auto::variable_labels,ssc_auto::variable_labels+ssc_auto::variable_count),ssc_auto::variable);}
-    else if(id==345){std::string token="{"+std::string(ssc_auto::variables[ssc_auto::variable])+"}";if(!chat_editing||chat_field!=0){chat_field=0;chat_buffer=ssc_auto::current().message;chat_editing=true;edit_cursor.begin(chat_buffer.size());}edit_cursor.insert(chat_buffer,token,100);chat_select_all=false;dirty=true;}
+    else if(id==344){ssc_auto::variable=std::clamp(ssc_auto::variable,0,ssc_auto::selectable_variable_count-1);open_dropdown(id,std::vector<std::wstring>(ssc_auto::variable_labels,ssc_auto::variable_labels+ssc_auto::selectable_variable_count),ssc_auto::variable);}
+    else if(id==345){ssc_auto::variable=std::clamp(ssc_auto::variable,0,ssc_auto::selectable_variable_count-1);std::string token="{"+std::string(ssc_auto::variables[ssc_auto::variable])+"}";if(!chat_editing||chat_field!=0){chat_field=0;chat_buffer=ssc_auto::current().message;chat_editing=true;edit_cursor.begin(chat_buffer.size());}edit_cursor.insert(chat_buffer,token,100);chat_select_all=false;dirty=true;}
 
     else if(id==172){ssc_diagnostics::open_logs(state_dir);}
     else if(id==160){if(!presence_supported||rpc_preview.phase==1)ssc_update::check(state_dir);dirty=true;}
@@ -290,7 +290,7 @@ void activate(int id) {
     else if(id==210){if(ssc_lab::picker_page>=6)ssc_lab::picker_page-=6;dirty=true;}
     else if(id==211){if(ssc_lab::picker_page+6<ssc_lab::filtered().size())ssc_lab::picker_page+=6;dirty=true;}
     else if(id>=220&&id<226){auto results=ssc_lab::filtered();auto row=ssc_lab::picker_page+id-220;if(row<results.size()){ssc_lab::column(ssc_lab::picker)=results[row];ssc_lab::picker=-1;ssc_lab::recompute();controls.clear();dirty=true;}}
-    else if(id==144||id==145){ssc_hud::selected=(ssc_hud::selected+(id==144?int(ssc_hud::items.size())-1:1))%int(ssc_hud::items.size());dirty=true;}
+    else if(id==144||id==145){ssc_hud::selected=ssc_hud::next_item(ssc_hud::selected,id==144?-1:1);dirty=true;}
     else if(id==83){rpc_requested=!rpc_requested;save();}
     else if(id==85){rpc_rating=!rpc_rating;save();}
     else if(id==84){rpc_timer=!rpc_timer;save();}
@@ -665,14 +665,14 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"0.1.5 HOTFIX",cyan);
-        bullet(201,L"Fixed Space closing text fields instead of inserting a space");
-        bullet(257,L"Related sound replacements now cover engine variants");
-        bullet(289,L"Killed Human replacements also cover kill-combo sounds");
-        bullet(321,L"Added more groups for impacts, collisions and explosions");
-        bullet(401,L"Incomplete online hit and impact-damage totals are unavailable");
-        bullet(433,L"Affected auto-message rules skip sending rather than show false totals");
-        bullet(465,L"Shots fired and projectile counts remain available");
+        text(50,153,L"0.1.6 COMPATIBILITY HOTFIX",cyan);
+        bullet(201,L"Updated mod compatibility for Skillshot City v0.992");
+        bullet(233,L"Team-roster positioning is temporarily unavailable");
+        bullet(297,L"Added music replacements and track durations");
+        bullet(329,L"All music tracks applies one custom song across the playlist");
+        bullet(361,L"Shared music follows each original track's loudness");
+        bullet(425,L"Unavailable hit and damage stats are hidden from pickers");
+        bullet(457,L"Existing affected rules keep an unavailable warning");
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
@@ -726,7 +726,7 @@ void paint_panel() {
                 if(ssc_auto::rules.empty()){text(286,278,L"No rules yet",cyan,true);text(286,323,L"Choose New Rule to set when a message is sent",muted,false,15);}
                 for(int row=0;row<6;++row){int index=auto_list_page*6+row;if(index>=int(ssc_auto::rules.size()))break;const auto& item=ssc_auto::rules[index];int y=218+row*63;
                     rectangle(266,y,820,55,RGB(16,37,62));auto label=ssc_chat::widen(item.name);
-                    text(280,y+7,label.c_str(),ink,false,15);auto message=ssc_chat::widen(item.message.substr(0,52));if(item.message.size()>52)message+=L"...";text(280,y+31,message.c_str(),muted,false,12);
+                    text(280,y+7,label.c_str(),ink,false,15);auto message=ssc_chat::widen(item.message.substr(0,52));if(item.message.size()>52)message+=L"...";auto warning=ssc_auto::rule_warning(item);if(!warning.empty())message=ssc_chat::widen(warning);text(280,y+31,message.c_str(),warning.empty()?muted:RGB(255,190,75),false,12);
                     toggle(360+index,822,y+9,item.enabled);button(380+index,938,y+9,132,36,L"EDIT");
                 }
                 if(!ssc_auto::status.empty())text(266,598,ssc_auto::status.substr(0,76).c_str(),cyan,false,11);
@@ -742,9 +742,9 @@ void paint_panel() {
                 for(int i=0;i<int(r.conditions.size());++i){auto& c=r.conditions[i];int y=326+i*36;button(410+i,366,y,245,30,stats[c.stat]);button(420+i,621,y,205,30,comparisons[c.comparison]);editbox(450+i,836,y,196,30,ssc_chat::widen(chat_editing&&chat_field==3+i?chat_buffer:std::to_string(c.value)),chat_editing&&chat_field==3+i);button(430+i,1044,y,42,30,L"X");}
                 text(266,447,L"MESSAGE",muted,false,13);auto value=chat_editing&&chat_field==0?chat_buffer:r.message;editbox(320,366,437,720,36,ssc_chat::widen(value),chat_editing&&chat_field==0);
                 text(266,490,L"SEND",muted,false,13);button(406,366,479,160,34,(std::to_wstring(r.repeats)+(r.repeats==1?L" time":L" times")).c_str());button(344,546,479,295,34,ssc_auto::variable_labels[ssc_auto::variable]);button(345,853,479,233,34,L"INSERT VARIABLE");
-                std::string preview,error;ssc_auto::format(value,ssc_auto::examples(),preview,error);text(266,528,L"EXAMPLE",cyan,false,12);text(366,528,ssc_chat::widen((error.empty()?preview:error).substr(0,76)).c_str(),ink,false,12);
+                std::string preview,error;auto previewRule=r;previewRule.message=value;error=ssc_auto::rule_warning(previewRule);if(error.empty())ssc_auto::format(value,ssc_auto::examples(),preview,error);text(266,528,L"EXAMPLE",cyan,false,12);text(366,528,ssc_chat::widen((error.empty()?preview:error).substr(0,76)).c_str(),ink,false,12);
                 button(321,266,562,150,36,L"SAVE",true,chat_editing);button(336,432,562,302,36,L"COPY RULE CODE");button(346,750,562,336,36,L"VARIABLE GUIDE",auto_guide);
-                if(!ssc_auto::status.empty())text(266,616,ssc_auto::status.substr(0,88).c_str(),cyan,false,12);
+                auto warning=ssc_auto::rule_warning(r);auto ruleStatus=warning.empty()?ssc_auto::status:ssc_chat::widen(warning)+L" - this rule cannot send with the current counter";if(!ruleStatus.empty())text(266,616,ruleStatus.substr(0,88).c_str(),cyan,false,12);
 
             }
         } else if(settings_page==1) {
@@ -763,16 +763,16 @@ void paint_panel() {
             if(sound_results.empty()&&sound_query.empty())filter_sounds();
             editbox(104,266,187,540,36,sound_query,sound_search_editing,L"Search sounds");
             button(100,822,187,120,36,L"PREVIOUS");button(101,958,187,128,36,L"NEXT");
-            for(size_t i=0;i<5&&sound_page+i<sound_results.size();++i){size_t index=sound_results[sound_page+i];auto label=ssc_sound::entries[index].label+(ssc_sound::has_replacement(ssc_sound::entries[index])?L" [CUSTOM]":L"");button(110+int(i),266,236+int(i)*34,820,30,label.c_str(),index==ssc_sound::selection);}
+            for(size_t i=0;i<5&&sound_page+i<sound_results.size();++i){size_t index=sound_results[sound_page+i];auto label=ssc_sound::display_name(ssc_sound::entries[index])+(ssc_sound::has_replacement(ssc_sound::entries[index])?L" [CUSTOM]":L"");button(110+int(i),266,236+int(i)*34,820,30,label.c_str(),index==ssc_sound::selection);}
 
             if(ssc_sound::selection<ssc_sound::entries.size()){
-                auto& e=ssc_sound::entries[ssc_sound::selection];std::wstring info=e.label+L" / "+std::to_wstring(e.rate)+L" Hz / "+std::to_wstring(e.channels)+L" ch";
+                auto& e=ssc_sound::entries[ssc_sound::selection];std::wstring info=ssc_sound::display_name(e)+L" / "+std::to_wstring(e.rate)+L" Hz / "+std::to_wstring(e.channels)+L" ch";
                 text(266,424,info.c_str(),cyan,false,14);
             }
             button(102,266,454,242,36,L"IMPORT AUDIO");button(103,526,454,242,36,L"RESTORE ORIGINAL");
             text(792,464,L"MATCH LEVEL",muted,false,12);toggle(82,982,454,match_sound_level);
             text(266,640,ssc_sound::status.c_str(),ink,false,11);
-            if(ssc_sound::selection<ssc_sound::entries.size()){auto& e=ssc_sound::entries[ssc_sound::selection];text(266,514,L"ALL RELATED SOUNDS",muted,false,13);button(487,600,500,150,36,ssc_sound::all_variants(e)?L"ON":L"OFF",ssc_sound::all_variants(e),ssc_sound::has_replacement(e)&&!ssc_sound::family(e).empty());text(792,514,L"VOLUME",muted,false,13);button(488,914,500,172,36,(std::to_wstring(ssc_sound::clip_volume(e))+L"%").c_str(),false,ssc_sound::has_replacement(e));}
+            if(ssc_sound::selection<ssc_sound::entries.size()){auto& e=ssc_sound::entries[ssc_sound::selection];text(266,514,e.music?L"ALL MUSIC TRACKS":L"ALL RELATED SOUNDS",muted,false,13);button(487,600,500,150,36,ssc_sound::all_variants(e)?L"ON":L"OFF",ssc_sound::all_variants(e),(ssc_sound::all_variants(e)||e.imported)&&!ssc_sound::variant_group(e).empty());text(792,514,L"VOLUME",muted,false,13);button(488,914,500,172,36,(std::to_wstring(ssc_sound::clip_volume(e))+L"%").c_str(),false,ssc_sound::has_replacement(e));}
             button(489,566,586,280,38,L"PREVIEW CUSTOM",false,ssc_sound::selection<ssc_sound::entries.size()&&ssc_sound::has_replacement(ssc_sound::entries[ssc_sound::selection]));
             button(105,266,586,280,38,L"PREVIEW ORIGINAL",false,ssc_sound::selection<ssc_sound::entries.size());
         } else if(settings_page==4) {
@@ -933,7 +933,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.5",cyan);
+            text(266,157,L"0.1.6",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
@@ -960,8 +960,8 @@ void paint_panel() {
         rectangle(1132,100,284,514,RGB(8,21,41));rectangle(1132,100,284,46,RGB(18,41,72));rectangle(1132,146,284,2,cyan);
         text(1146,116,L"VARIABLE GUIDE",ink,false,17);button(347,1374,106,30,30,L"X",false,true,true);
         text(1146,167,L"Use {name} or [name]",muted,false,13);
-        for(int row=0;row<5;++row){int i=auto_guide_page*5+row;if(i>=ssc_auto::variable_count)break;int y=205+row*68;text(1146,y,ssc_auto::variable_labels[i],ink,false,14);auto token=L"{"+ssc_chat::widen(ssc_auto::variables[i])+L"}";text(1146,y+21,token.c_str(),cyan,false,13);text(1146,y+42,ssc_auto::variable_details[i],muted,false,11);}
-        button(460,1146,560,62,30,L"<",false,auto_guide_page>0);button(461,1338,560,62,30,L">",false,auto_guide_page<(ssc_auto::variable_count-1)/5);text(1225,569,(std::to_wstring(auto_guide_page+1)+L" / "+std::to_wstring((ssc_auto::variable_count+4)/5)).c_str(),muted,false,13);
+        for(int row=0;row<5;++row){int i=auto_guide_page*5+row;if(i>=ssc_auto::selectable_variable_count)break;int y=205+row*68;text(1146,y,ssc_auto::variable_labels[i],ink,false,14);auto token=L"{"+ssc_chat::widen(ssc_auto::variables[i])+L"}";text(1146,y+21,token.c_str(),cyan,false,13);text(1146,y+42,ssc_auto::variable_details[i],muted,false,11);}
+        button(460,1146,560,62,30,L"<",false,auto_guide_page>0);button(461,1338,560,62,30,L">",false,auto_guide_page<(ssc_auto::selectable_variable_count-1)/5);text(1225,569,(std::to_wstring(auto_guide_page+1)+L" / "+std::to_wstring((ssc_auto::selectable_variable_count+4)/5)).c_str(),muted,false,13);
         GdiFlush();int left=int(std::lround(1132*raster_scale)),right=int(std::lround(1416*raster_scale)),top=int(std::lround(100*raster_scale)),bottom=int(std::lround(614*raster_scale));
         for(int y=top;y<bottom;++y)for(int x=left;x<right;++x)data[(size_t(y)*raster_w+x)*4+3]=255;
     }

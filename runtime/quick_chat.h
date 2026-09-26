@@ -25,16 +25,16 @@ inline std::wstring widen(const std::string& s){return std::wstring(s.begin(),s.
 inline std::wstring preview(){if(auto_text.empty())return L"Enter a message";if(auto_text.find('{')!=std::string::npos||auto_text.find('}')!=std::string::npos)return L"Statistic variables are not available in this preview";return widen(auto_text);}
 inline bool save(const std::filesystem::path& dir){try{nlohmann::json j={{"schema",1},{"enabled",enabled},{"order",order},{"auto_text",auto_text},{"auto_timing",auto_timing}};j["slots"]=nlohmann::json::array();for(auto& slot:slots)j["slots"].push_back({{"text",slot.text},{"icon",slot.icon},{"custom",slot.custom}});auto tmp=dir/L"quick-chat.json.tmp";std::ofstream out(tmp);out<<j.dump(2);out.close();return out&&MoveFileExW(tmp.c_str(),(dir/L"quick-chat.json").c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);}catch(...){return false;}}
 inline void load(const std::filesystem::path& dir){ssc_wheel_images::load(dir);try{auto p=dir/L"quick-chat.json";if(!std::filesystem::exists(p))return;if(std::filesystem::file_size(p)>16384)return;std::ifstream in(p);nlohmann::json j;in>>j;if(j.at("schema")!=1)return;auto next=slots;auto ord=j.at("order").get<std::array<int,9>>();auto sorted=ord;std::sort(sorted.begin(),sorted.end());for(int i=0;i<9;++i){if(sorted[i]!=i)return;next[i]={j.at("slots").at(i).at("text").get<std::string>(),j.at("slots").at(i).at("icon").get<int>(),j.at("slots").at(i).value("custom",false)};if(!valid_text(next[i].text)||next[i].icon<0||next[i].icon>8)return;}auto text=j.value("auto_text",std::string("GG"));int timing=j.value("auto_timing",0);if(!valid_text(text)||timing<0||timing>2)return;bool on=j.value("enabled",false);slots=next;order=ord;auto_text=text;auto_timing=timing;enabled=on;}catch(...){status=L"Could not load quick message settings";}}
-inline uintptr_t stock_atlas(){auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));return ssc_compat::supports(16)?base+ssc_compat::resolve(0xe1a1e0):0;}
+inline uintptr_t stock_atlas(){auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));return ssc_compat::supports(16)?base+ssc_compat::resolve(0xe21470):0;}
 // Native records are owned by the game. Never put a mod allocator's buffer in them.
 using Builder=void(*)(uintptr_t);
 using Assign=void*(*)(uintptr_t,const void*,size_t,size_t);
 inline Builder original=nullptr;inline Assign assign=nullptr;inline uintptr_t image_base=0;
 struct NativeString {uintptr_t pointer=0,padding=0;size_t size=0,capacity=16;};
-inline bool local_actor(uintptr_t actor){uintptr_t world=0,first=0,last=0,steam=0;int slot=-1;return ssc_names::read(image_base+ssc_compat::resolve(0xddb5d0),world)&&world&&ssc_names::read(world+0xa5b8,first)&&ssc_names::read(world+0xa5c0,last)&&ssc_names::read(image_base+ssc_compat::resolve(0xe12de8),steam)&&first==steam&&ssc_names::read(image_base+ssc_compat::resolve(0xe0f380),slot)&&slot>=0&&first&&last>=first&&(last-first)%0x3460==0&&uintptr_t(slot)<(last-first)/0x3460&&actor==first+uintptr_t(slot)*0x3460;}
+inline bool local_actor(uintptr_t actor){uintptr_t world=0,first=0,last=0,steam=0;int slot=-1;return ssc_names::read(image_base+ssc_compat::resolve(0xde25d0),world)&&world&&ssc_names::read(world+0xa618,first)&&ssc_names::read(world+0xa620,last)&&ssc_names::read(image_base+ssc_compat::resolve(0xe1a088),steam)&&first==steam&&ssc_names::read(image_base+ssc_compat::resolve(0xe16608),slot)&&slot>=0&&first&&last>=first&&(last-first)%0x3478==0&&uintptr_t(slot)<(last-first)/0x3478&&actor==first+uintptr_t(slot)*0x3478;}
 
 inline bool apply(uintptr_t actor){
- uintptr_t first=0,last=0;if(!enabled||!assign||!ssc_names::read(actor+0x2670,first)||!ssc_names::read(actor+0x2678,last)||!first||last<first||(last-first)%0x48||last-first>9*0x48)return false;
+ uintptr_t first=0,last=0;if(!enabled||!assign||!ssc_names::read(actor+0x2688,first)||!ssc_names::read(actor+0x2690,last)||!first||last<first||(last-first)%0x48||last-first>9*0x48)return false;
  struct Entry{int id;std::string text;};std::vector<Entry> entries;
  for(auto at=first;at<last;at+=0x48){int id=-1;if(!ssc_names::read(at+0x24,id)||id<0||id>8)return false;auto text=ssc_rpc::native_string(at);if(text.empty())return false;entries.push_back({id,text});}
  std::vector<Entry> ordered;for(int id:order){auto it=std::find_if(entries.begin(),entries.end(),[&](const Entry& e){return e.id==id;});if(it!=entries.end())ordered.push_back(*it);}
@@ -51,15 +51,15 @@ inline uintptr_t draw_label(uintptr_t a,float x,float y,float width,float height
 }
 inline bool attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
  if(!ssc_compat::supports(16))return false;
- struct Hook{uint32_t call,target,reserved;};Hook hooks[]={{0x80a32f,0x805680,0},{0x3c5145,0x805680,0},{0x3c5873,0x482b60,0},{0x3c59c4,0x47c900,0}};
+ struct Hook{uint32_t call,target,reserved;};Hook hooks[]={{0x80e83f,0x809bd0,0},{0x3c9615,0x809bd0,0},{0x3c9d43,0x485f80,0},{0x3c9e94,0x47f8b0,0}};
  for(auto& h:hooks){h.call=ssc_compat::resolve(h.call);h.target=ssc_compat::resolve(h.target);auto p=reinterpret_cast<const unsigned char*>(base+h.call);int32_t rel;std::memcpy(&rel,p+1,4);if(p[0]!=0xe8||base+h.call+5+rel!=base+h.target)return false;}
  unsigned char* bridge=nullptr;for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((base+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
  const unsigned char jump[]={0xff,0x25,0,0,0,0};std::memcpy(bridge,jump,6);auto entry=reinterpret_cast<uintptr_t>(build);std::memcpy(bridge+6,&entry,8);std::memcpy(bridge+32,jump,6);auto icon_entry=reinterpret_cast<uintptr_t>(ssc_wheel_images::draw);std::memcpy(bridge+38,&icon_entry,8);std::memcpy(bridge+64,jump,6);auto label_entry=reinterpret_cast<uintptr_t>(draw_label);std::memcpy(bridge+70,&label_entry,8);DWORD old;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,4096);
  DWORD protections[4]{};for(int i=0;i<4;++i)if(!VirtualProtect(reinterpret_cast<void*>(base+hooks[i].call),5,PAGE_EXECUTE_READWRITE,&protections[i])){for(int j=i-1;j>=0;--j){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+hooks[j].call),5,protections[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
- image_base=base;original=reinterpret_cast<Builder>(base+ssc_compat::resolve(0x805680));assign=reinterpret_cast<Assign>(base+ssc_compat::resolve(0x024820));
- original_label=reinterpret_cast<LabelDraw>(base+ssc_compat::resolve(0x47c900));
- ssc_wheel_images::original=reinterpret_cast<ssc_wheel_images::Draw>(base+ssc_compat::resolve(0x482b60));
+ image_base=base;original=reinterpret_cast<Builder>(base+ssc_compat::resolve(0x809bd0));assign=reinterpret_cast<Assign>(base+ssc_compat::resolve(0x24820));
+ original_label=reinterpret_cast<LabelDraw>(base+ssc_compat::resolve(0x47f8b0));
+ ssc_wheel_images::original=reinterpret_cast<ssc_wheel_images::Draw>(base+ssc_compat::resolve(0x485f80));
  for(int i=0;i<4;++i){int32_t rel=int32_t(reinterpret_cast<uintptr_t>(bridge+(i>=2?(i-1)*32:0))-(base+hooks[i].call+5));std::memcpy(reinterpret_cast<void*>(base+hooks[i].call+1),&rel,4);FlushInstructionCache(GetCurrentProcess(),reinterpret_cast<void*>(base+hooks[i].call),5);}
  // Hooks may share a page: finish every write before restoring protection,
  // then unwind in reverse so the original RX protection wins.

@@ -13,7 +13,15 @@ Run the installer and select your Skillshot City Steam folder. After installatio
 - **Sound Replacer:** import WAV or MP3 replacements, match volume and restore originals. Sample rate and mono/stereo conversion are automatic. Requires a restart to apply. MP3 decoding uses Windows Media Foundation.
 - **Cosmetics:** Customize your name with animated rainbow colors or a solid color, visible only to you.
 - **Discord Presence:** game status, available round/level details, elapsed time and ranked SSC rating. No developer setup or token is required.
-- **HUD Editor:** reposition and resize nine HUD groups, with saved layouts, resets and 25-600% scaling. Groups include minimap, version/FPS, round clock, round/players, money/syringes, weapons/ammo, healthbar/survival hearts/skills, team roster and event feed.
+- **HUD Editor:** reposition and resize eight HUD groups, with saved layouts, resets and 25-600% scaling. Groups include minimap, version/FPS, round clock, round/players, money/syringes, weapons/ammo, healthbar/survival hearts/skills and event feed.
+
+## Hotfix 0.1.6
+
+- Updated compatibility for Skillshot City v0.992
+- Added replacements for the current music playlist, track durations, and an All Music Tracks option
+- Shared music replacements follow the original tracks' relative loudness; the game's separate menu/game music controls still apply
+- Removed unavailable online hit and impact-damage variables from selection menus, while preserving saved rules with a warning
+- Team-roster positioning is temporarily unavailable following the game's HUD changes
 
 ## Hotfix 0.1.5
 

@@ -11,12 +11,13 @@ $sources=@("$root\installer\Engine.cs","$root\installer\Setup.cs","$root\install
 $common=@('/nologo','/warnaserror','/platform:x64','/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Web.Extensions.dll')
 if($RuntimeDirectory) {
     # Approved runtime/proxy hashes for the packaged release.
-    $approved=@{'opengl32.dll'='06BEC4DEC5CB838962DC2E82AFD3C3709F83ECF8097C4FAF7A31E031C392C85B';'runtime.dll'='2FF1956316D5681D7296290028095FC61ABAFA6461D1EFF756C38BF5A99D63CA'}
+    $approved=@{'opengl32.dll'='06BEC4DEC5CB838962DC2E82AFD3C3709F83ECF8097C4FAF7A31E031C392C85B';'runtime.dll'='8D6641FADD45911564DEE81F071ECCEB853D1D7C681CA840AC84E08BDADDA4F3'}
     foreach($name in $approved.Keys) {
         $path=(Resolve-Path -LiteralPath (Join-Path $RuntimeDirectory $name)).Path
         if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $approved[$name]) { throw "Unapproved payload hash for $name. Run runtime and isolated installation checks before updating the approved release hashes." }
         $common+="/resource:$path,$name"
     }
+    $common+="/resource:$root/runtime/third_party/AUDIO-NOTICES.txt,AUDIO-NOTICES.txt"
     $common+='/define:MENU_ALPHA'
 }
 & $compiler @common /target:winexe "/win32manifest:$root\installer\app.manifest" "/out:$build\SSC-Mod-Menu-Setup.exe" @sources

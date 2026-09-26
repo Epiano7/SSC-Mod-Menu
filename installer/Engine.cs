@@ -42,7 +42,8 @@ namespace SSCMods.Setup {
     public static class Engine {
         public const string Product = "SSCMods";
         public const string ManifestName = "SSCMods/install-manifest.json";
-        static readonly string[] Allowed = { "opengl32.dll", "SSCMods/runtime.dll", "SSCMods/Uninstall.exe" };
+        static readonly string[] Required = { "opengl32.dll", "SSCMods/runtime.dll", "SSCMods/Uninstall.exe" };
+        static readonly string[] Allowed = Required.Concat(new[]{"SSCMods/AUDIO-NOTICES.txt"}).ToArray();
         static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
         [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
         static extern bool CreateDirectory(string path, IntPtr attributes);
@@ -118,7 +119,7 @@ namespace SSCMods.Setup {
         static void ValidatePackage(Package package) {
             if (!package.RuntimeValidated) throw new IOException("This preview has no validated game runtime. Installation is unavailable; no game files were changed.");
             if (package.GameSize<=0 || !Regex.IsMatch(package.GameHash??"","^[A-F0-9]{64}$")) throw new IOException("Invalid release build metadata.");
-            if (package.Files.Count!=Allowed.Length || !Allowed.All(p=>package.Files.Count(f=>f.Path==p)==1) ||
+            if (package.Files.Count>Allowed.Length || !Required.All(p=>package.Files.Count(f=>f.Path==p)==1) || package.Files.Any(f=>!Allowed.Contains(f.Path)) || package.Files.Select(f=>f.Path).Distinct().Count()!=package.Files.Count ||
                 package.Files.Any(f=>f.Bytes==null || f.Bytes.Length==0)) throw new IOException("Incomplete embedded release payload.");
         }
         public static Inspection Inspect(string path,Package package) {
@@ -209,12 +210,13 @@ namespace SSCMods.Setup {
             var manifest=ReadManifest(root);
             // Steam may replace the game between mod releases. The new package must
             // match the current executable; the old manifest establishes file ownership.
-            if(manifest.State!="Installed"||!Regex.IsMatch(manifest.GameSha256??"","^[A-F0-9]{64}$")||manifest.Files.Count!=Allowed.Length)
+            if(manifest.State!="Installed"||!Regex.IsMatch(manifest.GameSha256??"","^[A-F0-9]{64}$")||!Required.All(p=>manifest.Files.Any(f=>f.Path==p)))
                 throw new IOException("Incomplete or incompatible installation manifest. Update blocked.");
             foreach(var file in manifest.Files) {
                 string target=Destination(root,file.Path);
                 if(!File.Exists(target)||FileHash(target)!=file.Sha256) throw new IOException("Modified or missing mod file: "+file.Path+". Update blocked.");
             }
+            foreach(var file in package.Files) if(!manifest.Files.Any(f=>f.Path==file.Path)&&File.Exists(Destination(root,file.Path))) throw new IOException("Unowned file blocks update: "+file.Path);
             result.CanInstall=true;result.Message="Ready to update SSC Mod Menu. Saved settings and game files are preserved.";return result;
         }
         public static void Update(string path,Package package,Action<int> afterCopy=null) {

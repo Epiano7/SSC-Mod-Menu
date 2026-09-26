@@ -240,7 +240,7 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
     ssc_diagnostics::initialize(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
-    log("SSC Mod Menu 0.1.5 startup");log_game_build();
+    log("SSC Mod Menu 0.1.6 startup");log_game_build();
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
     presence_supported=(supported&4)!=0;native_supported=true;
     log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");
@@ -251,7 +251,7 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     ssc_names::attached=ssc_names::attach();log(ssc_names::attached?"Tab and overhead name adapters attached":"Name adapters unavailable");
     try {
         wchar_t executable[32768];DWORD length=GetModuleFileNameW(nullptr,executable,32768);
-        if(length&&length<32768){ssc_sound::initialize(std::filesystem::path(executable).parent_path(),state_dir,sound_requested);ssc_sound::attached=attach_sound();log(ssc_sound::attached?"Audio buffer adapter attached (WAV; restart applies changes)":"Audio adapter unavailable");}
+        if(length&&length<32768){ssc_sound::initialize(std::filesystem::path(executable).parent_path(),state_dir,sound_requested);ssc_sound::attached=attach_sound();log(ssc_music::attach()?"Music file adapter attached":"Music file adapter unavailable");log(ssc_sound::attached?"Audio buffer adapter attached (WAV effects / OGG music; restart applies changes)":"Audio adapter unavailable");}
     }catch(const std::exception&){log("Sound catalog unavailable; originals preserved");}
     ssc_hud::attached=ssc_hud::attach();log(ssc_hud::attached?"HUD draw groups attached":"HUD adapter unavailable");
     log(attach_swap()?"Compatibility checks complete; SwapBuffers import attached":"SwapBuffers attachment refused");

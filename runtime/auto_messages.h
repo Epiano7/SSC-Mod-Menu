@@ -23,9 +23,19 @@ inline constexpr int variable_count=sizeof(variables)/sizeof(*variables);
 inline const char* condition_keys[]={"level","healthRemaining","maxHealth","roundNumber","shieldRemaining","shieldPercent","healthPercent","weaponCount","roundsTotal","levelsGained","roundTime","timeAlive","roundDeaths","damageTaken","healthMissing","roundsRemaining","deadTime","alivePercent","weaponTier","weaponMagazineSize","weaponFireRate","weaponProjectilesPerShot","ammoRemaining","money","syringes","shotsFired","projectilesFired","bulletHits","playerHits","npcHits","impactDamage"};
 inline const wchar_t* condition_labels[]={L"Current level",L"Health",L"Maximum health",L"Round number",L"Shield",L"Shield percentage",L"Health percentage",L"Weapon count",L"Total rounds",L"Levels gained",L"Round time (seconds)",L"Time alive (seconds)",L"Deaths this round",L"HP damage taken",L"Missing health",L"Rounds remaining",L"Time dead",L"Time alive percentage",L"Weapon tier",L"Weapon magazine size",L"Weapon fire rate",L"Projectiles per shot",L"Ammo remaining",L"Money",L"Syringes",L"Weapon shots fired",L"Weapon projectiles fired",L"Projectile hit events",L"Player hit events",L"NPC hit events",L"Pre-defense impact damage"};
 inline constexpr int condition_count=sizeof(condition_keys)/sizeof(*condition_keys);
+// Keep the four retired trailing IDs for saved rules and shared-code compatibility.
+inline constexpr int selectable_variable_count=variable_count-4;
+inline constexpr int selectable_condition_count=condition_count-4;
 inline constexpr uint64_t message_interval_ms=500;
 static_assert(std::size(variables)==std::size(variable_labels)&&std::size(variables)==std::size(variable_details));
 static_assert(std::size(condition_keys)==std::size(condition_labels));
+// These client-side contact counters do not cover authoritative online hits.
+inline bool unavailable_stat(const std::string& key){return key=="bulletHits"||key=="playerHits"||key=="npcHits"||key=="impactDamage";}
+inline std::string rule_warning(const Rule& r){
+ for(auto key:variables)if(unavailable_stat(key)&&(r.message.find(std::string("[")+key+"]")!=std::string::npos||r.message.find(std::string("{")+key+"}")!=std::string::npos))return std::string("Unavailable: ")+key;
+ for(const auto& c:r.conditions)if(c.stat>=0&&c.stat<condition_count&&unavailable_stat(condition_keys[c.stat]))return std::string("Unavailable: ")+condition_keys[c.stat];
+ return "";
+}
 inline Rule auto_gg(){Rule r;r.name="Auto-GG";return r;}
 inline std::vector<Rule> rules={auto_gg()};
 inline int selected=0,variable=0;
@@ -87,8 +97,8 @@ inline RoundTracker round_tracker;
 struct Pending {std::string text;uint64_t expires=0;size_t rule=0;std::string signature;};
 struct Engine {
  uintptr_t session=0;int round=0;bool participated=false,ended=false;Values previous;
- std::set<size_t> fired;std::vector<Pending> pending;uint64_t last_send=0,invalid_since=0;
- void reset(){session=0;round=0;participated=ended=false;invalid_since=0;previous.clear();fired.clear();pending.clear();}
+ std::wstring round_error;std::set<size_t> fired;std::vector<Pending> pending;uint64_t last_send=0,invalid_since=0;
+ void reset(){session=0;round=0;participated=ended=false;invalid_since=0;previous.clear();fired.clear();pending.clear();round_error.clear();}
  static int number(const Values& v,const char* key){try{auto it=v.find(key);return it==v.end()?-1:std::stoi(it->second);}catch(...){return -1;}}
  void observe(const Observation& o,uint64_t now){
   if(!enabled){reset();return;}if(!o.valid){if(o.connected&&session){if(!invalid_since)invalid_since=now;if(now>=invalid_since&&now-invalid_since<=2000)return;}reset();return;}invalid_since=0;
@@ -102,13 +112,13 @@ struct Engine {
    if(!trigger)continue;
    fired.insert(i);if(r.min_level&&number(o.values,"level")<r.min_level)continue;
    bool conditions=r.conditions.empty()||!r.any;bool missing=false;for(auto& c:r.conditions){int value=number(o.values,condition_keys[c.stat]);if(value<0){missing=true;break;}bool pass=c.comparison==0?value>=c.value:c.comparison==1?value<=c.value:value==c.value;if(r.any)conditions=conditions||pass;else conditions=conditions&&pass;}if(missing||!conditions)continue;
-   std::string text,error;if(!format(r.message,o.values,text,error)){status=std::wstring(error.begin(),error.end());continue;}
+   std::string text,error;if(!format(r.message,o.values,text,error)){auto detail=r.name+": "+error;round_error=std::wstring(detail.begin(),detail.end());status=round_error;continue;}
    for(int repeat=0;repeat<r.repeats&&pending.size()<60;++repeat)pending.push_back({text,now+15000+uint64_t(repeat)*message_interval_ms,i,code(r)});
   }
   if(finish)ended=true;
   previous=o.values;
  }
- template<class Sender> void dispatch(uint64_t now,Sender send){while(!pending.empty()){const auto& p=pending.front();if(now<p.expires&&p.rule<rules.size()&&rules[p.rule].enabled&&code(rules[p.rule])==p.signature)break;pending.erase(pending.begin());}if(pending.empty()||(last_send&&now-last_send<message_interval_ms))return;if(send(pending.front().text)){last_send=now;pending.erase(pending.begin());status=L"Message sent";}}
+ template<class Sender> void dispatch(uint64_t now,Sender send){while(!pending.empty()){const auto& p=pending.front();if(now<p.expires&&p.rule<rules.size()&&rules[p.rule].enabled&&code(rules[p.rule])==p.signature)break;pending.erase(pending.begin());}if(pending.empty()||(last_send&&now-last_send<message_interval_ms))return;if(send(pending.front().text)){last_send=now;pending.erase(pending.begin());status=round_error.empty()?L"Message sent":L"Another rule sent; "+round_error;}}
 };
 inline Engine engine;
 }
