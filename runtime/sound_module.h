@@ -157,7 +157,7 @@ inline void preview_original(){
     // Asynchronous filename playback owns its data; always use the original path.
     std::filesystem::path path=entries[selection].path;
     try{if(entries[selection].music){std::filesystem::create_directories(folder);path=folder/L"preview-original.wav";ssc_audio::write(path,original_wave(entries[selection]));}}catch(...){status=L"Could not decode music preview";return;}
-    if(play&&play(path.c_str(),nullptr,0x00020000|0x0001|0x0002))status=L"Playing original: "+entries[selection].label;
+    if(play&&play(path.c_str(),nullptr,0x20000|0x1|0x2))status=L"Playing original: "+entries[selection].label;
     else status=L"Could not preview original sound";
 }
 inline void preview_custom(HWND owner){

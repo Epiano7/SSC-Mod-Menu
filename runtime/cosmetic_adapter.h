@@ -132,39 +132,39 @@ inline float __cdecl account_draw(void* renderer,float x,float y,void* name,floa
 inline bool attach(){
     if(!ssc_compat::supports(1))return false;
     image_base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
-    native_predicate=reinterpret_cast<Predicate>(image_base+ssc_compat::resolve(0x3aa080));native_overhead=reinterpret_cast<Overhead>(image_base+ssc_compat::resolve(0x8457d0));native_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x47f720));
-    native_widget=reinterpret_cast<Widget>(image_base+ssc_compat::resolve(0x9980c0));
+    native_predicate=reinterpret_cast<Predicate>(image_base+ssc_compat::resolve(0x3a9fd0));native_overhead=reinterpret_cast<Overhead>(image_base+ssc_compat::resolve(0x8457d0));native_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x47f6f0));
+    native_widget=reinterpret_cast<Widget>(image_base+ssc_compat::resolve(0x9980e0));
     struct Site{uint32_t call,target;uintptr_t hook;};
     // Whitelist presentation calls only. Do not hook the predicate globally:
     // 5fb3b0/5fd316/6834a3/6b6db7 also service pass-related UI/cache logic.
     Site sites[]={
-        {0x419467,0x47f720,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x4194eb,0x47f720,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x620e54,0x47f720,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x63a6a7,0x47f720,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6a934c,0x47f720,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6a95d4,0x47f720,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6a97f2,0x47f720,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9df843,0x47f720,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9aae1b,0x47f720,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9aafbf,0x47f720,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x419437,0x47f6f0,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x4194bb,0x47f6f0,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x620e24,0x47f6f0,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x63a677,0x47f6f0,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6a931c,0x47f6f0,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6a95a4,0x47f6f0,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6a97c2,0x47f6f0,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9df863,0x47f6f0,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9aae3b,0x47f6f0,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9aafdf,0x47f6f0,reinterpret_cast<uintptr_t>(account_draw)},
 
-        {0x33c0d4,0x8457d0,reinterpret_cast<uintptr_t>(overhead)},
-        {0x845c7e,0x3aa080,reinterpret_cast<uintptr_t>(predicate)},
-        {0x41927f,0x3aa080,reinterpret_cast<uintptr_t>(predicate)},
-        {0x4391d5,0x3aa080,reinterpret_cast<uintptr_t>(predicate)},
-        {0x620afc,0x3aa080,reinterpret_cast<uintptr_t>(predicate)},
-        {0x63a36e,0x3aa080,reinterpret_cast<uintptr_t>(predicate)},
-        {0x6a7809,0x3aa080,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9df7a5,0x3aa080,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9aad4d,0x3aa080,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x9aaef7,0x3aa080,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x607421,0x9980c0,reinterpret_cast<uintptr_t>(local_widget)},
-        {0x99a559,0x47f720,reinterpret_cast<uintptr_t>(widget_draw)},
-        {0x846536,0x47f720,reinterpret_cast<uintptr_t>(draw)},
-        {0x8465c2,0x47f720,reinterpret_cast<uintptr_t>(draw)},
-        {0x435cae,0x47f720,reinterpret_cast<uintptr_t>(ssc_score_bridge)},
-        {0x435d33,0x47f720,reinterpret_cast<uintptr_t>(ssc_score_bridge)}};
+        {0x33c024,0x8457d0,reinterpret_cast<uintptr_t>(overhead)},
+        {0x845c7e,0x3a9fd0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x41924f,0x3a9fd0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x4391a5,0x3a9fd0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x620acc,0x3a9fd0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x63a33e,0x3a9fd0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x6a77d9,0x3a9fd0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x9df7c5,0x3a9fd0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x9aad6d,0x3a9fd0,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x9aaf17,0x3a9fd0,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x6073f1,0x9980e0,reinterpret_cast<uintptr_t>(local_widget)},
+        {0x99a579,0x47f6f0,reinterpret_cast<uintptr_t>(widget_draw)},
+        {0x846536,0x47f6f0,reinterpret_cast<uintptr_t>(draw)},
+        {0x8465c2,0x47f6f0,reinterpret_cast<uintptr_t>(draw)},
+        {0x435c7e,0x47f6f0,reinterpret_cast<uintptr_t>(ssc_score_bridge)},
+        {0x435d03,0x47f6f0,reinterpret_cast<uintptr_t>(ssc_score_bridge)}};
     for(auto& site:sites){site.call=ssc_compat::resolve(uint32_t(site.call));site.target=ssc_compat::resolve(uint32_t(site.target));}
     for(auto site:sites){auto p=reinterpret_cast<unsigned char*>(image_base+site.call);int32_t relative;std::memcpy(&relative,p+1,4);if(p[0]!=0xe8||image_base+site.call+5+relative!=image_base+site.target)return false;}
     unsigned char* bridge=nullptr;

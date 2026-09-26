@@ -46,13 +46,13 @@ asm(".text\n.globl ssc_combat_hit_bridge\n.def ssc_combat_hit_bridge; .scl 2; .t
 inline bool attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
  if(attached)return true;
  if(!ssc_compat::supports(64))return false;
- struct Hook{uint32_t call,target,reserved;};Hook hooks[]={{0x2f4e2d,0x7eb000,0},{0x7e388e,0x1ae330,0}};
+ struct Hook{uint32_t call,target,reserved;};Hook hooks[]={{0x2f4d7d,0x7eaf70,0},{0x7e37fe,0x1ae330,0}};
  for(auto& h:hooks){h.call=ssc_compat::resolve(h.call);h.target=ssc_compat::resolve(h.target);auto p=reinterpret_cast<const unsigned char*>(base+h.call);int32_t rel;std::memcpy(&rel,p+1,4);if(p[0]!=0xe8||base+h.call+5+rel!=base+h.target)return false;}
  unsigned char* bridge=nullptr;for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((base+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
  uintptr_t entries[]={reinterpret_cast<uintptr_t>(spawn),reinterpret_cast<uintptr_t>(ssc_combat_hit_bridge)};for(int i=0;i<2;++i){const unsigned char jump[]={0xff,0x25,0,0,0,0};std::memcpy(bridge+i*32,jump,6);std::memcpy(bridge+i*32+6,&entries[i],8);}DWORD old;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,4096);
  DWORD protections[2]{};for(int i=0;i<2;++i)if(!VirtualProtect(reinterpret_cast<void*>(base+hooks[i].call),5,PAGE_EXECUTE_READWRITE,&protections[i])){for(int j=i-1;j>=0;--j){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+hooks[j].call),5,protections[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
- image_base=base;original_spawn=reinterpret_cast<Spawn>(base+ssc_compat::resolve(0x7eb000));original_append=reinterpret_cast<Append>(base+ssc_compat::resolve(0x1ae330));
+ image_base=base;original_spawn=reinterpret_cast<Spawn>(base+ssc_compat::resolve(0x7eaf70));original_append=reinterpret_cast<Append>(base+ssc_compat::resolve(0x1ae330));
  for(int i=0;i<2;++i){int32_t rel=int32_t(reinterpret_cast<uintptr_t>(bridge+i*32)-(base+hooks[i].call+5));std::memcpy(reinterpret_cast<void*>(base+hooks[i].call+1),&rel,4);FlushInstructionCache(GetCurrentProcess(),reinterpret_cast<void*>(base+hooks[i].call),5);}
  for(int i=1;i>=0;--i){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+hooks[i].call),5,protections[i],&ignored);}attached=true;return true;
 }

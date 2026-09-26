@@ -15,6 +15,11 @@ Run the installer and select your Skillshot City Steam folder. After installatio
 - **Discord Presence:** game status, available round/level details, elapsed time and ranked SSC rating. No developer setup or token is required.
 - **HUD Editor:** reposition and resize eight HUD groups, with saved layouts, resets and 25-600% scaling. Groups include minimap, version/FPS, round clock, round/players, money/syringes, weapons/ammo, healthbar/survival hearts/skills and event feed.
 
+## Hotfix 0.1.7
+
+- Restored module compatibility after the latest Skillshot City update
+- Restored Auto Messages round detection
+
 ## Hotfix 0.1.6
 
 - Updated compatibility for Skillshot City v0.992

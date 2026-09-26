@@ -27,7 +27,7 @@ bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buf
 bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hud::editing;}
 
 // Advance this ID when publishing a new set of release notes.
-constexpr int release_notes_id=20260926;
+constexpr int release_notes_id=20260927;
 bool show_update_notes=true;int seen_release_notes=0;
 bool update_notes_due(int phase){return presence_supported&&phase==1&&welcome_seen&&show_update_notes&&seen_release_notes!=release_notes_id&&!opened;}
 int canvas_w=1120;constexpr int canvas_h=720;
@@ -163,7 +163,7 @@ void live_hud_move(float x,float y){if(hud_drag<0)return;auto& a=ssc_hud::items[
 void live_hud_wheel(int delta,int hovered_item){if(hud_drag>=0){finish_hud_drag();ReleaseCapture();}if(hovered_item>=0)ssc_hud::selected=hovered_item;auto& a=ssc_hud::items[ssc_hud::selected];a.scale*=std::pow(1.1f,float(delta)/WHEEL_DELTA);ssc_hud::constrain(a);save();}
 bool module_ready(int id){
     if(!ssc_compat::initialized)return true;
-    return id==80?ssc_sound::attached:id==81?ssc_names::attached:id==83?presence_supported:(id==86||id==193)?ssc_hud::attached:true;
+    return id==330?ssc_auto::supported():id==80?ssc_sound::attached:id==81?ssc_names::attached:id==83?presence_supported:(id==86||id==193)?ssc_hud::attached:true;
 }
 bool wheel_round_ended=false;
 void open_dropdown(int id,std::vector<std::wstring> labels,int choice){dropdown=dropdown==id?-1:id;dropdown_items=std::move(labels);dropdown_choice=choice;dirty=true;}
@@ -665,14 +665,9 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"0.1.6 COMPATIBILITY HOTFIX",cyan);
-        bullet(201,L"Updated mod compatibility for Skillshot City v0.992");
-        bullet(233,L"Team-roster positioning is temporarily unavailable");
-        bullet(297,L"Added music replacements and track durations");
-        bullet(329,L"All music tracks applies one custom song across the playlist");
-        bullet(361,L"Shared music follows each original track's loudness");
-        bullet(425,L"Unavailable hit and damage stats are hidden from pickers");
-        bullet(457,L"Existing affected rules keep an unavailable warning");
+        text(50,153,L"0.1.7 COMPATIBILITY HOTFIX",cyan);
+        bullet(201,L"Restored compatibility after the latest game update" );
+        bullet(233,L"Restored Auto Messages round detection" );
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
@@ -729,7 +724,7 @@ void paint_panel() {
                     text(280,y+7,label.c_str(),ink,false,15);auto message=ssc_chat::widen(item.message.substr(0,52));if(item.message.size()>52)message+=L"...";auto warning=ssc_auto::rule_warning(item);if(!warning.empty())message=ssc_chat::widen(warning);text(280,y+31,message.c_str(),warning.empty()?muted:RGB(255,190,75),false,12);
                     toggle(360+index,822,y+9,item.enabled);button(380+index,938,y+9,132,36,L"EDIT");
                 }
-                if(!ssc_auto::status.empty())text(266,598,ssc_auto::status.substr(0,76).c_str(),cyan,false,11);
+                if(!ssc_auto::supported())text(266,598,L"Paused: round data unavailable on this game version",RGB(255,190,75),false,11);else if(!ssc_auto::status.empty())text(266,598,ssc_auto::status.substr(0,76).c_str(),cyan,false,11);
                 auto count=std::count_if(ssc_auto::rules.begin(),ssc_auto::rules.end(),[](const ssc_auto::Rule& item){return item.enabled;});
                 text(266,619,(std::to_wstring(count)+L" enabled / "+std::to_wstring(ssc_auto::rules.size())+L" rules").c_str(),muted,false,13);
                 if(ssc_auto::rules.size()>6){button(349,850,607,44,36,L"<",false,auto_list_page>0);text(917,618,(std::to_wstring(auto_list_page+1)+L" / "+std::to_wstring((ssc_auto::rules.size()+5)/6)).c_str(),ink,false,13);button(350,1026,607,44,36,L">",false,(auto_list_page+1)*6<int(ssc_auto::rules.size()));}
@@ -933,7 +928,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.6",cyan);
+            text(266,157,L"0.1.7",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
@@ -983,9 +978,3 @@ void layout_panel(int width,int height) {
     panel_x=manager?int((width-(auto_guide_visible()?1120:panel_w)*draw_scale)*.5f):int(width-panel_w*draw_scale-24+(1-e)*24);
     panel_y=manager?int((height-panel_h*draw_scale)*.5f+(1-e)*18):int(40+(1-e)*12);
 }
-
-
-
-
-
-
