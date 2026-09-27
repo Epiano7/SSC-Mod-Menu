@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import traceback
+import tempfile
 import zipfile
 
 import ssc_installer as core
@@ -353,22 +354,38 @@ def launch(args):
     request = Path(record['game']) / 'SSCMods/linux-update-request.json' if record else None
     if request:
         request.unlink(missing_ok=True)
-    process = subprocess.Popen(args, env=env)
-    while process.poll() is None:
-        if request and request.is_file():
-            try:
-                data = core.read_json(request)
-                request.unlink()
-                version = data.get('version', '')
-                if not re.fullmatch(r'\d{1,5}\.\d{1,5}\.\d{1,5}', version):
-                    raise ValueError('Invalid requested update')
-                subprocess.Popen([sys.executable, str(Path(__file__).resolve().with_name('ssc_installer.py')),
-                                  '--native-update', record['game'], version], start_new_session=True)
-            except Exception:
-                log(traceback.format_exc())
-        import time
-        time.sleep(0.5)
-    return process.returncode
+    # A private per-launch mailbox bridges Wine to the native Discord socket.
+    # It carries presentation data only, and is removed when the game exits.
+    from discord_bridge import Bridge
+    relay = tempfile.TemporaryDirectory(prefix='.discord-', dir=Path(record['game']) / 'SSCMods') if record else None
+    bridge = Bridge(relay.name, log=log) if relay else None
+    if relay:
+        env['SSC_DISCORD_RELAY'] = 'Z:' + relay.name.replace('/', '\\')
+    try:
+        process = subprocess.Popen(args, env=env)
+        while process.poll() is None:
+            if bridge:
+                bridge.tick()
+            if request and request.is_file():
+                try:
+                    data = core.read_json(request)
+                    request.unlink()
+                    version = data.get('version', '')
+                    if not re.fullmatch(r'\d{1,5}\.\d{1,5}\.\d{1,5}', version):
+                        raise ValueError('Invalid requested update')
+                    subprocess.Popen([sys.executable, str(Path(__file__).resolve().with_name('ssc_installer.py')),
+                                      '--native-update', record['game'], version], start_new_session=True)
+                except Exception:
+                    log(traceback.format_exc())
+            import time
+            time.sleep(0.5)
+        return process.returncode
+    finally:
+        if bridge:
+            bridge.close()
+        if relay:
+            relay.cleanup()
+
 
 
 def export_logs(game, destination):

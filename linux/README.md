@@ -29,6 +29,8 @@ The in-game **Update and Restart** handoff is implemented but untested on Proton
 
 The installer keeps its launch helper under `~/.local/share/ssc-mod-menu` (or `XDG_DATA_HOME`), so removing the downloaded folder does not break launching. Keep or redownload the installer for repair or removal. Uninstall restores the previous launch option while preserving unrelated edits.
 
+Discord Presence now connects to the native Linux Discord app, including regular and Flatpak socket locations. Discord must be running. Actual activity display across these installations still needs broader testing.
+
 ## Troubleshooting and logs
 
 Open the installer and select **Export Logs** to save a ZIP for a bug report. Include your distribution, Proton version, and what happened. Review the ZIP before sharing it; nothing is uploaded automatically.

@@ -30,7 +30,7 @@ def build(runtime, output, version=None, python_archive=None, launcher=None):
                     files={name: hashlib.sha256(content).hexdigest() for name, content in files.items()})
     entries = {'payload/' + name: content for name, content in files.items()}
     entries['package.json'] = (json.dumps(metadata, indent=2) + '\n').encode()
-    for name in ('install.sh', 'ssc_installer.py', 'game_build.py', 'linux_desktop.py', 'linux_update.py', 'desktop_ui.py', 'README.md'):
+    for name in ('install.sh', 'ssc_installer.py', 'game_build.py', 'linux_desktop.py', 'linux_update.py', 'discord_bridge.py', 'desktop_ui.py', 'README.md'):
         entries[name] = (root / 'linux' / name).read_bytes().replace(b'\r\n', b'\n')
     for notice in (root / 'linux/licenses').iterdir():
         if notice.is_file():

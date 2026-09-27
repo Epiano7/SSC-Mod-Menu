@@ -29,6 +29,13 @@ The installer runs natively; the game and mod use Proton. The native Linux game 
 - **Discord Presence:** game status, available round/level details, elapsed time and ranked SSC rating. No developer setup or token is required.
 - **HUD Editor:** reposition and resize eight HUD groups, with saved layouts, resets and 25-600% scaling. Groups include minimap, version/FPS, round clock, round/players, money/syringes, weapons/ammo, healthbar/survival hearts/skills and event feed.
 
+## Hotfix 0.1.8
+
+- Restored module compatibility with the latest Skillshot City build
+- Fixed HUD dragging under Proton
+- Added Discord Presence connection support for regular and Flatpak Linux Discord installations
+- Linux support remains experimental; broader gameplay and update/restart testing is still needed
+
 ## Hotfix 0.1.7
 
 - Restored module compatibility after the latest Skillshot City update

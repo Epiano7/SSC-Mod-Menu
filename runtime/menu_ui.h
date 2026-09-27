@@ -27,7 +27,7 @@ bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buf
 bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hud::editing;}
 
 // Advance this ID when publishing a new set of release notes.
-constexpr int release_notes_id=20260927;
+constexpr int release_notes_id=20260928;
 bool update_popup=false;
 bool show_update_notes=true;int seen_release_notes=0;
 bool update_notes_due(int phase){return presence_supported&&phase==1&&welcome_seen&&show_update_notes&&seen_release_notes!=release_notes_id&&!opened;}
@@ -80,7 +80,9 @@ void save() {
 }
 constexpr float hud_view_x=266,hud_view_y=188,hud_view_w=820,hud_view_h=461;
 int hud_drag=-1;bool hud_resize=false;float hud_start_x=0,hud_start_y=0,hud_item_x=0,hud_item_y=0,hud_item_scale=1;
-void finish_hud_drag(){ssc_hud::freeze_bounds=false;if(hud_drag>=0){hud_drag=-1;save();}}
+void finish_hud_drag(){ssc_hud::freeze_bounds=false;if(hud_drag>=0){
+    const auto& a=ssc_hud::items[hud_drag];char report[192];snprintf(report,sizeof(report),"HUD drag ended: item=%s x=%.4f y=%.4f scale=%.3f",a.key,a.x,a.y,a.scale);log(report);
+    hud_drag=-1;save();}}
 int hud_hit(float x,float y){
     for(int i=int(ssc_hud::items.size())-1;i>=0;--i){if(!ssc_hud::available(i))continue;auto& item=ssc_hud::items[i];float bx=hud_view_x+item.x*hud_view_w,by=hud_view_y+item.y*hud_view_h;
         if(x>=bx-6&&x<=bx+item.w*item.scale*hud_view_w+6&&y>=by-6&&y<=by+item.h*item.scale*hud_view_h+6)return i;}
@@ -155,7 +157,7 @@ void show_manager(int page=-1) {
     dirty=true;hovered=pressed=keyboard_focus=0;controls.clear();
 }
 void show_quick() {finish_hud_drag();ReleaseCapture();cancel_edit();manager=false;visibility=animations?0.f:1.f;dirty=true;hovered=pressed=keyboard_focus=0;controls.clear();}
-void start_live_hud(){if(!ssc_hud::available(ssc_hud::selected))ssc_hud::selected=ssc_hud::next_item(0,1);finish_hud_drag();ReleaseCapture();cancel_edit();ssc_hud::enabled=true;ssc_hud::editing=true;ssc_hud::capture_frame=true;opened=true;manager=false;visibility=1;modal_visibility=0;controls.clear();pressed=hovered=keyboard_focus=0;dirty=true;save();}
+void start_live_hud(){log("HUD editor opened");if(!ssc_hud::available(ssc_hud::selected))ssc_hud::selected=ssc_hud::next_item(0,1);finish_hud_drag();ReleaseCapture();cancel_edit();ssc_hud::enabled=true;ssc_hud::editing=true;ssc_hud::capture_frame=true;opened=true;manager=false;visibility=1;modal_visibility=0;controls.clear();pressed=hovered=keyboard_focus=0;dirty=true;save();}
 int live_hud_hit(float x,float y){
  auto inside=[&](int i){if(!ssc_hud::visible(i,GetTickCount64()))return false;const auto& a=ssc_hud::items[i];float px=6.f/std::max(1,ssc_hud::view_w),py=6.f/std::max(1,ssc_hud::view_h);return x>=a.x-px&&x<=a.x+a.w*a.scale+px&&y>=a.y-py&&y<=a.y+a.h*a.scale+py;};
  if(inside(ssc_hud::selected))return ssc_hud::selected;
@@ -164,6 +166,20 @@ int live_hud_hit(float x,float y){
  return best;
 }
 void live_hud_move(float x,float y){if(hud_drag<0)return;auto& a=ssc_hud::items[hud_drag];float dx=x-hud_start_x,dy=y-hud_start_y;if(hud_resize)a.scale=hud_item_scale+std::max(dx/a.w,dy/a.h);else{a.x=hud_item_x+dx;a.y=hud_item_y+dy;}ssc_hud::constrain(a);dirty=true;}
+// Some Proton desktops coalesce or omit WM_MOUSEMOVE during capture.
+// Poll only an already-started gesture, and finish it if mouse-up was missed.
+void sample_live_hud_drag(int x,int y,int width,int height,bool down){
+ if(!ssc_hud::editing||hud_drag<0||width<=0||height<=0)return;
+ live_hud_move(float(x)/width,float(y)/height);
+ if(!down){finish_hud_drag();ReleaseCapture();}
+}
+void poll_live_hud_drag(HWND window){
+ static const bool wine=GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"wine_get_version")!=nullptr;
+ if(!wine||!ssc_hud::editing||hud_drag<0||GetForegroundWindow()!=window)return;
+ POINT cursor{};RECT client{};
+ if(!GetCursorPos(&cursor)||!ScreenToClient(window,&cursor)||!GetClientRect(window,&client))return;
+ sample_live_hud_drag(cursor.x,cursor.y,client.right,client.bottom,(GetAsyncKeyState(VK_LBUTTON)&0x8000)!=0);
+}
 void live_hud_wheel(int delta,int hovered_item){if(hud_drag>=0){finish_hud_drag();ReleaseCapture();}if(hovered_item>=0)ssc_hud::selected=hovered_item;auto& a=ssc_hud::items[ssc_hud::selected];a.scale*=std::pow(1.1f,float(delta)/WHEEL_DELTA);ssc_hud::constrain(a);save();}
 bool module_ready(int id){
     if(!ssc_compat::initialized)return true;
@@ -365,11 +381,11 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         POINT cursor{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};
         if(message==WM_MOUSEWHEEL)ScreenToClient(window,&cursor);
         float x=float(cursor.x)/std::max(1,ssc_hud::view_w),y=float(cursor.y)/std::max(1,ssc_hud::view_h);
-        if(message==WM_LBUTTONDOWN){pressed=hit(cursor.x,cursor.y);if(pressed)return 0;int i=live_hud_hit(x,y);if(i>=0){ssc_hud::selected=i;hud_drag=i;ssc_hud::freeze_bounds=true;auto& a=ssc_hud::items[i];hud_start_x=x;hud_start_y=y;hud_item_x=a.x;hud_item_y=a.y;hud_item_scale=a.scale;hud_resize=cursor.x>=(a.x+a.w*a.scale)*ssc_hud::view_w-12&&cursor.y>=(a.y+a.h*a.scale)*ssc_hud::view_h-12;SetCapture(window);dirty=true;}return 0;}
+        if(message==WM_LBUTTONDOWN){pressed=hit(cursor.x,cursor.y);if(pressed)return 0;int i=live_hud_hit(x,y);if(i>=0){ssc_hud::selected=i;hud_drag=i;ssc_hud::freeze_bounds=true;auto& a=ssc_hud::items[i];hud_start_x=x;hud_start_y=y;hud_item_x=a.x;hud_item_y=a.y;hud_item_scale=a.scale;hud_resize=cursor.x>=(a.x+a.w*a.scale)*ssc_hud::view_w-12&&cursor.y>=(a.y+a.h*a.scale)*ssc_hud::view_h-12;SetCapture(window);char report[192];snprintf(report,sizeof(report),"HUD drag started: item=%s capture=%d view=%dx%d",a.key,GetCapture()==window,ssc_hud::view_w,ssc_hud::view_h);log(report);dirty=true;}else{unsigned visible=0;for(int j=0;j<int(ssc_hud::items.size());++j)if(ssc_hud::visible(j,GetTickCount64()))visible|=1u<<j;char report[192];snprintf(report,sizeof(report),"HUD click missed: x=%.4f y=%.4f view=%dx%d visible=0x%X",x,y,ssc_hud::view_w,ssc_hud::view_h,visible);log(report);}return 0;}
         if(message==WM_MOUSEMOVE){if(hud_drag>=0)live_hud_move(x,y);return 0;}
         if(message==WM_LBUTTONUP){if(hud_drag>=0){live_hud_move(x,y);finish_hud_drag();ReleaseCapture();}else{int id=hit(cursor.x,cursor.y),down=pressed;pressed=0;if(id&&id==down)activate(id);}return 0;}
         if(message==WM_MOUSEWHEEL){live_hud_wheel(GET_WHEEL_DELTA_WPARAM(wp),live_hud_hit(x,y));return 0;}
-        if(message==WM_CAPTURECHANGED){finish_hud_drag();return 0;}
+        if(message==WM_CAPTURECHANGED){if(hud_drag>=0)log("HUD mouse capture lost");finish_hud_drag();return 0;}
         if((message>=WM_KEYFIRST&&message<=WM_KEYLAST)||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;
         if(message==WM_INPUT)return DefWindowProcW(window,message,wp,lp);
     }
@@ -676,9 +692,11 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"0.1.7 COMPATIBILITY HOTFIX",cyan);
+        text(50,153,L"0.1.8 COMPATIBILITY HOTFIX",cyan);
         bullet(201,L"Restored compatibility after the latest game update" );
-        bullet(233,L"Restored Auto Messages round detection" );
+        bullet(233,L"Fixed HUD dragging under Proton" );
+        bullet(265,L"Added native Linux Discord connection support" );
+        bullet(297,L"Linux support remains experimental" );
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
@@ -939,7 +957,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.7",cyan);
+            text(266,157,L"0.1.8",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
