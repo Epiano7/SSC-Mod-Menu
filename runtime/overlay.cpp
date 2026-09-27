@@ -92,8 +92,8 @@ void render(HDC dc) {
         if(update_notes_due(rpc_preview.phase)){opened=true;show_manager(14);}
         if(presence_supported&&rpc_preview.phase==1&&!ssc_update::checked)ssc_update::check(state_dir);
         if(ssc_update::poll(window,rpc_preview.phase==1||!presence_supported))dirty=true;
-        if(rpc_preview.phase!=1&&manager&&settings_page==7&&opened)close_menu(true);
-        if(rpc_preview.phase==1&&ssc_update::available()&&!ssc_update::notified&&!opened){ssc_update::notified=true;opened=true;show_manager(7);}
+        if(rpc_preview.phase!=1&&opened&&(update_popup||(manager&&settings_page==7)))close_menu(true);
+        if(ssc_update::notification_due(presence_supported&&rpc_preview.phase==1)&&!opened){ssc_update::notified=true;manager=false;update_popup=true;opened=true;dirty=true;}
     }
     RECT hud_client{};GetClientRect(window,&hud_client);if(ssc_hud::finish_frame(hud_client.right,hud_client.bottom,now)&&ssc_hud::editing)dirty=true;
     if(opened&&manager&&settings_page==11&&ssc_lab::duel_animating()){ssc_lab::advance_duel(seconds);static ULONGLONG duel_paint_at=0;if(now-duel_paint_at>=16||!ssc_lab::duel_animating()){duel_paint_at=now;dirty=true;}}

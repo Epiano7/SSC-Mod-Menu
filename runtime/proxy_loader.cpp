@@ -11,9 +11,10 @@ static BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
     if(!n || n>32700) return FALSE;
     std::wstring system=std::wstring(path)+L"\\opengl32.dll";
     HMODULE real=LoadLibraryExW(system.c_str(),nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if(!real) return FALSE;
+    if(!real || real==self) return FALSE;
     for(unsigned i=0;i<sizeof(names)/sizeof(names[0]);++i) {
-        functions[i]=GetProcAddress(real,names[i]); if(!functions[i]) return FALSE;
+        // Wine omits some Windows-only exports. Resolve those only if called.
+        functions[i]=GetProcAddress(real,names[i]);
     }
     n=GetModuleFileNameW(self,path,32768);
     if(n && n<32768) {
@@ -28,8 +29,11 @@ static BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
     return TRUE;
 }
 extern "C" FARPROC proxy_resolve(unsigned index) {
-    if(!InitOnceExecuteOnce(&once,initialize,nullptr,nullptr) || index>=sizeof(names)/sizeof(names[0]))
+    if(!InitOnceExecuteOnce(&once,initialize,nullptr,nullptr) || index>=sizeof(names)/sizeof(names[0]) || !functions[index]) {
+        MessageBoxW(nullptr,L"The system OpenGL library could not provide a required function. Remove the mod's opengl32.dll to restore the original game, and report your Proton version.",L"SSC Mod Menu loader",MB_OK|MB_ICONERROR);
         TerminateProcess(GetCurrentProcess(),ERROR_PROC_NOT_FOUND);
+        return nullptr;
+    }
     return functions[index];
 }
 BOOL WINAPI DllMain(HINSTANCE module,DWORD reason,LPVOID) {

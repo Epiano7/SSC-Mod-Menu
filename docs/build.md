@@ -36,3 +36,13 @@ The synthetic resolver tests cover moved code, changed bodies, ambiguous/missing
 Crash diagnostics are best effort. Forced termination, fail-fast errors, or another component replacing the exception filter may prevent a report. The mod preserves the previous exception handler and does not attempt to resume a corrupted process.
 
 Weapon Lab includes editable target health/shield, manual damage/reload modifiers, up to four comparison columns and timed duel playback. `weapon_lab_test.exe GAME_EXE` also compares 20,000 synthetic health/shield cases with an isolated arithmetic block in a private mapped game image; the game is not started. No live actor or player data is used. The shield balance values are read from the running game only after compatibility checks. Calculator results currently exclude unsupported multiple-impact weapons, bursts, melee/explosives and damage-over-time weapons; Minigun has a three-impact estimate. Perks, range falloff, travel, passive recovery and defense effects are not modeled. Timing remains an estimate, rather than a verified reproduction of the firing loop.
+
+## Linux / Proton packaging
+
+The native Linux installer packages the Windows mod payload for Steam Proton; it does not support the native Linux game executable
+
+Build the launcher with Zig using `scripts/Build-Linux-Launcher.ps1`, then package both platforms using `scripts/Build-Release.ps1`. Required parameters are `RuntimeDirectory`, `Python`, `BuildDirectory`, `LinuxPythonArchive`, and `LinuxLauncher`
+
+The Linux Python archive must be the pinned CPython 3.13.15 x86-64 glibc install-only archive from [python-build-standalone 20260924](https://github.com/astral-sh/python-build-standalone/releases/tag/20260924). `Build-Linux.py` verifies its SHA256 and the approved runtime payload hashes. Keep bundled dependency notices intact
+
+Publish `SSC-Mod-Menu-Setup.exe` and `SSC-Mod-Menu-Linux.tar.gz` as separate release assets. Linux remains experimental: successful installation does not establish that every module or the update/restart flow works under Proton. See [Linux instructions](../linux/README.md) for the current validation scope

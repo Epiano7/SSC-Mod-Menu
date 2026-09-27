@@ -28,6 +28,7 @@ bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hu
 
 // Advance this ID when publishing a new set of release notes.
 constexpr int release_notes_id=20260927;
+bool update_popup=false;
 bool show_update_notes=true;int seen_release_notes=0;
 bool update_notes_due(int phase){return presence_supported&&phase==1&&welcome_seen&&show_update_notes&&seen_release_notes!=release_notes_id&&!opened;}
 int canvas_w=1120;constexpr int canvas_h=720;
@@ -67,6 +68,7 @@ void save() {
     auto path=state_dir/L"menu.ini",temp=state_dir/L"menu.ini.tmp";
     std::ofstream out(temp);
     out<<"quick_modules="<<quick_mask<<"\n";
+    out<<"ignored_update_version="<<ssc_update::ignored_version<<"\n";
     out<<"show_update_notes="<<show_update_notes<<"\nseen_release_notes="<<seen_release_notes<<"\n";
     out<<"cooldown_pulse="<<ssc_cooldown::settings.enabled<<"\ncooldown_duration_ms="<<ssc_cooldown::settings.duration_ms<<"\n";
     out<<"hud_hover_fade="<<ssc_hud::hover_fade<<"\n";out<<"hud_enabled="<<ssc_hud::enabled<<"\n";for(const auto& item:ssc_hud::items){out<<"hud_box_"<<item.key<<"="<<item.home_x<<","<<item.home_y<<","<<item.w<<","<<item.h<<"\n";out<<"hud_"<<item.key<<"="<<item.x<<","<<item.y<<","<<item.scale<<"\n";}
@@ -101,6 +103,7 @@ void load_settings() {
         if(key=="hud_enabled"){ssc_hud::enabled=value=="1";continue;}
         if(key.rfind("hud_box_",0)==0){for(int i=0;i<int(ssc_hud::items.size());++i)if(key==std::string("hud_box_")+ssc_hud::items[i].key){float x,y,w,h;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f,%f%c",&x,&y,&w,&h,&extra)==4&&std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&x>=-.5f&&y>=-.5f&&w>0&&h>0){ssc_hud::apply_bounds(i,{x,y,x+w,y+h,2});ssc_hud::measured[i]=false;}}continue;}
         if(key.rfind("hud_",0)==0){for(auto& item:ssc_hud::items)if(key==std::string("hud_")+item.key){float x,y,z;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f%c",&x,&y,&z,&extra)==3){item.x=x;item.y=y;item.scale=z;ssc_hud::constrain(item);}}continue;}
+        if(key=="ignored_update_version"){if(ssc_update::valid_version(value))ssc_update::ignored_version=value;continue;}
         if(key=="rpc_id"){if(value.empty()||ssc_rpc::valid_id(value))rpc_id=value.empty()?ssc_rpc::bundled_application_id:value;continue;}
         try {size_t used=0;number=std::stoi(value,&used);if(used!=value.size())continue;}catch(...){continue;}
         if(key=="quick_modules"&&number>=0&&number<64)quick_mask=unsigned(number);
@@ -141,8 +144,9 @@ void refresh_dynamic_panel(ULONGLONG now,bool presence_tick=false) {
     static ULONGLONG rainbow_at=0;
     if(settings_page==4&&ssc_names::rainbow&&now-rainbow_at>=50){rainbow_at=now;dirty=true;}
 }
-void close_menu(bool immediate=false) {finish_scale();finish_lab_slider();if(manager&&settings_page==8){welcome_seen=true;seen_release_notes=release_notes_id;save();}if(manager&&settings_page==14){seen_release_notes=release_notes_id;save();}if(ssc_hud::editing){ssc_hud::editing=false;save();}finish_hud_drag();opened=false;dirty=true;pressed=0;keyboard_focus=0;cancel_edit();if(immediate){visibility=0;modal_visibility=0;}ReleaseCapture();log("Menu closed");}
+void close_menu(bool immediate=false) {if(update_popup)immediate=true;update_popup=false;finish_scale();finish_lab_slider();if(manager&&settings_page==8){welcome_seen=true;seen_release_notes=release_notes_id;save();}if(manager&&settings_page==14){seen_release_notes=release_notes_id;save();}if(ssc_hud::editing){ssc_hud::editing=false;save();}finish_hud_drag();opened=false;dirty=true;pressed=0;keyboard_focus=0;cancel_edit();if(immediate){visibility=0;modal_visibility=0;}ReleaseCapture();log("Menu closed");}
 void show_manager(int page=-1) {
+    update_popup=false;
     finish_scale();finish_lab_slider();if(page!=11){ssc_lab::picker=-1;ssc_lab::editing=-1;}
     // Navigation inside the full window is not a new opening transition.
     const bool already_visible=manager&&opened&&visibility>0.f;
@@ -229,6 +233,7 @@ void activate(int id) {
     else if(id==172){ssc_diagnostics::open_logs(state_dir);}
     else if(id==160){if(!presence_supported||rpc_preview.phase==1)ssc_update::check(state_dir);dirty=true;}
     else if(id==161){if(!presence_supported||rpc_preview.phase==1)ssc_update::apply();dirty=true;}
+    else if(id==283){if(ssc_update::valid_version(ssc_update::version)){ssc_update::ignored_version=ssc_update::version;save();}close_menu();}
     else if(id==180||id==181){ssc_names::rainbow=id==180;color_editing=false;save();}
     else if(id>=182&&id<=187){const unsigned colors[]={0xffffff,0x55ccff,0xff66cc,0x66ee99,0xffbb44,0xff6655};ssc_names::solid_rgb=colors[id-182];ssc_names::rainbow=false;save();}
     else if(id==188){if(color_editing){dirty=true;return;}wchar_t value[8];swprintf(value,8,L"%06X",ssc_names::solid_rgb);color_buffer=value;color_editing=true;edit_cursor.begin(color_buffer.size());dirty=true;}
@@ -641,18 +646,24 @@ void wheel_preview(){
 void paint_panel() {
     prepare_canvas();if(!pixels)return;controls.clear();wheel_hits.clear();
     edit_visuals.clear();
-    panel_w=manager?1120:640;panel_h=manager?720:quick_height();
+    panel_w=manager?1120:640;panel_h=manager?720:update_popup?310:quick_height();
     std::memset(pixels,0,raster_w*raster_h*4);
     rectangle(0,0,panel_w,panel_h,RGB(8,21,41));rectangle(4,4,panel_w-8,78,RGB(18,41,72));
     rectangle(4,82,panel_w-8,2,RGB(48,135,208));
-    text(26,24,L"SSC MOD MENU",ink,true);text(26,58,manager?L"MODULE SETTINGS":L"QUICK MENU",muted);
+    text(26,24,L"SSC MOD MENU",ink,true);text(26,58,update_popup?L"UPDATE AVAILABLE":manager?L"MODULE SETTINGS":L"QUICK MENU",muted);
     if(!(manager&&(settings_page==8||settings_page==14)))button(1,panel_w-60,23,36,36,L"X");
-    if(!native_supported){
+    if(update_popup){
+        text(26,116,L"MOD UPDATE AVAILABLE",cyan);
+        text(26,156,ssc_update::message.c_str(),ink,false,14);
+        button(161,26,199,280,40,ssc_update::action_label(),true,ssc_update::available());
+        button(1,326,199,284,40,L"LATER");
+        button(283,26,255,584,34,L"DON'T SHOW AGAIN FOR THIS UPDATE");
+    }else if(!native_supported){
         text(26,116,L"GAME UPDATE DETECTED",cyan);
         text(26,156,L"Modules are paused until a compatible mod update.",muted,false,14);
         text(26,209,ssc_update::message.c_str(),ink,false,14);
         button(160,26,270,250,42,L"CHECK FOR UPDATES",false,!ssc_update::process);
-        button(161,294,270,310,42,L"UPDATE AND RESTART",true,ssc_update::available());
+        button(161,294,270,310,42,ssc_update::action_label(),true,ssc_update::available());
     } else if(manager&&settings_page==8){
         text(50,125,L"WELCOME TO SSC MOD MENU",ink,true);
         text(50,200,L"Press RIGHT SHIFT to open the mod menu.");
@@ -797,7 +808,7 @@ void paint_panel() {
             text(266,111,L"UPDATE AVAILABLE",ink,true);
             text(266,180,ssc_update::message.c_str(),cyan);
             text(266,238,L"Download, install and restart Skillshot City.",muted);
-            button(161,266,308,340,48,L"UPDATE AND RESTART",true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
+            button(161,266,308,340,48,ssc_update::action_label(),true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
             button(1,630,308,180,48,L"LATER");
         } else if(settings_page==9){
             text(266,111,L"MISC",ink,true);
@@ -937,7 +948,7 @@ void paint_panel() {
             text(266,414,L"UPDATES");
             text(266,455,ssc_update::message.c_str(),muted,false,14);
             button(160,266,492,260,40,L"CHECK FOR UPDATES",false,!ssc_update::process&&(rpc_preview.phase==1||!presence_supported));
-            button(161,542,492,340,40,L"UPDATE AND RESTART",true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
+            button(161,542,492,340,40,ssc_update::action_label(),true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
 
             button(172,266,545,260,34,L"OPEN LOGS");
             text(266,605,L"Unofficial mod client. Not affiliated with the game developer.",muted,false,14);
@@ -970,7 +981,7 @@ void paint_live_hud_toolbar(){
 void layout_panel(int width,int height) {
     if(ssc_hud::editing){panel_w=760;panel_h=68;float base=std::min(1.f,std::max(.1f,float(width-24)/panel_w));if(std::abs(raster_scale-base)>.00001f){raster_scale=base;dirty=true;}draw_scale=base;panel_x=int((width-panel_w*base)*.5f);panel_y=ssc_hud::items[ssc_hud::selected].y<.13f?int(height-panel_h*base-12):12;return;}
 
-    panel_w=auto_guide_visible()?1440:manager?1120:640;panel_h=manager?720:quick_height();
+    panel_w=auto_guide_visible()?1440:manager?1120:640;panel_h=manager?720:update_popup?310:quick_height();
     float fit=std::min(float(width-40)/(auto_guide_visible()?1760:panel_w),float(height-40)/panel_h);
     float base=std::min(float(ui_scale)/100.f,std::max(.1f,fit));float e=ease(visibility);
     if(std::abs(raster_scale-base)>.00001f){raster_scale=base;dirty=true;}
