@@ -22,47 +22,25 @@ The installer runs natively; the game and mod use Proton. The native Linux game 
 
 [Full Linux instructions and log export](linux/README.md)
 
-## Current Official Modules
+## Modules
 
-- **Sound Replacer:** import WAV or MP3 replacements, match volume and restore originals. Sample rate and mono/stereo conversion are automatic. Requires a restart to apply. MP3 decoding uses Windows Media Foundation.
-- **Cosmetics:** Customize your name with animated rainbow colors or a solid color, visible only to you.
-- **Discord Presence:** game status, available round/level details, elapsed time and ranked SSC rating. No developer setup or token is required.
-- **HUD Editor:** reposition and resize eight HUD groups, with saved layouts, resets and 25-600% scaling. Groups include minimap, version/FPS, round clock, round/players, money/syringes, weapons/ammo, healthbar/survival hearts/skills and event feed.
+- **Sound Replacer:** import WAV or MP3 replacements for sound effects and music, preview clips, adjust individual volume, and replace related variants together. **All Music Tracks** uses one custom song across the music playlist. Track lengths are shown, and replacements apply after restarting the game
+- **Cosmetics:** customize your name with animated rainbow colors or a solid color, visible only to you
+- **Discord Presence:** show game status, available round and level details, elapsed time, and ranked SSC rating. No developer setup or token is required. Linux connects to the native Discord app, with support for regular and Flatpak socket locations
+- **HUD Editor:** move and resize eight HUD groups, save layouts, and reset individual elements. Team-roster positioning is currently unavailable
+- **Custom Quick Chat:** customize the quick-react wheel with up to 12 messages per slot. The first message labels the wheel, and each use sends a randomly chosen message from that slot's list. Rearrange slots, choose icons or import images, and preview the in-round and round-ended layouts
+- **Auto Messages:** create optional Battle Royale message rules using events, conditions, variables, and repeat counts. Enable or rename rules, reference the variable guide, and share rules through compact import codes. Both `{variable}` and `[variable]` are supported
 
-## Hotfix 0.1.8
+Enable Auto Messages before a round starts for complete supported round counters. Online hit counts and impact-damage totals are currently unavailable. Saved rules using unavailable variables display a warning and skip sending rather than report incomplete values
 
-- Restored module compatibility with the latest Skillshot City build
-- Fixed HUD dragging under Proton
-- Added Discord Presence connection support for regular and Flatpak Linux Discord installations
-- Linux support remains experimental; broader gameplay and update/restart testing is still needed
+## Other features
 
-## Hotfix 0.1.7
+- **Weapon Lab:** search weapons by name, tier, or type; compare up to four weapons with stronger values highlighted; adjust health, shields, and miss chance; and watch a timed duel with reloads. Simulations are estimates and do not account for skills or every special effect
+- **Local Round Recording:** optionally save Battle Royale round data on your PC, including class, level, health, and weapon inventory snapshots. Recording is disabled at each launch, only runs during rounds, and uploads nothing
+- **Interface:** adjust UI scale, choose which modules appear in the quick menu, and customize animation and HUD display preferences. Text edits save when leaving the field
+- **Updates:** check for releases through the in-game prompt. Available updates can be dismissed for that version, and release notes can be disabled separately
 
-- Restored module compatibility after the latest Skillshot City update
-- Restored Auto Messages round detection
-
-## Hotfix 0.1.6
-
-- Updated compatibility for Skillshot City v0.992
-- Added replacements for the current music playlist, track durations, and an All Music Tracks option
-- Shared music replacements follow the original tracks' relative loudness; the game's separate menu/game music controls still apply
-- Removed unavailable online hit and impact-damage variables from selection menus, while preserving saved rules with a warning
-- Team-roster positioning is temporarily unavailable following the game's HUD changes
-
-## Hotfix 0.1.5
-
-- Fixed Space closing text fields
-- Expanded related sound groups, including engine variants and kill-combo sounds
-- Disabled misleading online hit and impact-damage totals until complete tracking is available
-
-## New in 0.1.4
-
-- **Custom Quick Chat:** customize wheel messages, reorder slots, choose icons or import images, and preview both wheel layouts
-- **Auto Messages:** create optional BR rules with conditions, message variables, repeat counts, and shareable codes
-- **Sound Replacer:** preview custom sounds, adjust replacement volume, and apply one replacement to related clips, including engine and kill-combo sounds
-- **Interface:** choose quick-menu modules and edit text with a cursor, selection, and automatic saving when leaving quick-chat or rule fields
-
-Enable Auto Messages before the round starts for complete supported round counters. Online hit counts and impact-damage totals are currently unavailable because their source does not cover all online hits. Rules using those variables skip sending rather than report incomplete values.
+For version-by-version changes, see the [GitHub releases](https://github.com/Epiano7/SSC-Mod-Menu/releases)
 
 ## Screenshots
 

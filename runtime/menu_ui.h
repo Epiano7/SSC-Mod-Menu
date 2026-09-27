@@ -16,7 +16,7 @@ unsigned quick_mask=63;
 int quick_count(){int n=0;for(int i=0;i<6;++i)n+=(quick_mask>>i)&1;return n;}
 int quick_height(){return 186+64*quick_count();}
 bool auto_rule_editor=false,auto_guide=false;int auto_list_page=0,auto_guide_page=0;
-int dropdown=-1,dropdown_choice=0,chat_field=0;std::vector<std::wstring> dropdown_items;
+int dropdown=-1,dropdown_choice=0,chat_field=0,chat_variant=0;std::vector<std::wstring> dropdown_items;
 bool chat_editing=false,chat_select_all=false;std::string chat_buffer;
 ssc_edit::Cursor edit_cursor;
 struct EditVisual {std::wstring value;int id=0,x=0,y=0,w=0,size=15;size_t first=0;};
@@ -152,7 +152,7 @@ void show_manager(int page=-1) {
     finish_scale();finish_lab_slider();if(page!=11){ssc_lab::picker=-1;ssc_lab::editing=-1;}
     // Navigation inside the full window is not a new opening transition.
     const bool already_visible=manager&&opened&&visibility>0.f;
-    finish_hud_drag();ReleaseCapture();cancel_edit();manager=true;settings_page=page;
+    finish_hud_drag();ReleaseCapture();cancel_edit();manager=true;settings_page=page;if(page==15)chat_variant=0;
     if(!already_visible){modal_visibility=0;visibility=animations?0.f:1.f;}
     dirty=true;hovered=pressed=keyboard_focus=0;controls.clear();
 }
@@ -187,7 +187,7 @@ bool module_ready(int id){
 }
 bool wheel_round_ended=false;
 void open_dropdown(int id,std::vector<std::wstring> labels,int choice){dropdown=dropdown==id?-1:id;dropdown_items=std::move(labels);dropdown_choice=choice;dirty=true;}
-void select_dropdown(int value){auto& r=ssc_auto::current();int id=dropdown;dropdown=-1;if(id==488){const int levels[]={0,50,75,100,125,150,200,250,300};if(value>=0&&value<9)ssc_sound::set_volume(levels[value]);}else if(id==462){wheel_round_ended=value==1;auto visible=ssc_chat::visible_order(wheel_round_ended);if(std::find(visible.begin(),visible.end(),ssc_chat::selected)==visible.end())ssc_chat::selected=visible.back();chat_editing=false;}else if(id==324){auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];slot.icon=value;slot.custom=false;}else if(id==326)r.event=ssc_auto::choice_event(value);else if(id==344)ssc_auto::variable=value;else if(id==405)r.any=value==1;else if(id==406)r.repeats=value+1;else if(id==208){ssc_lab::sort_mode=value;ssc_lab::picker_page=0;}else if(id>=410&&id<413)r.conditions[id-410].stat=value;else if(id>=420&&id<423)r.conditions[id-420].comparison=value;save();}
+void select_dropdown(int value){auto& r=ssc_auto::current();int id=dropdown;dropdown=-1;if(id==500){chat_variant=std::clamp(value,0,int(ssc_chat::message_count(ssc_chat::slots[ssc_chat::order[ssc_chat::selected]]))-1);chat_editing=false;}else if(id==488){const int levels[]={0,50,75,100,125,150,200,250,300};if(value>=0&&value<9)ssc_sound::set_volume(levels[value]);}else if(id==462){wheel_round_ended=value==1;auto visible=ssc_chat::visible_order(wheel_round_ended);if(std::find(visible.begin(),visible.end(),ssc_chat::selected)==visible.end())ssc_chat::selected=visible.back();chat_variant=0;chat_editing=false;}else if(id==324){auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];slot.icon=value;slot.custom=false;}else if(id==326)r.event=ssc_auto::choice_event(value);else if(id==344)ssc_auto::variable=value;else if(id==405)r.any=value==1;else if(id==406)r.repeats=value+1;else if(id==208){ssc_lab::sort_mode=value;ssc_lab::picker_page=0;}else if(id>=410&&id<413)r.conditions[id-410].stat=value;else if(id>=420&&id<423)r.conditions[id-420].comparison=value;save();}
 void activate(int id) {
     if(!module_ready(id))return;
     int active_field=chat_field==0?320:chat_field==1?400:chat_field==2?401:450+chat_field-3;
@@ -204,15 +204,19 @@ void activate(int id) {
     else if(id==300&&ssc_chat::attached){ssc_chat::enabled=!ssc_chat::enabled;save();}
     else if(id==301){show_manager(15);}
     else if(id==302){auto_rule_editor=false;auto_list_page=0;ssc_auto::import_pending=ssc_auto::delete_pending=false;show_manager(16);}
-    else if(id>=310&&id<=318){ssc_chat::selected=id-310;chat_editing=false;dirty=true;}
-    else if(id==320){if(chat_editing&&chat_field==0){dirty=true;return;}chat_field=0;chat_buffer=settings_page==15?ssc_chat::slots[ssc_chat::order[ssc_chat::selected]].text:ssc_auto::current().message;chat_editing=true;chat_select_all=false;edit_cursor.begin(chat_buffer.size());dirty=true;}
-    else if(id==321){bool ok=false;if(settings_page==15){ok=ssc_chat::valid_text(chat_buffer);if(ok)ssc_chat::slots[ssc_chat::order[ssc_chat::selected]].text=chat_buffer;}else{auto candidate=ssc_auto::current();if(chat_field==0)candidate.message=chat_buffer;else if(chat_field==1)candidate.name=chat_buffer;else{try{size_t used=0;int value=std::stoi(chat_buffer,&used);if(used!=chat_buffer.size())throw 0;if(chat_field==2)candidate.threshold=value;else candidate.conditions.at(chat_field-3).value=value;}catch(...){ssc_auto::status=L"Enter a valid number";dirty=true;return;}}ok=ssc_auto::valid(candidate);if(ok)ssc_auto::current()=candidate;}if(ok){chat_editing=false;ssc_auto::status.clear();save();}else{ssc_auto::status=L"Check the name, message or number";dirty=true;}}
+    else if(id>=310&&id<=318){ssc_chat::selected=id-310;chat_variant=0;chat_editing=false;dirty=true;}
+    else if(id==320){if(chat_editing&&chat_field==0){dirty=true;return;}chat_field=0;chat_buffer=settings_page==15?ssc_chat::message_at(ssc_chat::slots[ssc_chat::order[ssc_chat::selected]],chat_variant):ssc_auto::current().message;chat_editing=true;chat_select_all=false;edit_cursor.begin(chat_buffer.size());dirty=true;}
+    else if(id==321){bool ok=false;if(settings_page==15){auto candidate=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];if(chat_buffer.empty()&&ssc_chat::message_count(candidate)>1){ssc_chat::remove_message(candidate,chat_variant);chat_variant=std::min(chat_variant,int(ssc_chat::message_count(candidate))-1);}else ssc_chat::message_at(candidate,chat_variant)=chat_buffer;ok=ssc_chat::valid_slot(candidate);if(ok)ssc_chat::slots[ssc_chat::order[ssc_chat::selected]]=candidate;}else{auto candidate=ssc_auto::current();if(chat_field==0)candidate.message=chat_buffer;else if(chat_field==1)candidate.name=chat_buffer;else{try{size_t used=0;int value=std::stoi(chat_buffer,&used);if(used!=chat_buffer.size())throw 0;if(chat_field==2)candidate.threshold=value;else candidate.conditions.at(chat_field-3).value=value;}catch(...){ssc_auto::status=L"Enter a valid number";dirty=true;return;}}ok=ssc_auto::valid(candidate);if(ok)ssc_auto::current()=candidate;}if(ok){chat_editing=false;ssc_auto::status.clear();save();}else{ssc_auto::status=L"Check the name, message or number";dirty=true;}}
 
+    else if(id==500){auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];std::vector<std::wstring> labels;for(size_t i=0;i<ssc_chat::message_count(slot);++i){auto label=ssc_chat::message_at(slot,i);if(label.empty())label="Use original message";if(label.size()>30)label=label.substr(0,27)+"...";labels.push_back(std::to_wstring(i+1)+L". "+ssc_chat::widen(label));}open_dropdown(id,labels,chat_variant);}
+    else if(id==501){auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];if(!slot.text.empty()&&ssc_chat::message_count(slot)<ssc_chat::max_messages){slot.variants.push_back(slot.text);chat_variant=int(slot.variants.size());save();activate(320);chat_select_all=true;edit_cursor.anchor=0;edit_cursor.pos=chat_buffer.size();}}
+    else if(id==502){auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];ssc_chat::remove_message(slot,chat_variant);chat_variant=std::min(chat_variant,int(ssc_chat::message_count(slot))-1);save();}
+    else if(id==503){auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];ssc_chat::make_first(slot,chat_variant);chat_variant=0;save();}
     else if(id==322){ssc_chat::move_visible(-1,wheel_round_ended);chat_editing=false;save();}
     else if(id==323){ssc_chat::move_visible(1,wheel_round_ended);chat_editing=false;save();}
     else if(id==324){open_dropdown(id,std::vector<std::wstring>(ssc_chat::names,ssc_chat::names+9),ssc_chat::slots[ssc_chat::order[ssc_chat::selected]].icon);}
     else if(id==462){open_dropdown(id,{L"During round",L"Round ended"},wheel_round_ended?1:0);}
-    else if(id==325){ssc_chat::reset();chat_editing=false;save();}
+    else if(id==325){ssc_chat::reset();chat_variant=0;chat_editing=false;save();}
     else if(id==328){int slot=ssc_chat::order[ssc_chat::selected];if(ssc_wheel_images::choose(game_window,state_dir,slot)){ssc_chat::slots[slot].custom=true;save();}dirty=true;}
     else if(id==329){ssc_chat::slots[ssc_chat::order[ssc_chat::selected]].custom=false;save();}
     else if(id==326){std::vector<std::wstring> labels;for(int event:ssc_auto::selectable_events)labels.emplace_back(ssc_auto::events[event]);open_dropdown(id,labels,ssc_auto::event_choice(ssc_auto::current().event));}
@@ -657,7 +661,7 @@ void wheel_preview(){
   auto brush=CreateSolidBrush(i==ssc_chat::selected?RGB(27,106,196):RGB(24,47,75));auto old=SelectObject(canvas,brush);auto pen=SelectObject(canvas,GetStockObject(NULL_PEN));Polygon(canvas,points,4);SelectObject(canvas,pen);SelectObject(canvas,old);DeleteObject(brush);
   WheelHit shape{};shape.id=310+i;int left=points[0].x,right=left,top=points[0].y,bottom=top;for(int j=0;j<4;++j){shape.points[j]=points[j];left=std::min(left,int(points[j].x));right=std::max(right,int(points[j].x));top=std::min(top,int(points[j].y));bottom=std::max(bottom,int(points[j].y));}wheel_hits.push_back(shape);controls.push_back({310+i,left,top,right-left+1,bottom-top+1,true});preview_icon(ssc_chat::order[i],int(x)-22,int(y)-22,44);
  }
- auto& selected=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];auto value=chat_editing?chat_buffer:selected.text;auto label=value.empty()?std::wstring(ssc_chat::names[ssc_chat::order[ssc_chat::selected]]):ssc_chat::widen(value);auto lines=wrap_label(label,166,13);int size=lines.size()>6?11:13;if(size==11)lines=wrap_label(label,166,size);int top=int(cy)-int(lines.size())*(size+3)/2;for(size_t row=0;row<lines.size();++row)text(int(cx)-text_width(lines[row].c_str(),size)/2,top+int(row)*(size+3),lines[row].c_str(),ink,false,size);button(462,329,574,300,32,wheel_round_ended?L"ROUND ENDED":L"DURING ROUND");
+ auto& selected=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];auto value=chat_editing&&chat_variant==0?chat_buffer:selected.text;auto label=value.empty()?std::wstring(ssc_chat::names[ssc_chat::order[ssc_chat::selected]]):ssc_chat::widen(value);auto lines=wrap_label(label,166,13);int size=lines.size()>6?11:13;if(size==11)lines=wrap_label(label,166,size);int top=int(cy)-int(lines.size())*(size+3)/2;for(size_t row=0;row<lines.size();++row)text(int(cx)-text_width(lines[row].c_str(),size)/2,top+int(row)*(size+3),lines[row].c_str(),ink,false,size);button(462,329,574,300,32,wheel_round_ended?L"ROUND ENDED":L"DURING ROUND");
 }
 void paint_panel() {
     prepare_canvas();if(!pixels)return;controls.clear();wheel_hits.clear();
@@ -727,11 +731,17 @@ void paint_panel() {
         } else if(settings_page==15){
             text(266,111,L"CUSTOM QUICK CHAT",ink,true);toggle(300,986,106,ssc_chat::enabled);
             wheel_preview();auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];
-            text(720,180,L"MESSAGE",muted,false,13);auto value=chat_editing?chat_buffer:slot.text;
-            editbox(320,720,207,366,40,ssc_chat::widen(value),chat_editing,L"Use original message");button(321,720,259,160,36,L"SAVE",true,chat_editing);
-            text(720,317,L"ICON",muted,false,13);button(324,720,342,366,38,slot.custom?L"Custom image":ssc_chat::names[slot.icon]);button(328,720,392,220,38,L"IMPORT IMAGE");button(329,952,392,134,38,L"RESET",false,slot.custom);
-            button(322,720,452,175,38,L"MOVE UP",false,ssc_chat::selected>0);button(323,911,452,175,38,L"MOVE DOWN",false,ssc_chat::selected<8);
-            button(325,720,513,366,38,L"RESET WHEEL");if(!ssc_wheel_images::status.empty())text(720,568,ssc_wheel_images::status.substr(0,40).c_str(),cyan,false,12);
+            chat_variant=std::clamp(chat_variant,0,int(ssc_chat::message_count(slot))-1);
+            text(720,176,(L"MESSAGES ("+std::to_wstring(slot.text.empty()?0:ssc_chat::message_count(slot))+L" / 12)").c_str(),muted,false,13);
+            auto listed=ssc_chat::message_at(slot,chat_variant);if(listed.empty())listed="Use original message";if(listed.size()>30)listed=listed.substr(0,27)+"...";
+            button(500,720,199,366,36,(std::to_wstring(chat_variant+1)+L". "+ssc_chat::widen(listed)).c_str());
+            auto value=chat_editing?chat_buffer:ssc_chat::message_at(slot,chat_variant);
+            editbox(320,720,247,366,40,ssc_chat::widen(value),chat_editing,L"Use original message");
+            button(321,720,300,80,34,L"SAVE",true,chat_editing);button(501,808,300,80,34,L"ADD",false,!slot.text.empty()&&ssc_chat::message_count(slot)<ssc_chat::max_messages);button(502,896,300,90,34,L"REMOVE",false,!slot.text.empty());button(503,994,300,92,34,L"FIRST",false,chat_variant>0);
+            text(720,350,L"First message labels the wheel",muted,false,12);text(720,370,L"Each use sends a random message",muted,false,12);
+            text(720,408,L"ICON",muted,false,13);button(324,720,432,366,36,slot.custom?L"Custom image":ssc_chat::names[slot.icon]);button(328,720,480,220,36,L"IMPORT IMAGE");button(329,952,480,134,36,L"RESET",false,slot.custom);
+            button(322,720,532,175,36,L"MOVE UP",false,ssc_chat::selected>0);button(323,911,532,175,36,L"MOVE DOWN",false,ssc_chat::selected<8);
+            button(325,720,584,366,36,L"RESET WHEEL");if(!ssc_wheel_images::status.empty())text(720,633,ssc_wheel_images::status.substr(0,40).c_str(),cyan,false,12);
             text(286,613,L"Click a slot to edit it",muted,false,13);
         } else if(settings_page==16){
             text(266,111,L"AUTO MESSAGES",ink,true);
