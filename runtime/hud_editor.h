@@ -47,31 +47,31 @@ template<int Index> void __cdecl draw(uintptr_t object){
 // Hook only validated call sites. Renderer hooks forward 14/20 native arguments.
 struct Hook {uintptr_t call,target;int item;unsigned stack_bytes;bool map_root=false;bool fade=false;bool skills_root=false;};
 inline Hook hooks[]={
- {0x3b8b2d,0x439940,1,0},
- {0x3b86b9,0x423770,2,0,true},{0x3b8a10,0x423770,2,0,true},
+ {0x3b8d2d,0x439b40,1,0},
+ {0x3b88b9,0x423970,2,0,true},{0x3b8c10,0x423970,2,0,true},
  {0x1a9af3,0x1a9bb0,3,0},
- {0x429703,0x3b93f0,5,0},
- {0x3b8ec0,0x40afe0,6,0,true},
- {0x3b8e81,0x41a200,7,0},
- {0x3b8e4f,0x3eab90,8,0},{0x3b8e65,0x40de10,8,0,false,false,true},
+ {0x429903,0x3b95f0,5,0},
+ {0x3b90c0,0x40b1e0,6,0,true},
+ {0x3b9081,0x41a400,7,0},
+ {0x3b904f,0x3ead90,8,0},{0x3b9065,0x40e010,8,0,false,false,true},
  // These draws are called from the map routine but are not part of the map.
- {0x4296af,0x416680,-1,0},{0x4296c8,0x418520,-1,0},
- {0x4296f3,0x3ea000,-1,0},{0x429718,0x4197b0,-1,0},
+ {0x4298af,0x416880,-1,0},{0x4298c8,0x418720,-1,0},
+ {0x4298f3,0x3ea200,-1,0},{0x429918,0x4199b0,-1,0},
  // Timer icon and its three text branches inside the round/player renderer.
- {0x3bbeab,0x484830,4,128},{0x3bc0d4,0x47f6f0,4,80},
- {0x3bc17f,0x47f6f0,4,80},{0x3bc215,0x47f6f0,4,80},
- {0x439a67,0x447710,-2,32,false,true},
- {0x3eac96,0x447710,-2,32,false,true},
- {0x40b0f0,0x447710,-2,32,false,true},
- {0x40e40e,0x447710,-2,32,false,true},
- {0x41a2f8,0x447710,-2,32,false,true},
- {0x42388e,0x447710,-2,32,false,true},
- {0x3b9620,0x447710,-2,32,false,true},
- {0x3ba8a1,0x447710,-2,32,false,true},
- {0x3ea118,0x447710,-2,32,false,true},
- {0x4168ee,0x447710,-2,32,false,true},
- {0x4186ec,0x447710,-2,32,false,true},
- {0x41994f,0x447710,-2,32,false,true},
+ {0x3bc0ab,0x484ba0,4,128},{0x3bc2d4,0x47fa60,4,80},
+ {0x3bc37f,0x47fa60,4,80},{0x3bc415,0x47fa60,4,80},
+ {0x439c67,0x447910,-2,32,false,true},
+ {0x3eae96,0x447910,-2,32,false,true},
+ {0x40b2f0,0x447910,-2,32,false,true},
+ {0x40e60e,0x447910,-2,32,false,true},
+ {0x41a4f8,0x447910,-2,32,false,true},
+ {0x423a8e,0x447910,-2,32,false,true},
+ {0x3b9820,0x447910,-2,32,false,true},
+ {0x3baaa1,0x447910,-2,32,false,true},
+ {0x3ea318,0x447910,-2,32,false,true},
+ {0x416aee,0x447910,-2,32,false,true},
+ {0x4188ec,0x447910,-2,32,false,true},
+ {0x419b4f,0x447910,-2,32,false,true},
  {0x1c497f,0x1c1fc0,-3,112},
  {0x1c4a7a,0x1c1fc0,-3,112},
  {0x1c5fa1,0x1c1fc0,-3,112},
@@ -79,12 +79,12 @@ inline Hook hooks[]={
  {0x1c6220,0x1c1fc0,-3,112},
  {0x1c72c5,0x1c1fc0,-3,112},
  {0x1c73b2,0x1c1fc0,-3,112},
- {0x484949,0x1c1fc0,-3,112},
- {0x4860bf,0x1c1fc0,-3,112},
+ {0x484cbf,0x1c1fc0,-3,112},
+ {0x48645f,0x1c1fc0,-3,112},
  // Screen-wide progress strips share the currency function, but are not counters.
- {0x40b46b,0x484830,-1,128},{0x40b598,0x484830,-1,128},{0x40b6c9,0x484fb0,-1,120},
+ {0x40b66b,0x484ba0,-1,128},{0x40b798,0x484ba0,-1,128},{0x40b8c9,0x485350,-1,120},
  // Local skill readiness and only its icon draw (not health/background).
- {0x40e6be,0x960d70,-4,0},{0x40ee32,0x485f50,-5,80}
+ {0x40e8be,0x9615a0,-4,0},{0x40f032,0x4862f0,-5,80}
 };
 inline uintptr_t game_base=0;
 inline bool changed(const Item& item){return item.scale!=1||item.x!=item.home_x||item.y!=item.home_y;}
@@ -131,11 +131,11 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
  // Native mouse coordinates use the game's logical canvas, not the GL viewport.
  int width=fade_w?fade_w:view_w,height=fade_h?fade_h:view_h;
  if(game_base==reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
-  width=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfa99e0));height=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfa99e4));
+  width=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfaa9e0));height=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfaa9e4));
  }
  if(width<=0||height<=0){width=view_w;height=view_h;}
  if(editing&&active_item>=0)return std::abs(alpha);
- const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+ssc_compat::resolve(0x447710));
+ const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+ssc_compat::resolve(0x447910));
  // Move only the proximity test away; preserve native global/status opacity.
  if(!hover_fade)return original(object,alpha,-1000000.f,-1000000.f,0,0,std::max(1.f,feather),global);
  if(enabled&&active_item>=0&&width>0&&height>0){const auto& a=items[active_item];
@@ -154,12 +154,12 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
 using Ready=bool(__cdecl*)(uintptr_t,uintptr_t);
 template<class T> inline T native_field(uintptr_t object,size_t offset){T v;std::memcpy(&v,reinterpret_cast<const void*>(object+offset),sizeof(v));return v;}
 inline bool __cdecl skill_ready_hook(uintptr_t skill,uintptr_t actor){
-    const bool ready=reinterpret_cast<Ready>(game_base+ssc_compat::resolve(0x960d70))(skill,actor);
+    const bool ready=reinterpret_cast<Ready>(game_base+ssc_compat::resolve(0x9615a0))(skill,actor);
     skill_pulse=0;skill_icon=-1;
     if(!ssc_cooldown::settings.enabled){ssc_cooldown::tracker.clear();return ready;}
     // Arguments are native-owned records at a fingerprint-validated HUD call site.
     // Preserve the game's result; only observe the local living player's cooldown.
-    const int local=native_field<int>(game_base+ssc_compat::resolve(0xe16608),0);
+    const int local=native_field<int>(game_base+ssc_compat::resolve(0xe17608),0);
     if(!skill||!actor||local<0||native_field<int>(actor,0x78)!=local||native_field<unsigned char>(actor,0)!=0||
        !native_field<unsigned char>(actor,0x81)){ssc_cooldown::tracker.clear();return ready;}
     ssc_cooldown::Sample sample{actor,native_field<int>(skill,0),native_field<float>(skill,0x220),native_field<float>(skill,0x224),ready};

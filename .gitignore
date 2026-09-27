@@ -11,3 +11,6 @@ menu.ini
 settings.ini
 
 /tests/
+
+# Local native-game port diagnostics (not part of the Proton release)
+/runtime/linux/

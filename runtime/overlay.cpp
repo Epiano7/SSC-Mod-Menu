@@ -92,11 +92,12 @@ void render(HDC dc) {
         if(update_notes_due(rpc_preview.phase)){opened=true;show_manager(14);}
         if(presence_supported&&rpc_preview.phase==1&&!ssc_update::checked)ssc_update::check(state_dir);
         if(ssc_update::poll(window,rpc_preview.phase==1||!presence_supported))dirty=true;
-        if(rpc_preview.phase!=1&&manager&&settings_page==7&&opened)close_menu(true);
-        if(rpc_preview.phase==1&&ssc_update::available()&&!ssc_update::notified&&!opened){ssc_update::notified=true;opened=true;show_manager(7);}
+        if(rpc_preview.phase!=1&&opened&&(update_popup||(manager&&settings_page==7)))close_menu(true);
+        if(ssc_update::notification_due(presence_supported&&rpc_preview.phase==1)&&!opened){ssc_update::notified=true;manager=false;update_popup=true;opened=true;dirty=true;}
     }
     RECT hud_client{};GetClientRect(window,&hud_client);if(ssc_hud::finish_frame(hud_client.right,hud_client.bottom,now)&&ssc_hud::editing)dirty=true;
     if(opened&&manager&&settings_page==11&&ssc_lab::duel_animating()){ssc_lab::advance_duel(seconds);static ULONGLONG duel_paint_at=0;if(now-duel_paint_at>=16||!ssc_lab::duel_animating()){duel_paint_at=now;dirty=true;}}
+    poll_live_hud_drag(window);
     advance_animation(seconds);
     if(window!=game_window||(!opened&&visibility==0.f&&modal_visibility==0.f&&!clock_enabled))return;
     RECT client;GetClientRect(window,&client);int width=client.right,height=client.bottom;
@@ -240,7 +241,7 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
     ssc_diagnostics::initialize(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
-    log("SSC Mod Menu 0.1.7 startup");log_game_build();
+    log("SSC Mod Menu 0.1.8 startup");log_game_build();
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
     presence_supported=(supported&4)!=0;native_supported=true;
     log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");

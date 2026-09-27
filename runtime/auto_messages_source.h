@@ -16,16 +16,16 @@ inline void sample_weapon(uintptr_t record,Values& values){
 }
 
 // Fingerprint both producers/consumers of world+6aa0 and the native send route.
-inline constexpr uint32_t native_dependencies[][3]={{0x88a6f0,0x2ac420,0},{0x2e7de0,0x221560,0},{0x82bfe0,0x7fe370,0},{0x229d10,0x893f70,0}};
+inline constexpr uint32_t native_dependencies[][3]={{0x88ae50,0x2ac400,0},{0x2e7e10,0x221570,0},{0x82c800,0x7feb30,0},{0x229cf0,0x894710,0}};
 inline bool supported(){return ssc_compat::supports(32)&&ssc_compat::supports(4)&&ssc_compat::supports(8);}
 inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
  Observation o;actor=world=0;if(!supported())return o;using ssc_names::read;
  int session=0,mode=-1,raw_round=0,last=0,local=-1,slot=-1,kind=-1;double joining=0;float countdown=0,ending=0;uintptr_t first=0,end=0,steam=0;unsigned char active=0,survival=0;
- if(!read(base+ssc_compat::resolve(0xfaa604),session)||session!=2||!read(base+ssc_compat::resolve(0xfaa618),joining)||!std::isfinite(joining)||joining>0)return o;
+ if(!read(base+ssc_compat::resolve(0xfab604),session)||session!=2||!read(base+ssc_compat::resolve(0xfab618),joining)||!std::isfinite(joining)||joining>0)return o;
  o.connected=true;
- if(!read(base+ssc_compat::resolve(0xde25d0),world)||!world)return o;
+ if(!read(base+ssc_compat::resolve(0xde35d0),world)||!world)return o;
  if(!read(world+0x128,mode)||mode!=6||!read(world+0x485,survival)||survival||!read(world+0x3e0,raw_round)||raw_round<1||raw_round>100||!read(world+0x46c,last)||last<raw_round-1||last>100||!read(world+0x3c0,countdown)||!std::isfinite(countdown)||!read(world+0x6ae8,ending)||!std::isfinite(ending))return o;
- if(!read(world+0xa618,first)||!read(world+0xa620,end)||!first||end<first||(end-first)%0x3478||(end-first)/0x3478>2048||!read(base+ssc_compat::resolve(0xe1a088),steam)||first!=steam||!read(base+ssc_compat::resolve(0xe16608),local)||local<0||uintptr_t(local)>=(end-first)/0x3478)return o;
+ if(!read(world+0xa618,first)||!read(world+0xa620,end)||!first||end<first||(end-first)%0x3478||(end-first)/0x3478>2048||!read(base+ssc_compat::resolve(0xe1b088),steam)||first!=steam||!read(base+ssc_compat::resolve(0xe17608),local)||local<0||uintptr_t(local)>=(end-first)/0x3478)return o;
  actor=first+uintptr_t(local)*0x3478;
  if(!read(actor+0x78,slot)||slot!=local||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active)return o;
  o.valid=true;o.active=raw_round>=2&&countdown<=0&&ending<=0;o.ending=raw_round>=2&&(ending>0||countdown>0);o.preparing=countdown>0&&ending<=0;o.session=world;o.round=raw_round-1;o.last_round=last;o.values["roundNumber"]=std::to_string(o.round);
@@ -52,7 +52,7 @@ inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
   if(read(actor+0x2998,equipped)&&equipped>=0)for(auto record=weapons;record<weapons_end;record+=0x748){int id=-1;if(read(record+0x20c,id)&&id==equipped){auto name=ssc_rpc::native_string(record+0x48);if(!name.empty()&&printable(name)){o.values["weaponName"]=name;sample_weapon(record,o.values);}break;}}
  }
  uintptr_t classes=0,classes_end=0;
- if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe1feb8),classes)&&read(base+ssc_compat::resolve(0xe1fec0),classes_end)&&classes&&classes_end>=classes&&(classes_end-classes)%0x98==0&&(classes_end-classes)/0x98<=512&&uintptr_t(class_id)<(classes_end-classes)/0x98){auto name=ssc_rpc::native_string(classes+uintptr_t(class_id)*0x98+0x18);if(!name.empty())o.values["className"]=name;}
+ if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe20eb8),classes)&&read(base+ssc_compat::resolve(0xe20ec0),classes_end)&&classes&&classes_end>=classes&&(classes_end-classes)%0x98==0&&(classes_end-classes)/0x98<=512&&uintptr_t(class_id)<(classes_end-classes)/0x98){auto name=ssc_rpc::native_string(classes+uintptr_t(class_id)*0x98+0x18);if(!name.empty())o.values["className"]=name;}
  return o;
 }
 using NativeSender=void(*)(uintptr_t,unsigned char,uintptr_t,const void*);
@@ -63,7 +63,7 @@ inline bool send_native(uintptr_t base,uintptr_t world,uintptr_t actor,const std
  // The native client chat-input path calls this with flag=0. It deep-copies the
  // temporary native-layout string into its own outbound queue, then shows it locally.
  ssc_chat::NativeString message{reinterpret_cast<uintptr_t>(text.data()),0,text.size(),std::max(size_t(16),text.size())};
- if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x221560));
+ if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x221570));
  sender(world,0,actor,&message);
  // Engine::dispatch limits automatic messages. Observe the native wheel's
  // cooldown above, but never impose an additional lockout on manual input.

@@ -1,6 +1,6 @@
 # SSC Mod Menu
 
-An unofficial Windows client-side mod for Skillshot City.
+An unofficial client-side mod for Skillshot City, with a Windows installer and an experimental Linux installer for Steam Proton.
 
 ## Download
 
@@ -8,12 +8,33 @@ An unofficial Windows client-side mod for Skillshot City.
 
 Run the installer and select your Skillshot City Steam folder. After installation, launch through Steam and press **Right Shift** to open the mod menu.
 
+## Linux / Proton (experimental)
+
+[Download SSC Mod Menu for Linux](https://github.com/Epiano7/SSC-Mod-Menu/releases/latest/download/SSC-Mod-Menu-Linux.tar.gz)
+
+**Installation has been confirmed on Arch Linux with regular Steam and Proton Experimental. Most mod features are still untested on Linux.** Other distributions, Flatpak Steam, and in-game updating have not been verified
+
+In **Skillshot City → Properties → Compatibility**, enable **Force the use of a specific Steam Play compatibility tool** and choose **Proton Experimental**. Let Steam download the Windows build and launch it once, then close the game and fully exit Steam
+
+Extract the download, open **SSC-Mod-Menu-Setup**, select the folder containing **SkillshotCity.exe**, and click **Install / Update**. Reopen Steam and launch the game
+
+The installer runs natively; the game and mod use Proton. The native Linux game is not supported yet. No separate Wine setup is needed. If the setup file does not open, allow executing it as a program in its file Properties
+
+[Full Linux instructions and log export](linux/README.md)
+
 ## Current Official Modules
 
 - **Sound Replacer:** import WAV or MP3 replacements, match volume and restore originals. Sample rate and mono/stereo conversion are automatic. Requires a restart to apply. MP3 decoding uses Windows Media Foundation.
 - **Cosmetics:** Customize your name with animated rainbow colors or a solid color, visible only to you.
 - **Discord Presence:** game status, available round/level details, elapsed time and ranked SSC rating. No developer setup or token is required.
 - **HUD Editor:** reposition and resize eight HUD groups, with saved layouts, resets and 25-600% scaling. Groups include minimap, version/FPS, round clock, round/players, money/syringes, weapons/ammo, healthbar/survival hearts/skills and event feed.
+
+## Hotfix 0.1.8
+
+- Restored module compatibility with the latest Skillshot City build
+- Fixed HUD dragging under Proton
+- Added Discord Presence connection support for regular and Flatpak Linux Discord installations
+- Linux support remains experimental; broader gameplay and update/restart testing is still needed
 
 ## Hotfix 0.1.7
 

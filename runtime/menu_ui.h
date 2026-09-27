@@ -27,7 +27,8 @@ bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buf
 bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hud::editing;}
 
 // Advance this ID when publishing a new set of release notes.
-constexpr int release_notes_id=20260927;
+constexpr int release_notes_id=20260928;
+bool update_popup=false;
 bool show_update_notes=true;int seen_release_notes=0;
 bool update_notes_due(int phase){return presence_supported&&phase==1&&welcome_seen&&show_update_notes&&seen_release_notes!=release_notes_id&&!opened;}
 int canvas_w=1120;constexpr int canvas_h=720;
@@ -67,6 +68,7 @@ void save() {
     auto path=state_dir/L"menu.ini",temp=state_dir/L"menu.ini.tmp";
     std::ofstream out(temp);
     out<<"quick_modules="<<quick_mask<<"\n";
+    out<<"ignored_update_version="<<ssc_update::ignored_version<<"\n";
     out<<"show_update_notes="<<show_update_notes<<"\nseen_release_notes="<<seen_release_notes<<"\n";
     out<<"cooldown_pulse="<<ssc_cooldown::settings.enabled<<"\ncooldown_duration_ms="<<ssc_cooldown::settings.duration_ms<<"\n";
     out<<"hud_hover_fade="<<ssc_hud::hover_fade<<"\n";out<<"hud_enabled="<<ssc_hud::enabled<<"\n";for(const auto& item:ssc_hud::items){out<<"hud_box_"<<item.key<<"="<<item.home_x<<","<<item.home_y<<","<<item.w<<","<<item.h<<"\n";out<<"hud_"<<item.key<<"="<<item.x<<","<<item.y<<","<<item.scale<<"\n";}
@@ -78,7 +80,9 @@ void save() {
 }
 constexpr float hud_view_x=266,hud_view_y=188,hud_view_w=820,hud_view_h=461;
 int hud_drag=-1;bool hud_resize=false;float hud_start_x=0,hud_start_y=0,hud_item_x=0,hud_item_y=0,hud_item_scale=1;
-void finish_hud_drag(){ssc_hud::freeze_bounds=false;if(hud_drag>=0){hud_drag=-1;save();}}
+void finish_hud_drag(){ssc_hud::freeze_bounds=false;if(hud_drag>=0){
+    const auto& a=ssc_hud::items[hud_drag];char report[192];snprintf(report,sizeof(report),"HUD drag ended: item=%s x=%.4f y=%.4f scale=%.3f",a.key,a.x,a.y,a.scale);log(report);
+    hud_drag=-1;save();}}
 int hud_hit(float x,float y){
     for(int i=int(ssc_hud::items.size())-1;i>=0;--i){if(!ssc_hud::available(i))continue;auto& item=ssc_hud::items[i];float bx=hud_view_x+item.x*hud_view_w,by=hud_view_y+item.y*hud_view_h;
         if(x>=bx-6&&x<=bx+item.w*item.scale*hud_view_w+6&&y>=by-6&&y<=by+item.h*item.scale*hud_view_h+6)return i;}
@@ -101,6 +105,7 @@ void load_settings() {
         if(key=="hud_enabled"){ssc_hud::enabled=value=="1";continue;}
         if(key.rfind("hud_box_",0)==0){for(int i=0;i<int(ssc_hud::items.size());++i)if(key==std::string("hud_box_")+ssc_hud::items[i].key){float x,y,w,h;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f,%f%c",&x,&y,&w,&h,&extra)==4&&std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&x>=-.5f&&y>=-.5f&&w>0&&h>0){ssc_hud::apply_bounds(i,{x,y,x+w,y+h,2});ssc_hud::measured[i]=false;}}continue;}
         if(key.rfind("hud_",0)==0){for(auto& item:ssc_hud::items)if(key==std::string("hud_")+item.key){float x,y,z;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f%c",&x,&y,&z,&extra)==3){item.x=x;item.y=y;item.scale=z;ssc_hud::constrain(item);}}continue;}
+        if(key=="ignored_update_version"){if(ssc_update::valid_version(value))ssc_update::ignored_version=value;continue;}
         if(key=="rpc_id"){if(value.empty()||ssc_rpc::valid_id(value))rpc_id=value.empty()?ssc_rpc::bundled_application_id:value;continue;}
         try {size_t used=0;number=std::stoi(value,&used);if(used!=value.size())continue;}catch(...){continue;}
         if(key=="quick_modules"&&number>=0&&number<64)quick_mask=unsigned(number);
@@ -141,8 +146,9 @@ void refresh_dynamic_panel(ULONGLONG now,bool presence_tick=false) {
     static ULONGLONG rainbow_at=0;
     if(settings_page==4&&ssc_names::rainbow&&now-rainbow_at>=50){rainbow_at=now;dirty=true;}
 }
-void close_menu(bool immediate=false) {finish_scale();finish_lab_slider();if(manager&&settings_page==8){welcome_seen=true;seen_release_notes=release_notes_id;save();}if(manager&&settings_page==14){seen_release_notes=release_notes_id;save();}if(ssc_hud::editing){ssc_hud::editing=false;save();}finish_hud_drag();opened=false;dirty=true;pressed=0;keyboard_focus=0;cancel_edit();if(immediate){visibility=0;modal_visibility=0;}ReleaseCapture();log("Menu closed");}
+void close_menu(bool immediate=false) {if(update_popup)immediate=true;update_popup=false;finish_scale();finish_lab_slider();if(manager&&settings_page==8){welcome_seen=true;seen_release_notes=release_notes_id;save();}if(manager&&settings_page==14){seen_release_notes=release_notes_id;save();}if(ssc_hud::editing){ssc_hud::editing=false;save();}finish_hud_drag();opened=false;dirty=true;pressed=0;keyboard_focus=0;cancel_edit();if(immediate){visibility=0;modal_visibility=0;}ReleaseCapture();log("Menu closed");}
 void show_manager(int page=-1) {
+    update_popup=false;
     finish_scale();finish_lab_slider();if(page!=11){ssc_lab::picker=-1;ssc_lab::editing=-1;}
     // Navigation inside the full window is not a new opening transition.
     const bool already_visible=manager&&opened&&visibility>0.f;
@@ -151,7 +157,7 @@ void show_manager(int page=-1) {
     dirty=true;hovered=pressed=keyboard_focus=0;controls.clear();
 }
 void show_quick() {finish_hud_drag();ReleaseCapture();cancel_edit();manager=false;visibility=animations?0.f:1.f;dirty=true;hovered=pressed=keyboard_focus=0;controls.clear();}
-void start_live_hud(){if(!ssc_hud::available(ssc_hud::selected))ssc_hud::selected=ssc_hud::next_item(0,1);finish_hud_drag();ReleaseCapture();cancel_edit();ssc_hud::enabled=true;ssc_hud::editing=true;ssc_hud::capture_frame=true;opened=true;manager=false;visibility=1;modal_visibility=0;controls.clear();pressed=hovered=keyboard_focus=0;dirty=true;save();}
+void start_live_hud(){log("HUD editor opened");if(!ssc_hud::available(ssc_hud::selected))ssc_hud::selected=ssc_hud::next_item(0,1);finish_hud_drag();ReleaseCapture();cancel_edit();ssc_hud::enabled=true;ssc_hud::editing=true;ssc_hud::capture_frame=true;opened=true;manager=false;visibility=1;modal_visibility=0;controls.clear();pressed=hovered=keyboard_focus=0;dirty=true;save();}
 int live_hud_hit(float x,float y){
  auto inside=[&](int i){if(!ssc_hud::visible(i,GetTickCount64()))return false;const auto& a=ssc_hud::items[i];float px=6.f/std::max(1,ssc_hud::view_w),py=6.f/std::max(1,ssc_hud::view_h);return x>=a.x-px&&x<=a.x+a.w*a.scale+px&&y>=a.y-py&&y<=a.y+a.h*a.scale+py;};
  if(inside(ssc_hud::selected))return ssc_hud::selected;
@@ -160,6 +166,20 @@ int live_hud_hit(float x,float y){
  return best;
 }
 void live_hud_move(float x,float y){if(hud_drag<0)return;auto& a=ssc_hud::items[hud_drag];float dx=x-hud_start_x,dy=y-hud_start_y;if(hud_resize)a.scale=hud_item_scale+std::max(dx/a.w,dy/a.h);else{a.x=hud_item_x+dx;a.y=hud_item_y+dy;}ssc_hud::constrain(a);dirty=true;}
+// Some Proton desktops coalesce or omit WM_MOUSEMOVE during capture.
+// Poll only an already-started gesture, and finish it if mouse-up was missed.
+void sample_live_hud_drag(int x,int y,int width,int height,bool down){
+ if(!ssc_hud::editing||hud_drag<0||width<=0||height<=0)return;
+ live_hud_move(float(x)/width,float(y)/height);
+ if(!down){finish_hud_drag();ReleaseCapture();}
+}
+void poll_live_hud_drag(HWND window){
+ static const bool wine=GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"wine_get_version")!=nullptr;
+ if(!wine||!ssc_hud::editing||hud_drag<0||GetForegroundWindow()!=window)return;
+ POINT cursor{};RECT client{};
+ if(!GetCursorPos(&cursor)||!ScreenToClient(window,&cursor)||!GetClientRect(window,&client))return;
+ sample_live_hud_drag(cursor.x,cursor.y,client.right,client.bottom,(GetAsyncKeyState(VK_LBUTTON)&0x8000)!=0);
+}
 void live_hud_wheel(int delta,int hovered_item){if(hud_drag>=0){finish_hud_drag();ReleaseCapture();}if(hovered_item>=0)ssc_hud::selected=hovered_item;auto& a=ssc_hud::items[ssc_hud::selected];a.scale*=std::pow(1.1f,float(delta)/WHEEL_DELTA);ssc_hud::constrain(a);save();}
 bool module_ready(int id){
     if(!ssc_compat::initialized)return true;
@@ -229,6 +249,7 @@ void activate(int id) {
     else if(id==172){ssc_diagnostics::open_logs(state_dir);}
     else if(id==160){if(!presence_supported||rpc_preview.phase==1)ssc_update::check(state_dir);dirty=true;}
     else if(id==161){if(!presence_supported||rpc_preview.phase==1)ssc_update::apply();dirty=true;}
+    else if(id==283){if(ssc_update::valid_version(ssc_update::version)){ssc_update::ignored_version=ssc_update::version;save();}close_menu();}
     else if(id==180||id==181){ssc_names::rainbow=id==180;color_editing=false;save();}
     else if(id>=182&&id<=187){const unsigned colors[]={0xffffff,0x55ccff,0xff66cc,0x66ee99,0xffbb44,0xff6655};ssc_names::solid_rgb=colors[id-182];ssc_names::rainbow=false;save();}
     else if(id==188){if(color_editing){dirty=true;return;}wchar_t value[8];swprintf(value,8,L"%06X",ssc_names::solid_rgb);color_buffer=value;color_editing=true;edit_cursor.begin(color_buffer.size());dirty=true;}
@@ -360,11 +381,11 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         POINT cursor{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};
         if(message==WM_MOUSEWHEEL)ScreenToClient(window,&cursor);
         float x=float(cursor.x)/std::max(1,ssc_hud::view_w),y=float(cursor.y)/std::max(1,ssc_hud::view_h);
-        if(message==WM_LBUTTONDOWN){pressed=hit(cursor.x,cursor.y);if(pressed)return 0;int i=live_hud_hit(x,y);if(i>=0){ssc_hud::selected=i;hud_drag=i;ssc_hud::freeze_bounds=true;auto& a=ssc_hud::items[i];hud_start_x=x;hud_start_y=y;hud_item_x=a.x;hud_item_y=a.y;hud_item_scale=a.scale;hud_resize=cursor.x>=(a.x+a.w*a.scale)*ssc_hud::view_w-12&&cursor.y>=(a.y+a.h*a.scale)*ssc_hud::view_h-12;SetCapture(window);dirty=true;}return 0;}
+        if(message==WM_LBUTTONDOWN){pressed=hit(cursor.x,cursor.y);if(pressed)return 0;int i=live_hud_hit(x,y);if(i>=0){ssc_hud::selected=i;hud_drag=i;ssc_hud::freeze_bounds=true;auto& a=ssc_hud::items[i];hud_start_x=x;hud_start_y=y;hud_item_x=a.x;hud_item_y=a.y;hud_item_scale=a.scale;hud_resize=cursor.x>=(a.x+a.w*a.scale)*ssc_hud::view_w-12&&cursor.y>=(a.y+a.h*a.scale)*ssc_hud::view_h-12;SetCapture(window);char report[192];snprintf(report,sizeof(report),"HUD drag started: item=%s capture=%d view=%dx%d",a.key,GetCapture()==window,ssc_hud::view_w,ssc_hud::view_h);log(report);dirty=true;}else{unsigned visible=0;for(int j=0;j<int(ssc_hud::items.size());++j)if(ssc_hud::visible(j,GetTickCount64()))visible|=1u<<j;char report[192];snprintf(report,sizeof(report),"HUD click missed: x=%.4f y=%.4f view=%dx%d visible=0x%X",x,y,ssc_hud::view_w,ssc_hud::view_h,visible);log(report);}return 0;}
         if(message==WM_MOUSEMOVE){if(hud_drag>=0)live_hud_move(x,y);return 0;}
         if(message==WM_LBUTTONUP){if(hud_drag>=0){live_hud_move(x,y);finish_hud_drag();ReleaseCapture();}else{int id=hit(cursor.x,cursor.y),down=pressed;pressed=0;if(id&&id==down)activate(id);}return 0;}
         if(message==WM_MOUSEWHEEL){live_hud_wheel(GET_WHEEL_DELTA_WPARAM(wp),live_hud_hit(x,y));return 0;}
-        if(message==WM_CAPTURECHANGED){finish_hud_drag();return 0;}
+        if(message==WM_CAPTURECHANGED){if(hud_drag>=0)log("HUD mouse capture lost");finish_hud_drag();return 0;}
         if((message>=WM_KEYFIRST&&message<=WM_KEYLAST)||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;
         if(message==WM_INPUT)return DefWindowProcW(window,message,wp,lp);
     }
@@ -641,18 +662,24 @@ void wheel_preview(){
 void paint_panel() {
     prepare_canvas();if(!pixels)return;controls.clear();wheel_hits.clear();
     edit_visuals.clear();
-    panel_w=manager?1120:640;panel_h=manager?720:quick_height();
+    panel_w=manager?1120:640;panel_h=manager?720:update_popup?310:quick_height();
     std::memset(pixels,0,raster_w*raster_h*4);
     rectangle(0,0,panel_w,panel_h,RGB(8,21,41));rectangle(4,4,panel_w-8,78,RGB(18,41,72));
     rectangle(4,82,panel_w-8,2,RGB(48,135,208));
-    text(26,24,L"SSC MOD MENU",ink,true);text(26,58,manager?L"MODULE SETTINGS":L"QUICK MENU",muted);
+    text(26,24,L"SSC MOD MENU",ink,true);text(26,58,update_popup?L"UPDATE AVAILABLE":manager?L"MODULE SETTINGS":L"QUICK MENU",muted);
     if(!(manager&&(settings_page==8||settings_page==14)))button(1,panel_w-60,23,36,36,L"X");
-    if(!native_supported){
+    if(update_popup){
+        text(26,116,L"MOD UPDATE AVAILABLE",cyan);
+        text(26,156,ssc_update::message.c_str(),ink,false,14);
+        button(161,26,199,280,40,ssc_update::action_label(),true,ssc_update::available());
+        button(1,326,199,284,40,L"LATER");
+        button(283,26,255,584,34,L"DON'T SHOW AGAIN FOR THIS UPDATE");
+    }else if(!native_supported){
         text(26,116,L"GAME UPDATE DETECTED",cyan);
         text(26,156,L"Modules are paused until a compatible mod update.",muted,false,14);
         text(26,209,ssc_update::message.c_str(),ink,false,14);
         button(160,26,270,250,42,L"CHECK FOR UPDATES",false,!ssc_update::process);
-        button(161,294,270,310,42,L"UPDATE AND RESTART",true,ssc_update::available());
+        button(161,294,270,310,42,ssc_update::action_label(),true,ssc_update::available());
     } else if(manager&&settings_page==8){
         text(50,125,L"WELCOME TO SSC MOD MENU",ink,true);
         text(50,200,L"Press RIGHT SHIFT to open the mod menu.");
@@ -665,9 +692,11 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"0.1.7 COMPATIBILITY HOTFIX",cyan);
+        text(50,153,L"0.1.8 COMPATIBILITY HOTFIX",cyan);
         bullet(201,L"Restored compatibility after the latest game update" );
-        bullet(233,L"Restored Auto Messages round detection" );
+        bullet(233,L"Fixed HUD dragging under Proton" );
+        bullet(265,L"Added native Linux Discord connection support" );
+        bullet(297,L"Linux support remains experimental" );
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
@@ -797,7 +826,7 @@ void paint_panel() {
             text(266,111,L"UPDATE AVAILABLE",ink,true);
             text(266,180,ssc_update::message.c_str(),cyan);
             text(266,238,L"Download, install and restart Skillshot City.",muted);
-            button(161,266,308,340,48,L"UPDATE AND RESTART",true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
+            button(161,266,308,340,48,ssc_update::action_label(),true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
             button(1,630,308,180,48,L"LATER");
         } else if(settings_page==9){
             text(266,111,L"MISC",ink,true);
@@ -928,7 +957,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.7",cyan);
+            text(266,157,L"0.1.8",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
@@ -937,7 +966,7 @@ void paint_panel() {
             text(266,414,L"UPDATES");
             text(266,455,ssc_update::message.c_str(),muted,false,14);
             button(160,266,492,260,40,L"CHECK FOR UPDATES",false,!ssc_update::process&&(rpc_preview.phase==1||!presence_supported));
-            button(161,542,492,340,40,L"UPDATE AND RESTART",true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
+            button(161,542,492,340,40,ssc_update::action_label(),true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
 
             button(172,266,545,260,34,L"OPEN LOGS");
             text(266,605,L"Unofficial mod client. Not affiliated with the game developer.",muted,false,14);
@@ -970,7 +999,7 @@ void paint_live_hud_toolbar(){
 void layout_panel(int width,int height) {
     if(ssc_hud::editing){panel_w=760;panel_h=68;float base=std::min(1.f,std::max(.1f,float(width-24)/panel_w));if(std::abs(raster_scale-base)>.00001f){raster_scale=base;dirty=true;}draw_scale=base;panel_x=int((width-panel_w*base)*.5f);panel_y=ssc_hud::items[ssc_hud::selected].y<.13f?int(height-panel_h*base-12):12;return;}
 
-    panel_w=auto_guide_visible()?1440:manager?1120:640;panel_h=manager?720:quick_height();
+    panel_w=auto_guide_visible()?1440:manager?1120:640;panel_h=manager?720:update_popup?310:quick_height();
     float fit=std::min(float(width-40)/(auto_guide_visible()?1760:panel_w),float(height-40)/panel_h);
     float base=std::min(float(ui_scale)/100.f,std::max(.1f,fit));float e=ease(visibility);
     if(std::abs(raster_scale-base)>.00001f){raster_scale=base;dirty=true;}

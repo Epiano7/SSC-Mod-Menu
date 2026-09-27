@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <filesystem>
+#include <fstream>
 #include <ctime>
 #include <cmath>
 #include "third_party/json.hpp"
@@ -100,8 +102,40 @@ struct Shared {
 inline Shared& shared(){static Shared* s=new Shared;return *s;}
 inline void status(Shared& s,const wchar_t* value){std::lock_guard<std::mutex> lock(s.mutex);s.status=value;}
 inline std::wstring status(){auto& s=shared();std::lock_guard<std::mutex> lock(s.mutex);return s.status;}
+// The native launcher supplies a private, per-launch relay directory under Proton.
+// Keep all file I/O off the render thread; Windows continues to use named pipes.
+inline std::filesystem::path relay_directory(){
+    wchar_t path[32768];DWORD length=GetEnvironmentVariableW(L"SSC_DISCORD_RELAY",path,32768);
+    return length&&length<32768?std::filesystem::path(path):std::filesystem::path{};
+}
+inline DWORD relay_worker(Shared& s,const std::filesystem::path& root){
+    unsigned long long revision=0;int phase=-1;std::time_t start=0;
+    for(;;){
+        bool enabled,timer,stop;std::string id;Snapshot snapshot;ULONGLONG sampled;
+        {std::lock_guard<std::mutex> lock(s.mutex);enabled=s.enabled;timer=s.timer;stop=s.stop;id=s.id;snapshot=s.snapshot;sampled=s.sampled;}
+        auto now=GetTickCount64();enabled=enabled&&!stop&&valid_id(id)&&sampled&&now-sampled<=10000;
+        if(phase!=snapshot.phase){phase=snapshot.phase;start=std::time(nullptr);}
+        try{
+            Json request={{"revision",++revision},{"enabled",enabled}};
+            if(enabled){request["client_id"]=id;request["activity"]=activity(snapshot,start,timer);}
+            auto temporary=root/L"activity.tmp";
+            {std::ofstream out(temporary,std::ios::binary);out<<request.dump();out.close();if(!out)throw std::runtime_error("relay write");}
+            if(!MoveFileExW(temporary.c_str(),(root/L"activity.json").c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))throw std::runtime_error("relay publish");
+            if(!enabled)status(s,L"Disabled or waiting for game status");
+            else{
+                std::string value;HANDLE input=CreateFileW((root/L"status.txt").c_str(),GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+                if(input!=INVALID_HANDLE_VALUE){char buffer[161];DWORD count=0;if(ReadFile(input,buffer,sizeof(buffer),&count,nullptr)&&count<=160)value.assign(buffer,count);CloseHandle(input);}
+                if(value.empty())status(s,L"Waiting for Linux Discord bridge");
+                else{std::wstring text(value.begin(),value.end());status(s,text.c_str());}
+            }
+        }catch(...){status(s,L"Linux Discord bridge unavailable; reinstall the Linux test build");}
+        if(stop)break;
+        Sleep(1000);
+    }
+    return 0;
+}
 inline DWORD WINAPI worker(void* context){
-    auto& s=*static_cast<Shared*>(context);Channel channel;std::string id,last_activity,pending;
+    auto& s=*static_cast<Shared*>(context);auto relay=relay_directory();if(!relay.empty())return relay_worker(s,relay);Channel channel;std::string id,last_activity,pending;
     bool ready=false;ULONGLONG retry=0,last_send=0,deadline=0;unsigned nonce=0;int phase=-1;std::time_t start=0;
     auto disconnect=[&](){channel.close();ready=false;pending.clear();last_activity.clear();retry=GetTickCount64()+5000;};
     for(;;){
