@@ -82,16 +82,16 @@ inline uintptr_t draw_label(uintptr_t a,float x,float y,float width,float height
 }
 inline bool attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
  if(!ssc_compat::supports(16))return false;
- struct Hook{uint32_t call,target,reserved;};Hook hooks[]={{0x80f03f,0x80a3d0,0},{0x3c97d5,0x80a3d0,0},{0x3c9f03,0x4862f0,0},{0x3ca054,0x47fbf0,0},{0x80a391,0x24820,0},{0x80efc2,0x221570,0}};
+ struct Hook{uint32_t call,target,reserved;};Hook hooks[]={{0x80f7bf,0x80ab50,0},{0x3c9975,0x80ab50,0},{0x3ca0a3,0x486220,0},{0x3ca1f4,0x47fb20,0},{0x80ab11,0x24820,0},{0x80f742,0x2215c0,0}};
  for(auto& h:hooks){h.call=ssc_compat::resolve(h.call);h.target=ssc_compat::resolve(h.target);auto p=reinterpret_cast<const unsigned char*>(base+h.call);int32_t rel;std::memcpy(&rel,p+1,4);if(p[0]!=0xe8||base+h.call+5+rel!=base+h.target)return false;}
  unsigned char* bridge=nullptr;for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((base+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
  const unsigned char jump[]={0xff,0x25,0,0,0,0};std::memcpy(bridge,jump,6);auto entry=reinterpret_cast<uintptr_t>(build);std::memcpy(bridge+6,&entry,8);std::memcpy(bridge+32,jump,6);auto icon_entry=reinterpret_cast<uintptr_t>(ssc_wheel_images::draw);std::memcpy(bridge+38,&icon_entry,8);std::memcpy(bridge+64,jump,6);auto label_entry=reinterpret_cast<uintptr_t>(draw_label);std::memcpy(bridge+70,&label_entry,8);std::memcpy(bridge+96,jump,6);auto select_entry=reinterpret_cast<uintptr_t>(select_message);std::memcpy(bridge+102,&select_entry,8);std::memcpy(bridge+128,jump,6);auto send_entry=reinterpret_cast<uintptr_t>(send_message);std::memcpy(bridge+134,&send_entry,8);DWORD old;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,4096);
  DWORD protections[6]{};for(int i=0;i<6;++i)if(!VirtualProtect(reinterpret_cast<void*>(base+hooks[i].call),5,PAGE_EXECUTE_READWRITE,&protections[i])){for(int j=i-1;j>=0;--j){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+hooks[j].call),5,protections[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
- image_base=base;original=reinterpret_cast<Builder>(base+ssc_compat::resolve(0x80a3d0));assign=reinterpret_cast<Assign>(base+ssc_compat::resolve(0x24820));
- original_send=reinterpret_cast<Sender>(base+ssc_compat::resolve(0x221570));
- original_label=reinterpret_cast<LabelDraw>(base+ssc_compat::resolve(0x47fbf0));
- ssc_wheel_images::original=reinterpret_cast<ssc_wheel_images::Draw>(base+ssc_compat::resolve(0x4862f0));
+ image_base=base;original=reinterpret_cast<Builder>(base+ssc_compat::resolve(0x80ab50));assign=reinterpret_cast<Assign>(base+ssc_compat::resolve(0x24820));
+ original_send=reinterpret_cast<Sender>(base+ssc_compat::resolve(0x2215c0));
+ original_label=reinterpret_cast<LabelDraw>(base+ssc_compat::resolve(0x47fb20));
+ ssc_wheel_images::original=reinterpret_cast<ssc_wheel_images::Draw>(base+ssc_compat::resolve(0x486220));
  for(int i=0;i<6;++i){int32_t rel=int32_t(reinterpret_cast<uintptr_t>(bridge+(i>=2?(i-1)*32:0))-(base+hooks[i].call+5));std::memcpy(reinterpret_cast<void*>(base+hooks[i].call+1),&rel,4);FlushInstructionCache(GetCurrentProcess(),reinterpret_cast<void*>(base+hooks[i].call),5);}
  // Hooks may share a page: finish every write before restoring protection,
  // then unwind in reverse so the original RX protection wins.

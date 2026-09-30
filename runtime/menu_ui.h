@@ -7,6 +7,7 @@ HWND game_window;
 bool opened=false,clock_enabled=false,dirty=true,save_failed=false,suppress_escape_up=false;
 bool animations=true,sound_requested=false,cosmetic_requested=false,match_sound_level=true;
 bool rpc_requested=false,rpc_timer=true,rpc_rating=true,rpc_editing=false,rpc_select_all=false,rpc_error=false;
+std::string private_code;bool private_editing=false;
 std::string rpc_id=ssc_rpc::bundled_application_id;std::wstring rpc_buffer;ssc_rpc::Snapshot rpc_preview;
 int sound_wheel_remainder=0;
 bool sound_search_editing=false;std::wstring sound_query;size_t sound_page=0;std::vector<size_t> sound_results;
@@ -23,11 +24,12 @@ struct EditVisual {std::wstring value;int id=0,x=0,y=0,w=0,size=15;size_t first=
 std::vector<EditVisual> edit_visuals;
 int lab_drag=-1;
 bool scale_dragging=false;int scale_preview=100;float scale_drag_left=0,scale_drag_width=1;
+bool bot_color_error=false;
 bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buffer;
 bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hud::editing;}
 
 // Advance this ID when publishing a new set of release notes.
-constexpr int release_notes_id=20260928;
+constexpr int release_notes_id=20260930;
 bool update_popup=false;
 bool show_update_notes=true;int seen_release_notes=0;
 bool update_notes_due(int phase){return presence_supported&&phase==1&&welcome_seen&&show_update_notes&&seen_release_notes!=release_notes_id&&!opened;}
@@ -57,8 +59,8 @@ void log(const char* message) {
     std::ofstream out(state_dir/L"runtime.log",std::ios::app);SYSTEMTIME now;GetSystemTime(&now);char stamp[48];std::snprintf(stamp,sizeof(stamp),"[%04u-%02u-%02u %02u:%02u:%02u UTC] ",now.wYear,now.wMonth,now.wDay,now.wHour,now.wMinute,now.wSecond);out<<stamp<<message<<"\n";
 }
 void activate(int id);
-void commit_text(){if(chat_editing)activate(321);}
-void cancel_edit(){commit_text();dropdown=-1;chat_editing=false;sound_search_editing=false;color_editing=false;rpc_editing=false;rpc_error=false;dirty=true;}
+void commit_text(){if(chat_editing)activate(321);if(color_editing&&settings_page==18&&ssc_names::private_visible()){unsigned rgb,alpha;if(ssc_names::parse_bot_color(color_buffer,rgb,alpha))activate(537);}}
+void cancel_edit(){private_editing=false;commit_text();dropdown=-1;chat_editing=false;sound_search_editing=false;color_editing=false;rpc_editing=false;rpc_error=false;dirty=true;}
 void save() {
     ssc_names::cosmetics=cosmetic_requested&&ssc_compat::supports(1);
     ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);
@@ -67,6 +69,7 @@ void save() {
     bool auto_saved=ssc_auto::save(state_dir);
     auto path=state_dir/L"menu.ini",temp=state_dir/L"menu.ini.tmp";
     std::ofstream out(temp);
+    auto bot_hex=ssc_names::bot_color_hex();out<<"bot_name_hex="<<std::string(bot_hex.begin(),bot_hex.end())<<"\n";
     out<<"quick_modules="<<quick_mask<<"\n";
     out<<"ignored_update_version="<<ssc_update::ignored_version<<"\n";
     out<<"show_update_notes="<<show_update_notes<<"\nseen_release_notes="<<seen_release_notes<<"\n";
@@ -101,6 +104,7 @@ void load_settings() {
     while(std::getline(in,line)) {
         auto at=line.find('=');if(at==std::string::npos)continue;
         std::string key=line.substr(0,at),value=line.substr(at+1);int number=0;
+        if(key=="bot_name_hex"){unsigned rgb,alpha;if(ssc_names::parse_bot_color(std::wstring(value.begin(),value.end()),rgb,alpha)){ssc_names::bot_rgb=rgb;ssc_names::bot_alpha=alpha;}continue;}
         if(key=="hud_hover_fade"){ssc_hud::hover_fade=value!="0";continue;}
         if(key=="hud_enabled"){ssc_hud::enabled=value=="1";continue;}
         if(key.rfind("hud_box_",0)==0){for(int i=0;i<int(ssc_hud::items.size());++i)if(key==std::string("hud_box_")+ssc_hud::items[i].key){float x,y,w,h;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f,%f%c",&x,&y,&w,&h,&extra)==4&&std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&x>=-.5f&&y>=-.5f&&w>0&&h>0){ssc_hud::apply_bounds(i,{x,y,x+w,y+h,2});ssc_hud::measured[i]=false;}}continue;}
@@ -142,12 +146,13 @@ void advance_animation(float seconds) {
 void refresh_dynamic_panel(ULONGLONG now,bool presence_tick=false) {
     if(!opened||!manager||ssc_hud::editing)return;
     if(presence_tick&&(settings_page==5||settings_page==16))dirty=true;
-    static ULONGLONG caret_at=0;if((chat_editing||sound_search_editing||color_editing||rpc_editing||(settings_page==11&&(ssc_lab::picker>=0||ssc_lab::editing>=0)))&&now/500!=caret_at){caret_at=now/500;dirty=true;}
+    static ULONGLONG caret_at=0;if((private_editing||chat_editing||sound_search_editing||color_editing||rpc_editing||(settings_page==11&&(ssc_lab::picker>=0||ssc_lab::editing>=0)))&&now/500!=caret_at){caret_at=now/500;dirty=true;}
     static ULONGLONG rainbow_at=0;
     if(settings_page==4&&ssc_names::rainbow&&now-rainbow_at>=50){rainbow_at=now;dirty=true;}
 }
 void close_menu(bool immediate=false) {if(update_popup)immediate=true;update_popup=false;finish_scale();finish_lab_slider();if(manager&&settings_page==8){welcome_seen=true;seen_release_notes=release_notes_id;save();}if(manager&&settings_page==14){seen_release_notes=release_notes_id;save();}if(ssc_hud::editing){ssc_hud::editing=false;save();}finish_hud_drag();opened=false;dirty=true;pressed=0;keyboard_focus=0;cancel_edit();if(immediate){visibility=0;modal_visibility=0;}ReleaseCapture();log("Menu closed");}
 void show_manager(int page=-1) {
+    if(page==18&&!ssc_names::private_visible())page=-1;
     update_popup=false;
     finish_scale();finish_lab_slider();if(page!=11){ssc_lab::picker=-1;ssc_lab::editing=-1;}
     // Navigation inside the full window is not a new opening transition.
@@ -182,6 +187,7 @@ void poll_live_hud_drag(HWND window){
 }
 void live_hud_wheel(int delta,int hovered_item){if(hud_drag>=0){finish_hud_drag();ReleaseCapture();}if(hovered_item>=0)ssc_hud::selected=hovered_item;auto& a=ssc_hud::items[ssc_hud::selected];a.scale*=std::pow(1.1f,float(delta)/WHEEL_DELTA);ssc_hud::constrain(a);save();}
 bool module_ready(int id){
+    if(id==510||id==511||(id>=530&&id<=537))return ssc_names::private_visible();
     if(!ssc_compat::initialized)return true;
     return id==330?ssc_auto::supported():id==80?ssc_sound::attached:id==81?ssc_names::attached:id==83?presence_supported:(id==86||id==193)?ssc_hud::attached:true;
 }
@@ -190,13 +196,23 @@ void open_dropdown(int id,std::vector<std::wstring> labels,int choice){dropdown=
 void select_dropdown(int value){auto& r=ssc_auto::current();int id=dropdown;dropdown=-1;if(id==500){chat_variant=std::clamp(value,0,int(ssc_chat::message_count(ssc_chat::slots[ssc_chat::order[ssc_chat::selected]]))-1);chat_editing=false;}else if(id==488){const int levels[]={0,50,75,100,125,150,200,250,300};if(value>=0&&value<9)ssc_sound::set_volume(levels[value]);}else if(id==462){wheel_round_ended=value==1;auto visible=ssc_chat::visible_order(wheel_round_ended);if(std::find(visible.begin(),visible.end(),ssc_chat::selected)==visible.end())ssc_chat::selected=visible.back();chat_variant=0;chat_editing=false;}else if(id==324){auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];slot.icon=value;slot.custom=false;}else if(id==326)r.event=ssc_auto::choice_event(value);else if(id==344)ssc_auto::variable=value;else if(id==405)r.any=value==1;else if(id==406)r.repeats=value+1;else if(id==208){ssc_lab::sort_mode=value;ssc_lab::picker_page=0;}else if(id>=410&&id<413)r.conditions[id-410].stat=value;else if(id>=420&&id<423)r.conditions[id-420].comparison=value;save();}
 void activate(int id) {
     if(!module_ready(id))return;
+    if(color_editing&&settings_page==18&&id!=536&&id!=537&&!(id>=530&&id<536))commit_text();
     if(id==504&&settings_page==15){chat_new=false;chat_editing=false;chat_buffer.clear();dirty=true;return;}
     int active_field=chat_field==0?320:chat_field==1?400:chat_field==2?401:450+chat_field-3;
     if(chat_editing&&id!=321&&id!=active_field&&id!=345){commit_text();if(chat_editing)return;}
     if(id!=120&&id!=121)rpc_editing=false;
     if(id!=104)sound_search_editing=false;
     if(id>=1000&&id<1100&&dropdown>=0){select_dropdown(id-1000);return;}
-    if(id==490){edit_cursor.begin(ssc_lab::query.size());dirty=true;}
+    if(id!=521)private_editing=false;
+    if(id==520){show_manager(19);}
+    else if(id==521){if(!ssc_auth::service().busy()){private_editing=true;edit_cursor.begin(private_code.size());ssc_auth_privacy::secrets_used=true;dirty=true;}}
+    else if(id==522){ssc_auth::service().request(private_code);dirty=true;}
+    else if(id==510){show_manager(18);}
+    else if(id>=530&&id<536){const unsigned colors[]={0xffffff,0x55ccff,0xff66cc,0x66ee99,0xffbc41,0xff6655};ssc_names::bot_rgb=colors[id-530];ssc_names::bot_alpha=255;color_editing=false;bot_color_error=false;save();}
+    else if(id==536){if(!color_editing){color_buffer=ssc_names::bot_color_hex();color_editing=true;bot_color_error=false;edit_cursor.begin(color_buffer.size());dirty=true;}}
+    else if(id==537){unsigned rgb,alpha;if(ssc_names::parse_bot_color(color_buffer,rgb,alpha)){ssc_names::bot_rgb=rgb;ssc_names::bot_alpha=alpha;color_editing=false;bot_color_error=false;save();}else{bot_color_error=true;dirty=true;}}
+    else if(id==511){ssc_auth::service().enable(!ssc_auth::active());dirty=true;}
+    else if(id==490){edit_cursor.begin(ssc_lab::query.size());dirty=true;}
     else if(id==487){ssc_sound::toggle_variants();dirty=true;}
     else if(id==488){if(ssc_sound::selection<ssc_sound::entries.size()){auto v=ssc_sound::clip_volume(ssc_sound::entries[ssc_sound::selection]);open_dropdown(id,{L"0%",L"50%",L"75%",L"100%",L"125%",L"150%",L"200%",L"250%",L"300%"},v==0?0:v==50?1:v==75?2:v==100?3:v==125?4:v==150?5:v==200?6:v==250?7:8);}}
     else if(id==489){ssc_sound::preview_custom(game_window);dirty=true;}
@@ -267,7 +283,7 @@ void activate(int id) {
     else if(id==105){ssc_sound::preview_original();dirty=true;}
     else if(id==1)close_menu();
     else if(id==3)show_manager();
-    else if(id==4){ssc_auto::enabled=false;ssc_auto::engine.reset();ssc_chat::enabled=false;ssc_hud::enabled=false;sound_requested=false;cosmetic_requested=false;rpc_requested=false;clock_enabled=false;save();}
+    else if(id==4){ssc_auth::service().enable(false);ssc_auto::enabled=false;ssc_auto::engine.reset();ssc_chat::enabled=false;ssc_hud::enabled=false;sound_requested=false;cosmetic_requested=false;rpc_requested=false;clock_enabled=false;save();}
     else if(id==5)show_quick();
     else if(id>=10&&id<=12){show_manager(id==10?-1:id-10);}
     else if(id==40){animations=!animations;visibility=opened?1.f:0.f;modal_visibility=opened&&manager?1.f:0.f;save();}
@@ -353,6 +369,8 @@ template<class S,class Accept> bool edit_input(S& value,UINT message,WPARAM wp,s
  return false;
 }
 LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
+    if(message==WM_POWERBROADCAST&&(wp==PBT_APMSUSPEND||wp==PBT_APMRESUMEAUTOMATIC||wp==PBT_APMRESUMESUSPEND||wp==PBT_APMRESUMECRITICAL)){ssc_beta::service().invalidate();ssc_auth::service().invalidate();dirty=true;}
+    if(message==WM_DESTROY){ssc_beta::service().stop();ssc_auth::service().stop();}
     if(opened&&dropdown>=0){if(message==WM_MOUSEWHEEL){dropdown_choice=std::clamp(dropdown_choice-GET_WHEEL_DELTA_WPARAM(wp)/WHEEL_DELTA,0,int(dropdown_items.size())-1);dirty=true;return 0;}if(message==WM_KEYDOWN){if(wp==VK_ESCAPE){dropdown=-1;dirty=true;suppress_escape_up=true;return 0;}if(wp==VK_UP||wp==VK_DOWN||wp==VK_TAB){dropdown_choice=std::clamp(dropdown_choice+(wp==VK_UP?-1:1),0,int(dropdown_items.size())-1);dirty=true;return 0;}if(wp==VK_RETURN){select_dropdown(dropdown_choice);return 0;}}if(message==WM_LBUTTONDOWN&&hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp))==0){dropdown=-1;pressed=0;dirty=true;return 0;}}
 
     if(opened&&manager&&settings_page==3&&message==WM_MOUSEWHEEL){POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(window,&p);float x=(p.x-panel_x)/draw_scale,y=(p.y-panel_y)/draw_scale;if(x>=266&&x<=1086&&y>=187&&y<=452){sound_wheel_remainder+=GET_WHEEL_DELTA_WPARAM(wp);int steps=sound_wheel_remainder/WHEEL_DELTA;sound_wheel_remainder%=WHEEL_DELTA;int last=std::max(0,int(sound_results.size())-5);sound_page=size_t(std::clamp(int(sound_page)-steps,0,last));dirty=true;return 0;}}
@@ -395,6 +413,16 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         if(message==WM_INPUT)return DefWindowProcW(window,message,wp,lp);
     }
     if(opened||visibility>0.f) {
+        if(opened&&manager&&settings_page==19&&private_editing){
+            if(message==WM_KEYDOWN&&(wp==VK_ESCAPE||wp==VK_RETURN||wp==VK_TAB)){private_editing=false;dirty=true;return 0;}
+            if(message==WM_KEYDOWN&&wp=='V'&&(GetKeyState(VK_CONTROL)&0x8000)){
+                auto pasted=ssc_auto::read_clipboard(window);ssc_auth::license::trim(pasted);
+                if(pasted.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")==std::string::npos)edit_cursor.insert(private_code,pasted,256);
+                ssc_auth::license::wipe(pasted);dirty=true;return 0;
+            }
+            if(edit_input(private_code,message,wp,256,[](unsigned c){return c>=32&&c<=126;},window))return 0;
+        }
+
         if(opened&&manager&&(settings_page==15||settings_page==16)&&chat_editing){
             if(message==WM_KEYDOWN&&wp==VK_ESCAPE){chat_editing=false;dirty=true;suppress_escape_up=true;return 0;}
             if(message==WM_KEYDOWN&&wp==VK_RETURN){activate(321);return 0;}
@@ -427,6 +455,12 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
             if(message==WM_LBUTTONUP&&scale_dragging){move_scale(GET_X_LPARAM(lp));finish_scale();finish_lab_slider();ReleaseCapture();return 0;}
             if(message==WM_CAPTURECHANGED){finish_scale();finish_lab_slider();}
             if(message==WM_KEYDOWN&&keyboard_focus==53&&(wp==VK_LEFT||wp==VK_RIGHT||wp==VK_HOME||wp==VK_END)){ui_scale=wp==VK_HOME?50:wp==VK_END?200:std::clamp(ui_scale+(wp==VK_RIGHT?1:-1),50,200);save();return 0;}
+        }
+        if(opened&&color_editing&&manager&&settings_page==18){
+            if(!ssc_names::private_visible()){color_editing=false;dirty=true;return 0;}
+            if(message==WM_KEYDOWN&&wp==VK_ESCAPE){color_editing=false;bot_color_error=false;dirty=true;suppress_escape_up=true;return 0;}
+            if(message==WM_KEYDOWN&&wp==VK_RETURN){activate(537);return 0;}
+            if(edit_input(color_buffer,message,wp,9,[](unsigned c){return c=='#'||(c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F');},window)){bot_color_error=false;return 0;}
         }
         if(opened&&color_editing&&manager&&settings_page==4){
             if(message==WM_KEYDOWN&&wp==VK_ESCAPE){color_editing=false;dirty=true;return 0;}
@@ -697,11 +731,12 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"0.1.8 COMPATIBILITY HOTFIX",cyan);
+        text(50,153,L"0.1.9 COMPATIBILITY HOTFIX",cyan);
         bullet(201,L"Restored compatibility after the latest game update" );
-        bullet(233,L"Fixed HUD dragging under Proton" );
-        bullet(265,L"Added native Linux Discord connection support" );
-        bullet(297,L"Linux support remains experimental" );
+        bullet(233,L"Updated Cosmetics, Presence, HUD and Auto Messages" );
+        bullet(265,L"Updated Weapon Lab compatibility" );
+        bullet(297,L"Added private activation codes for approved beta testing" );
+        bullet(329,L"Automatic access checks on later launches" );
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
@@ -716,9 +751,32 @@ void paint_panel() {
         button(13,24,224,192,44,L"MISC",settings_page==9);
         button(12,24,282,192,44,L"ABOUT",settings_page==2);
         button(14,24,340,192,44,L"WEAPON LAB",settings_page==11);button(15,24,398,192,44,L"RECORDING",settings_page==12);button(16,24,456,192,44,L"CREDITS",settings_page==13);
+        button(520,24,514,192,44,L"PRIVATE ACCESS",settings_page==19);
+        if(ssc_names::private_visible())button(510,24,572,192,44,L"BOT HIGHLIGHT",settings_page==18);
         rectangle(238,108,1,546,RGB(38,65,101));
 
-        if(settings_page==17){
+        if(settings_page==19){
+            text(266,111,L"PRIVATE ACCESS",ink,true);
+            text(266,190,L"Activation code",muted,false,15);
+            editbox(521,266,222,820,42,ssc_chat::widen(private_code),private_editing);
+            button(522,266,282,200,40,L"ACTIVATE",false,!ssc_auth::service().busy()&&!private_code.empty());
+            text(266,356,ssc_auth::license::label(ssc_auth::service().state()),cyan,false,15);
+        } else if(settings_page==18&&ssc_names::private_visible()){
+            text(266,111,L"BOT HIGHLIGHTING",ink,true);toggle(511,986,106,ssc_auth::active());
+            text(266,186,L"NAME COLOR",muted);
+            editbox(536,266,222,306,40,color_editing?color_buffer:ssc_names::bot_color_hex(),color_editing);
+            button(537,590,222,140,40,L"APPLY",false,color_editing);
+            text(752,233,L"#RRGGBB or #RRGGBBAA",muted,false,12);
+            const wchar_t* labels[]={L"WHITE",L"CYAN",L"PINK",L"GREEN",L"GOLD",L"CORAL"};
+            for(int i=0;i<6;++i)button(530+i,266+i*136,292,126,36,labels[i]);
+            unsigned rgb=ssc_names::bot_rgb,alpha=ssc_names::bot_alpha;
+            if(color_editing)ssc_names::parse_bot_color(color_buffer,rgb,alpha);
+            auto blend=[&](unsigned value,unsigned background){return (value*alpha+background*(255-alpha))/255;};
+            auto tint=RGB(blend((rgb>>16)&255,28),blend((rgb>>8)&255,39),blend(rgb&255,58));
+            text(266,384,L"PREVIEW",muted);
+            text(282,430,L"Example bot",tint,true);text(640,430,L"Example player",ink,true);
+            text(266,500,bot_color_error?L"Enter 6 or 8 hex digits":L"Applies to overhead names and the scoreboard",bot_color_error?RGB(255,120,100):muted,false,13);
+        } else if(settings_page==17){
             text(266,111,L"QUICK MENU",ink,true);
             const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages"};
             for(int i=0;i<6;++i){int y=188+i*70;text(282,y+9,names[i]);toggle(481+i,978,y,(quick_mask&(1u<<i))!=0);}
@@ -970,7 +1028,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.8",cyan);
+            text(266,157,L"0.1.9",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");

@@ -156,13 +156,13 @@ inline void refresh(){
     if(!ssc_compat::initialized||!ssc_compat::supports(8)){status=L"Unavailable on this game version.";return;}
     auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
     // All consumer functions are fingerprinted, including field layout and formula.
-    const uintptr_t dependencies[]={base+ssc_compat::resolve(0xa02c90),base+ssc_compat::resolve(0x1cfd90),base+ssc_compat::resolve(0x5c19c0),base+ssc_compat::resolve(0x5efde0),base+ssc_compat::resolve(0x3aba10),base+ssc_compat::resolve(0x41a400),base+ssc_compat::resolve(0x7feb30)};
+    const uintptr_t dependencies[]={base+ssc_compat::resolve(0xa03470),base+ssc_compat::resolve(0x1cfde0),base+ssc_compat::resolve(0x5c2110),base+ssc_compat::resolve(0x5f0530),base+ssc_compat::resolve(0x3ab9e0),base+ssc_compat::resolve(0x41a5c0),base+ssc_compat::resolve(0x7ff2b0)};
     for(auto address:dependencies)if(address==base){status=L"Weapon definitions unavailable.";return;}
     uintptr_t table=0;
     if(!ssc_names::read(base+ssc_compat::resolve(0xfa9e98),table)||!read_catalog(table,weapons)){status=L"Weapon data not ready. Try Refresh at the main menu.";return;}
     // Read balance globals only when both the damage implementation and its
     // address bindings match. Never substitute guessed shield constants.
-    if(ssc_compat::resolve(0x7feb30)&&ssc_names::read(base+ssc_compat::resolve(0xfae14c),shield_rules.low)
+    if(ssc_compat::resolve(0x7ff2b0)&&ssc_names::read(base+ssc_compat::resolve(0xfae14c),shield_rules.low)
         &&ssc_names::read(base+ssc_compat::resolve(0xfae150),shield_rules.high))
         shield_rules.ready=std::isfinite(shield_rules.low)&&std::isfinite(shield_rules.high)&&shield_rules.low>=0&&shield_rules.high>=0&&shield_rules.low<=100&&shield_rules.high<=100;
     for(int i=0;i<4;++i)column(i)=std::min(column(i),weapons.size()-1);

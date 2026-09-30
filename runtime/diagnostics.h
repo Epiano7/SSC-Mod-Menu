@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <cstdio>
+#include "private_auth_privacy.h"
 namespace ssc_diagnostics {
 inline wchar_t crash_text[32768]{},crash_dump[32768]{};
 inline LPTOP_LEVEL_EXCEPTION_FILTER previous=nullptr;
@@ -20,7 +21,7 @@ inline LONG WINAPI crashed(EXCEPTION_POINTERS* exception){
             int n=std::snprintf(text,sizeof(text),"SSC Mod Menu 0.1.2\r\nUnhandled exception: %08lX\r\nAddress: %p\r\nModule base: %p\r\nModule offset: %llX\r\nSee runtime.log for game fingerprint and module checks.\r\nThis report does not establish that the mod caused the crash.\r\n",exception->ExceptionRecord->ExceptionCode,address,static_cast<void*>(module),static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(address)-reinterpret_cast<uintptr_t>(module)));
             DWORD written=0;if(n>0)WriteFile(file,text,DWORD(n),&written,nullptr);FlushFileBuffers(file);CloseHandle(file);
         }
-        if(write_dump){HANDLE dump=CreateFileW(crash_dump,GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(write_dump&&!ssc_auth_privacy::secrets_used){HANDLE dump=CreateFileW(crash_dump,GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
             if(dump!=INVALID_HANDLE_VALUE){MINIDUMP_EXCEPTION_INFORMATION info{GetCurrentThreadId(),exception,FALSE};write_dump(GetCurrentProcess(),GetCurrentProcessId(),dump,MiniDumpNormal,&info,nullptr,nullptr);FlushFileBuffers(dump);CloseHandle(dump);}}
     }
     return previous?previous(exception):EXCEPTION_CONTINUE_SEARCH;

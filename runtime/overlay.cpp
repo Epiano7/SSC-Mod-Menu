@@ -15,6 +15,7 @@
 #include "text_editor.h"
 #include "sound_module.h"
 #include "cosmetic_adapter.h"
+#include "beta_auth.h"
 #include "presence_source.h"
 #include "weapon_lab.h"
 #include "local_recorder.h"
@@ -81,6 +82,13 @@ void render(HDC dc) {
         previous_proc=reinterpret_cast<WNDPROC>(old);game_window=window;log("Render and input attached; Right Shift opens menu");
     }
     ULONGLONG now=GetTickCount64();float seconds=last_frame?float(now-last_frame)/1000.f:0.f;last_frame=now;
+    static ULONGLONG auth_start_at=0;
+    if(now-auth_start_at>=1000){auth_start_at=now;ssc_auth::service().start();}
+    static uint64_t private_cleared=0;auto cleared=ssc_auth::service().cleared();if(cleared!=private_cleared){private_cleared=cleared;ssc_auth::license::wipe(private_code);private_editing=false;dirty=true;}
+    static auto private_last=ssc_auth::license::State::idle;auto private_state=ssc_auth::service().state();if(private_state!=private_last){private_last=private_state;if(settings_page==19)dirty=true;}
+    static bool private_was_visible=false;
+    bool private_visible=ssc_names::private_visible();
+    if(private_visible!=private_was_visible){private_was_visible=private_visible;dirty=true;controls.clear();pressed=hovered=keyboard_focus=0;if(!private_visible&&settings_page==18)show_manager(-1);}
     static ULONGLONG diagnostics_at=0;
     if(developer_tools&&now-diagnostics_at>15000){diagnostics_at=now;char report[160];snprintf(report,sizeof(report),"Draw diagnostics: rainbow=%u audio=%u",ssc_names::cosmetic_draws.load(),ssc_sound::substituted.load());log(report);}
     ssc_auto::tick(now);
@@ -239,9 +247,9 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     if(n&&n<32768) state_dir=path;
     else {n=GetEnvironmentVariableW(L"LOCALAPPDATA",path,32768);if(!n||n>=32768)return;state_dir=std::filesystem::path(path)/L"SkillshotCityMod";}
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
-    ssc_diagnostics::initialize(state_dir);
+    ssc_diagnostics::initialize(state_dir);ssc_auth::service().configure(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
-    log("SSC Mod Menu 0.1.8 startup");log_game_build();
+    log("SSC Mod Menu 0.1.9 startup");log_game_build();
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
     presence_supported=(supported&4)!=0;native_supported=true;
     log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");
@@ -249,7 +257,7 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     load_settings();ssc_chat::attached=ssc_chat::attach();log(ssc_chat::attached?"Custom quick chat adapter attached":"Custom quick chat unavailable");
     ssc_names::cosmetics=cosmetic_requested&&ssc_compat::supports(1);
     ssc_combat::attached=ssc_combat::attach();log(ssc_combat::attached?"Combat event counters attached":"Combat event counters unavailable");
-    ssc_names::attached=ssc_names::attach();log(ssc_names::attached?"Tab and overhead name adapters attached":"Name adapters unavailable");
+    ssc_names::attached=ssc_names::attach();ssc_names::validate_bot_layout();log(ssc_names::attached?"Tab and overhead name adapters attached":"Name adapters unavailable");
     try {
         wchar_t executable[32768];DWORD length=GetModuleFileNameW(nullptr,executable,32768);
         if(length&&length<32768){ssc_sound::initialize(std::filesystem::path(executable).parent_path(),state_dir,sound_requested);ssc_sound::attached=attach_sound();log(ssc_music::attach()?"Music file adapter attached":"Music file adapter unavailable");log(ssc_sound::attached?"Audio buffer adapter attached (WAV effects / OGG music; restart applies changes)":"Audio adapter unavailable");}

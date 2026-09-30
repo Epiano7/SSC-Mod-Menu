@@ -42,3 +42,7 @@ If the installer cannot open, check `~/.local/state/ssc-mod-menu/logs` (or `XDG_
 Audio import, HUD editing, cosmetics, quick chat, Auto Messages, clipboard integration, Discord presence, and update/restart behavior still need broader gameplay testing on Linux.
 
 Bundled dependency notices are included under `licenses` and `python`.
+
+## Private access
+
+Activation for privately approved beta testing is currently available on native Windows only. It remains disabled under Proton until secure device-key storage has been validated. Public modules do not require activation

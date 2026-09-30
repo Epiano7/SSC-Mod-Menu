@@ -46,3 +46,5 @@ Build the launcher with Zig using `scripts/Build-Linux-Launcher.ps1`, then packa
 The Linux Python archive must be the pinned CPython 3.13.15 x86-64 glibc install-only archive from [python-build-standalone 20260924](https://github.com/astral-sh/python-build-standalone/releases/tag/20260924). `Build-Linux.py` verifies its SHA256 and the approved runtime payload hashes. Keep bundled dependency notices intact
 
 Publish `SSC-Mod-Menu-Setup.exe` and `SSC-Mod-Menu-Linux.tar.gz` as separate release assets. Linux remains experimental: successful installation does not establish that every module or the update/restart flow works under Proton. See [Linux instructions](../linux/README.md) for the current validation scope
+
+Private authorization adds a pinned, statically linked libsodium dependency and WinHTTP. See [authorization implementation and validation](private-authorization.md) for build prerequisites and live-test limitations.

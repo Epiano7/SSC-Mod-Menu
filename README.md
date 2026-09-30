@@ -68,3 +68,7 @@ If something goes wrong, open **All Modules > About > Open logs**. Startup check
 - everyone in the SSC discord that provided feedback regarding early module dev, thank you!
 
 [Build instructions](docs/build.md) | [Contributing](CONTRIBUTING.md) | [Installer details](installer/README.md)
+
+## Private access
+
+Privately approved beta testers can enter an activation code under **Private access**. Later launches check access automatically. Public modules do not require a code. Private activation currently requires native Windows; see the [Linux guide](linux/README.md) for platform limits
