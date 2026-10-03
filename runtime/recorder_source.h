@@ -7,7 +7,7 @@ namespace ssc_record {
 inline bool active_round(uintptr_t base,int phase){
     if(phase!=2||!ssc_compat::supports(2)||!ssc_compat::supports(4))return false;
     using ssc_names::read;uintptr_t world=0;int mode=0,round=0,last=0;float countdown=0,ending=0;unsigned char survival=0;
-    return read(base+ssc_compat::resolve(0xde35d0),world)&&world&&
+    return read(base+ssc_compat::resolve(0xde45d0),world)&&world&&
         read(world+0x128,mode)&&mode==6&&read(world+0x485,survival)&&!survival&&read(world+0x3e0,round)&&round>=2&&round<=101&&
         read(world+0x46c,last)&&last>=1&&last<=100&&round-1<=last&&read(world+0x3c0,countdown)&&
         std::isfinite(countdown)&&countdown<=0&&read(world+0x6ae8,ending)&&std::isfinite(ending)&&ending<=0;
@@ -16,8 +16,8 @@ inline Json sample_local_build(uintptr_t base){
     Json result={{"class_id",nullptr},{"level",nullptr},{"health",nullptr},{"max_health",nullptr},{"inventory_weapons",nullptr}};
     if(!ssc_compat::supports(4))return result;
     using ssc_names::read;uintptr_t world=0,first=0,last=0,steam_first=0;int local=-1,slot=-1,kind=-1;unsigned char active=0;
-    if(!read(base+ssc_compat::resolve(0xde35d0),world)||!world||!read(world+0xa618,first)||!read(world+0xa620,last)||!first||last<first||(last-first)%0x3478||(last-first)/0x3478>2048
-       ||!read(base+ssc_compat::resolve(0xe1b088),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe17608),local)||local<0||uintptr_t(local)>=(last-first)/0x3478)return result;
+    if(!read(base+ssc_compat::resolve(0xde45d0),world)||!world||!read(world+0xa618,first)||!read(world+0xa620,last)||!first||last<first||(last-first)%0x3478||(last-first)/0x3478>2048
+       ||!read(base+ssc_compat::resolve(0xe1c0a8),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe18628),local)||local<0||uintptr_t(local)>=(last-first)/0x3478)return result;
     auto actor=first+uintptr_t(local)*0x3478;
     if(!read(actor+0x78,slot)||slot!=local||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active)return result;
     int class_id=-1,level=-1,round=-1,mode=-1;

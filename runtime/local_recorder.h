@@ -15,7 +15,7 @@ struct Message { int kind=0;std::string line;std::filesystem::path folder; };
 struct State {
     std::mutex mutex;std::condition_variable wake;std::deque<Message> queue;
     std::atomic<bool> enabled{false};std::atomic<unsigned> status{0},dropped{0},written{0};
-    bool active=false;std::filesystem::path folder;
+    bool active=false;std::filesystem::path folder;Json tracking=nullptr;
     bool launched=false;std::string previous;ULONGLONG started=0,last_sample=0;unsigned sequence=0;
 };
 inline State& state(){static auto* value=new State;return *value;}
@@ -57,20 +57,20 @@ inline void start(const std::filesystem::path& folder){auto& s=state();if(s.enab
     s.folder=folder;s.status=6;s.dropped=0;s.written=0;
 }
 inline void end_round(){auto& s=state();if(!s.active)return;s.active=false;s.status=5;
-    Json event={{"event","recording_stopped"},{"elapsed_ms",GetTickCount64()-s.started},{"dropped_events",s.dropped.load()}};enqueue({2,event.dump(),{}},true);
+    Json event={{"event","recording_stopped"},{"elapsed_ms",GetTickCount64()-s.started},{"dropped_events",s.dropped.load()},{"tracking",s.tracking}};enqueue({2,event.dump(),{}},true);
 }
 inline void stop(){auto& s=state();s.enabled=false;end_round();if(s.status==6)s.status=0;}
 inline void round_state(bool active){auto& s=state();if(!s.enabled||!active){end_round();return;}if(s.active)return;
     if(!s.launched){HMODULE module=nullptr;GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&state),&module);try{std::thread(worker,&s).detach();s.launched=true;}catch(...){s.enabled=false;s.status=2;return;}}
-    s.active=true;s.status=4;s.previous.clear();s.started=GetTickCount64();s.last_sample=0;s.sequence=0;
-    Json header={{"schema",1},{"event","recording_started"},{"source","native_status_1hz"},{"build","0.1.5"},{"combat_counters_available",false},{"roster_available",false},{"skill_choices_available",false},{"random_class_choice",nullptr}};
+    s.active=true;s.tracking=nullptr;s.status=4;s.previous.clear();s.started=GetTickCount64();s.last_sample=0;s.sequence=0;
+    Json header={{"schema",2},{"event","recording_started"},{"source","native_status_1hz"},{"tracking_schema",1},{"combat_counters_available",false},{"roster_available",false},{"skill_choices_available",false},{"random_class_choice",nullptr}};
     enqueue({1,header.dump(),s.folder},true);
 }
 inline void sample(int phase,const std::string& mode,const std::string& build,ULONGLONG now,const Json& build_fields=nullptr){auto& s=state();if(!s.enabled||!s.active||phase!=2)return;
     // Native fallback contains game-mode/class/level labels, never player names.
-    std::string identity=std::to_string(phase)+"|"+mode+"|"+build+"|"+build_fields.dump();
+    std::string identity=std::to_string(phase)+"|"+mode+"|"+build+"|"+build_fields.dump()+"|"+s.tracking.dump();
     if(identity==s.previous&&now-s.last_sample<10000)return;
-    Json event={{"event",identity==s.previous?"heartbeat":"observed_state"},{"sequence",++s.sequence},{"elapsed_ms",now>=s.started?now-s.started:0},{"phase",phase},{"mode_round_label",mode},{"class_level_label",build},{"local_build",build_fields},{"dropped_events",s.dropped.load()}};
+    Json event={{"event",identity==s.previous?"heartbeat":"observed_state"},{"sequence",++s.sequence},{"elapsed_ms",now>=s.started?now-s.started:0},{"phase",phase},{"mode_round_label",mode},{"class_level_label",build},{"local_build",build_fields},{"tracking",s.tracking},{"dropped_events",s.dropped.load()}};
     enqueue({0,event.dump(),{}});s.previous=identity;s.last_sample=now;
 }
 }

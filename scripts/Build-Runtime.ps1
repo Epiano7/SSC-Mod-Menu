@@ -118,3 +118,8 @@ if($LASTEXITCODE) {throw 'Combat stats tests failed'}
 if($LASTEXITCODE){throw 'Music tests compilation failed'}
 & "$build/music_module_test.exe" (Join-Path $build ("music-test-"+[guid]::NewGuid().ToString("N")))
 if($LASTEXITCODE){throw "Music module tests failed"}
+
+& $Compiler "-ffile-prefix-map=$root=." -O2 -std=c++17 -static -Wall -Wextra -Werror "$root/tests/geri_mode_test.cpp" -o "$build/geri_mode_test.exe"
+if($LASTEXITCODE){throw 'Geri mode test compilation failed'}
+& "$build/geri_mode_test.exe"
+if($LASTEXITCODE){throw 'Geri mode tests failed'}

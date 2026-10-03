@@ -63,21 +63,21 @@ inline bool save(const std::filesystem::path& dir){try{Json j={{"schema",2},{"en
 inline void load(const std::filesystem::path& dir){diagnostic_dir=dir;try{auto p=dir/L"auto-messages.json";if(!std::filesystem::exists(p))return;if(std::filesystem::file_size(p)>16384)throw std::runtime_error("size");std::ifstream in(p);Json j;in>>j;if((j.at("schema")!=1&&j.at("schema")!=2)||!j.at("rules").is_array()||j.at("rules").size()>12)throw std::runtime_error("schema");std::vector<Rule> next;for(auto& e:j.at("rules")){auto r=unpack(e.at("rule"));r.enabled=e.at("on").get<bool>();next.push_back(r);}bool on=j.at("enabled").get<bool>();rules=next;enabled=on;selected=0;}catch(...){status=L"Could not load message rules";}}
 inline std::string read_clipboard(HWND window){std::string value;if(!OpenClipboard(window))return value;HANDLE h=GetClipboardData(CF_UNICODETEXT);if(h){auto p=static_cast<const wchar_t*>(GlobalLock(h));if(p){size_t cap=GlobalSize(h)/sizeof(wchar_t),n=0;while(n<cap&&n<=512&&p[n])++n;if(n<cap&&n<=512){for(size_t i=0;i<n;++i){if(p[i]<32||p[i]>126){value.clear();break;}value+=char(p[i]);}}GlobalUnlock(h);}}CloseClipboard();return value;}
 inline bool copy_clipboard(HWND window,const std::string& value){if(value.empty())return false;auto h=GlobalAlloc(GMEM_MOVEABLE,(value.size()+1)*sizeof(wchar_t));if(!h)return false;auto p=static_cast<wchar_t*>(GlobalLock(h));if(!p){GlobalFree(h);return false;}for(size_t i=0;i<value.size();++i)p[i]=wchar_t(value[i]);p[value.size()]=0;GlobalUnlock(h);if(!OpenClipboard(window)){GlobalFree(h);return false;}bool ok=EmptyClipboard()&&SetClipboardData(CF_UNICODETEXT,h);CloseClipboard();if(!ok)GlobalFree(h);return ok;}
-struct Observation {bool valid=false,active=false,ending=false,eligible=true,preparing=true,connected=false;uintptr_t session=0;int round=0,last_round=0;Values values;double damage_total=-1;int death_total=-1;};
+struct Observation {bool valid=false,active=false,ending=false,eligible=true,preparing=true,connected=false;uintptr_t session=0,actor=0;int round=0,last_round=0;Values values;double damage_total=-1;int death_total=-1;};
 // Cumulative observations require seeing the countdown before the round starts.
 // Joining/enabling mid-round never fabricates a full-round total.
 struct RoundTracker {
- uintptr_t session=0;int round=0,start_level=-1,start_deaths=-1;double start_damage=-1;uint64_t start=0,seen=0,alive_ms=0;bool prepared=false,running=false,finished=false,last_alive=false,complete=false,advanced=false;uint64_t invalid_since=0;Values frozen;
+ uintptr_t session=0,actor=0;int round=0,start_level=-1,start_deaths=-1;double start_damage=-1;uint64_t start=0,seen=0,alive_ms=0;bool prepared=false,running=false,finished=false,last_alive=false,complete=false,advanced=false;uint64_t invalid_since=0;Values frozen;
  void reset(){*this=RoundTracker{};}
  static int value(const Values& values,const char* key){auto i=values.find(key);if(i==values.end())return -1;try{return std::stoi(i->second);}catch(...){return -1;}}
  void observe(Observation& o,uint64_t now){
   if(!o.valid){if(o.connected&&session){if(!invalid_since)invalid_since=now;if(now>=invalid_since&&now-invalid_since<=2000)return;}reset();return;}
   invalid_since=0;
-  if(session!=o.session||round!=o.round){
+  if(session!=o.session||actor!=o.actor||round!=o.round){
    // The native countdown belongs to the previous round, including warmup (round 0).
-   bool carry=prepared&&session==o.session&&o.round==round+1&&now>=seen&&now-seen<=2000;
+   bool carry=prepared&&session==o.session&&actor==o.actor&&o.round==round+1&&now>=seen&&now-seen<=2000;
    auto previous_seen=seen;auto previous_damage=start_damage;int previous_deaths=start_deaths;
-   reset();session=o.session;round=o.round;
+   reset();session=o.session;actor=o.actor;round=o.round;
    if(carry){prepared=advanced=true;seen=previous_seen;start_level=value(o.values,"level");start_deaths=previous_deaths;start_damage=previous_damage;}
   }
   if(!o.active&&!o.ending){prepared=o.preparing;start_level=value(o.values,"level");start_deaths=o.death_total;start_damage=o.damage_total;seen=now;return;}

@@ -25,7 +25,7 @@ The installer runs natively; the game and mod use Proton. The native Linux game 
 ## Modules
 
 - **Sound Replacer:** import WAV or MP3 replacements for sound effects and music, preview clips, adjust individual volume, and replace related variants together. **All Music Tracks** uses one custom song across the music playlist. Track lengths are shown, and replacements apply after restarting the game
-- **Cosmetics:** customize your name with animated rainbow colors or a solid color, visible only to you
+- **Cosmetics:** customize your name with a solid color, animated rainbow, or a custom gradient with up to three colors. Choose colors with the in-game picker or hex fields. Overrides apply across name displays, including chat and leaderboards, and are visible only to you
 - **Discord Presence:** show game status, available round and level details, elapsed time, and ranked SSC rating. No developer setup or token is required. Linux connects to the native Discord app, with support for regular and Flatpak socket locations
 - **HUD Editor:** move and resize eight HUD groups, save layouts, and reset individual elements. Team-roster positioning is currently unavailable
 - **Custom Quick Chat:** customize the quick-react wheel with up to 12 messages per slot. The first message labels the wheel, and each use sends a randomly chosen message from that slot's list. Rearrange slots, choose icons or import images, and preview the in-round and round-ended layouts
@@ -38,6 +38,7 @@ Enable Auto Messages before a round starts for complete supported round counters
 - **Weapon Lab:** search weapons by name, tier, or type; compare up to four weapons with stronger values highlighted; adjust health, shields, and miss chance; and watch a timed duel with reloads. Simulations are estimates and do not account for skills or every special effect
 - **Local Round Recording:** optionally save Battle Royale round data on your PC, including class, level, health, and weapon inventory snapshots. Recording is disabled at each launch, only runs during rounds, and uploads nothing
 - **Interface:** adjust UI scale, choose which modules appear in the quick menu, and customize animation and HUD display preferences. Text edits save when leaving the field
+- **Geri Challenge:** hide the skill-draft and syringe selection panel from **All Modules > Misc**. Disabled by default; switch it off to restore the panel. This hides the UI and does not enforce challenge rules. [Details and testing limits](docs/geri-challenge.md)
 - **Updates:** check for releases through the in-game prompt. Available updates can be dismissed for that version, and release notes can be disabled separately
 
 For version-by-version changes, see the [GitHub releases](https://github.com/Epiano7/SSC-Mod-Menu/releases)

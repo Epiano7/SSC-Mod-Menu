@@ -16,19 +16,19 @@ inline void sample_weapon(uintptr_t record,Values& values){
 }
 
 // Fingerprint both producers/consumers of world+6aa0 and the native send route.
-inline constexpr uint32_t native_dependencies[][3]={{0x88b5e0,0x2ac330,0},{0x2e7d00,0x2215c0,0},{0x82cf80,0x7ff2b0,0},{0x229dd0,0x894ea0,0}};
+inline constexpr uint32_t native_dependencies[][3]={{0x88bf10,0x2ac450,0},{0x2e7e20,0x221690,0},{0x82da80,0x7ffd80,0},{0x229ea0,0x8957d0,0}};
 inline bool supported(){return ssc_compat::supports(32)&&ssc_compat::supports(4)&&ssc_compat::supports(8);}
 inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
  Observation o;actor=world=0;if(!supported())return o;using ssc_names::read;
  int session=0,mode=-1,raw_round=0,last=0,local=-1,slot=-1,kind=-1;double joining=0;float countdown=0,ending=0;uintptr_t first=0,end=0,steam=0;unsigned char active=0,survival=0;
- if(!read(base+ssc_compat::resolve(0xfab604),session)||session!=2||!read(base+ssc_compat::resolve(0xfab618),joining)||!std::isfinite(joining)||joining>0)return o;
+ if(!read(base+ssc_compat::resolve(0xfac614),session)||session!=2||!read(base+ssc_compat::resolve(0xfac628),joining)||!std::isfinite(joining)||joining>0)return o;
  o.connected=true;
- if(!read(base+ssc_compat::resolve(0xde35d0),world)||!world)return o;
+ if(!read(base+ssc_compat::resolve(0xde45d0),world)||!world)return o;
  if(!read(world+0x128,mode)||mode!=6||!read(world+0x485,survival)||survival||!read(world+0x3e0,raw_round)||raw_round<1||raw_round>100||!read(world+0x46c,last)||last<raw_round-1||last>100||!read(world+0x3c0,countdown)||!std::isfinite(countdown)||!read(world+0x6ae8,ending)||!std::isfinite(ending))return o;
- if(!read(world+0xa618,first)||!read(world+0xa620,end)||!first||end<first||(end-first)%0x3478||(end-first)/0x3478>2048||!read(base+ssc_compat::resolve(0xe1b088),steam)||first!=steam||!read(base+ssc_compat::resolve(0xe17608),local)||local<0||uintptr_t(local)>=(end-first)/0x3478)return o;
+ if(!read(world+0xa618,first)||!read(world+0xa620,end)||!first||end<first||(end-first)%0x3478||(end-first)/0x3478>2048||!read(base+ssc_compat::resolve(0xe1c0a8),steam)||first!=steam||!read(base+ssc_compat::resolve(0xe18628),local)||local<0||uintptr_t(local)>=(end-first)/0x3478)return o;
  actor=first+uintptr_t(local)*0x3478;
  if(!read(actor+0x78,slot)||slot!=local||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active)return o;
- o.valid=true;o.active=raw_round>=2&&countdown<=0&&ending<=0;o.ending=raw_round>=2&&(ending>0||countdown>0);o.preparing=countdown>0&&ending<=0;o.session=world;o.round=raw_round-1;o.last_round=last;o.values["roundNumber"]=std::to_string(o.round);
+ o.actor=actor;o.valid=true;o.active=raw_round>=2&&countdown<=0&&ending<=0;o.ending=raw_round>=2&&(ending>0||countdown>0);o.preparing=countdown>0&&ending<=0;o.session=world;o.round=raw_round-1;o.last_round=last;o.values["roundNumber"]=std::to_string(o.round);
  o.values["roundsTotal"]=std::to_string(o.last_round);o.values["roundsRemaining"]=std::to_string(std::max(0,o.last_round-o.round));
  int level=-1,class_id=-1;float hp=0,max_hp=0;
  if(read(actor+0x870,level)&&level>=0&&level<=10000)o.values["level"]=std::to_string(level);
@@ -52,7 +52,7 @@ inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
   if(read(actor+0x2998,equipped)&&equipped>=0)for(auto record=weapons;record<weapons_end;record+=0x748){int id=-1;if(read(record+0x20c,id)&&id==equipped){auto name=ssc_rpc::native_string(record+0x48);if(!name.empty()&&printable(name)){o.values["weaponName"]=name;sample_weapon(record,o.values);}break;}}
  }
  uintptr_t classes=0,classes_end=0;
- if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe20eb8),classes)&&read(base+ssc_compat::resolve(0xe20ec0),classes_end)&&classes&&classes_end>=classes&&(classes_end-classes)%0x98==0&&(classes_end-classes)/0x98<=512&&uintptr_t(class_id)<(classes_end-classes)/0x98){auto name=ssc_rpc::native_string(classes+uintptr_t(class_id)*0x98+0x18);if(!name.empty())o.values["className"]=name;}
+ if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe11a38),classes)&&read(base+ssc_compat::resolve(0xe11a40),classes_end)&&classes&&classes_end>=classes&&(classes_end-classes)%0x98==0&&(classes_end-classes)/0x98<=512&&uintptr_t(class_id)<(classes_end-classes)/0x98){auto name=ssc_rpc::native_string(classes+uintptr_t(class_id)*0x98+0x18);if(!name.empty())o.values["className"]=name;}
  return o;
 }
 using NativeSender=void(*)(uintptr_t,unsigned char,uintptr_t,const void*);
@@ -63,7 +63,7 @@ inline bool send_native(uintptr_t base,uintptr_t world,uintptr_t actor,const std
  // The native client chat-input path calls this with flag=0. It deep-copies the
  // temporary native-layout string into its own outbound queue, then shows it locally.
  ssc_chat::NativeString message{reinterpret_cast<uintptr_t>(text.data()),0,text.size(),std::max(size_t(16),text.size())};
- if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x2215c0));
+ if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x221690));
  sender(world,0,actor,&message);
  // Engine::dispatch limits automatic messages. Observe the native wheel's
  // cooldown above, but never impose an additional lockout on manual input.
@@ -88,13 +88,22 @@ inline void append_combat_values(Values& values,const ssc_combat::Counter& count
  values["shotsFired"]=std::to_string(counter.totals.shots);
  values["projectilesFired"]=std::to_string(counter.totals.projectiles);
 }
-inline void tick(uint64_t now){
- static uint64_t last=0;if(now-last<100)return;last=now;
- ssc_combat::enabled.store(enabled&&ssc_combat::attached,std::memory_order_relaxed);
- if(!enabled){engine.reset();round_tracker.reset();std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();return;}
+// Shared observations feed recording without enabling message dispatch.
+inline Observation tracking_observation;
+inline uint64_t tracking_at=0;
+inline bool tracking_enabled=false;
+inline void tick(uint64_t now,bool recording=false){
+ static uint64_t last=0;const bool requested=enabled||recording;
+ if(requested!=tracking_enabled){last=0;tracking_enabled=requested;round_tracker.reset();tracking_observation={};tracking_at=0;std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();}
+ if(last&&now>=last&&now-last<100)return;
+ if(last&&(now<last||now-last>2000)){std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();}
+ last=now;
+ ssc_combat::enabled.store(requested&&ssc_combat::attached,std::memory_order_relaxed);
+ if(!requested){tracking_observation={};tracking_at=0;engine.reset();round_tracker.reset();std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();return;}
  try{auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t actor=0,world=0;auto o=sample(base,actor,world);round_tracker.observe(o,now);
  if(ssc_combat::attached){std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::Context c;c.valid=o.valid;c.active=o.active;c.ending=o.ending;c.preparing=o.preparing;c.session=o.session;c.actor=actor;c.round=o.round;ssc_combat::counter.observe(c);if(o.valid)append_combat_values(o.values,ssc_combat::counter);}
- engine.observe(o,now);if(o.valid)engine.dispatch(now,[&](const std::string& text){return send_native(base,world,actor,text);});diagnose(o,now);}
- catch(...){enabled=false;ssc_combat::enabled=false;engine.reset();round_tracker.reset();status=L"Auto messages paused after a data error";}
+ tracking_observation=o;tracking_at=now;
+ if(enabled){engine.observe(o,now);if(o.valid)engine.dispatch(now,[&](const std::string& text){return send_native(base,world,actor,text);});diagnose(o,now);}else engine.reset();}
+ catch(...){tracking_observation={};tracking_at=0;enabled=false;ssc_combat::enabled=false;engine.reset();round_tracker.reset();status=L"Auto messages paused after a data error";}
 }
 }

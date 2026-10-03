@@ -13,7 +13,35 @@ inline Overhead native_overhead=nullptr;
 inline Draw native_draw=nullptr;
 inline std::atomic<bool> cosmetics{false};
 inline bool rainbow=true;inline unsigned solid_rgb=0x55ccff;
-inline void solid(float& r,float& g,float& b,float& phase){if(!rainbow){r=float((solid_rgb>>16)&255)/255;g=float((solid_rgb>>8)&255)/255;b=float(solid_rgb&255)/255;phase=-1;}}
+inline bool gradient=false;inline int gradient_count=3;
+inline std::array<unsigned,3> gradient_colors{5623039,16737996,16759620};
+inline std::array<float,3> gradient_rgb(float phase){
+ if(!std::isfinite(phase))phase=0;
+ const int count=std::clamp(gradient_count,2,3);float t=(phase-std::floor(phase))*count;int a=std::min(int(t),count-1),b=(a+1)%count;t-=a;
+ std::array<float,3> color{};for(int k=0;k<3;++k){int shift=16-8*k;float first=float((gradient_colors[a]>>shift)&255)/255,second=float((gradient_colors[b]>>shift)&255)/255;color[k]=first+(second-first)*t;}return color;
+}
+inline thread_local int color_scope=0;
+// -1 means a shared text path with no owner attribution; 0/1 are explicit
+// other/local decisions from actor, sender or account-specific adapters.
+inline thread_local int identity_scope=-1;
+struct ColorScope {
+ int previous,previous_identity;
+ explicit ColorScope(bool local,bool attributed=true):previous(color_scope),previous_identity(identity_scope){
+  if(attributed)identity_scope=local?1:0;
+  color_scope=local&&cosmetics.load()?(gradient?2:(!rainbow?1:0)):0;
+ }
+ ~ColorScope(){color_scope=previous;identity_scope=previous_identity;}
+};
+using Palette=float*(*)(uintptr_t,float*,float,float,unsigned char,unsigned char);
+inline Palette native_palette=nullptr;
+inline float* palette(uintptr_t context,float* output,float position,float lift,unsigned char gray,unsigned char balance){
+ if(!color_scope)return native_palette(context,output,position,lift,gray,balance);
+ auto color=gradient_rgb(position/255.f);
+ if(color_scope==1)for(int k=0;k<3;++k)color[k]=float((solid_rgb>>(16-8*k))&255)/255;
+ for(int k=0;k<3;++k){output[k]=color[k];}return output;
+}
+
+inline void solid(float& r,float& g,float& b,float& phase){if(!rainbow&&!gradient){r=float((solid_rgb>>16)&255)/255;g=float((solid_rgb>>8)&255)/255;b=float(solid_rgb&255)/255;phase=0;}}
 inline std::atomic<unsigned> cosmetic_draws{0};
 inline bool attached=false;
 inline uintptr_t image_base=0;
@@ -63,8 +91,8 @@ inline bool bot_range(int slot,int kind,int start,int offset,int count,size_t to
 // generated-player range from the world start, offset and count fields.
 inline void validate_bot_layout(){
  bot_layout=false;std::array<unsigned char,0x3304> code{};std::array<unsigned char,32> hash{},expected{};
- const char* hex="ba342f909e53a6f11ed342886f74f2b4a359c93c9796e9ea260502325f7d984e";
- if(!ssc_compat::supports(1)||!read_bytes(image_base+0x2782f0,code.data(),code.size()))return;
+ const char* hex="0b15125e0e4fc95db4ef8d175992bc126dcc0067d8da6aeb9d569e2fd5975907";
+ if(!ssc_compat::supports(1)||!read_bytes(image_base+0x2783b0,code.data(),code.size()))return;
  if(sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr)!=0)return;
  crypto_hash_sha256(hash.data(),code.data(),code.size());bot_layout=sodium_memcmp(hash.data(),expected.data(),32)==0;
 }
@@ -86,24 +114,24 @@ inline bool account_string(uintptr_t object,std::string& value){
 }
 inline bool local_account(uintptr_t account){
     std::string own,candidate;
-    return account_string(image_base+ssc_compat::resolve(0xdfd1c8),own)&&account_string(account,candidate)&&own==candidate;
+    return account_string(image_base+ssc_compat::resolve(0xdfe1e8),own)&&account_string(account,candidate)&&own==candidate;
 }
 inline bool native_phase(float& phase){
     float speed=0,time=0;
-    if(!read(image_base+ssc_compat::resolve(0xfaa094),speed)||!read(image_base+ssc_compat::resolve(0xfaaaf0),time)||!std::isfinite(time)||!std::isfinite(speed))return false;
+    if(!read(image_base+ssc_compat::resolve(0xfab0a4),speed)||!read(image_base+ssc_compat::resolve(0xfabb00),time)||!std::isfinite(time)||!std::isfinite(speed))return false;
     float candidate=std::fmod(time*speed,1.f);if(!std::isfinite(candidate))return false;if(candidate<0)candidate+=1.f;phase=candidate;return true;
 }
 inline Identity identify(uintptr_t actor){
     Identity answer;uintptr_t world=0,first=0,last=0,registry=0;int slot=-1,kind=-1,local_slot=-1;unsigned char active=0;
-    if(!read(image_base+ssc_compat::resolve(0xde35d0),world)||!world||!read(world+0xa618,first)||!read(world+0xa620,last)||!first||last<first||(last-first)%0x3478||(last-first)/0x3478>2048)return answer;
+    if(!read(image_base+ssc_compat::resolve(0xde45d0),world)||!world||!read(world+0xa618,first)||!read(world+0xa620,last)||!first||last<first||(last-first)%0x3478||(last-first)/0x3478>2048)return answer;
     if(actor<first||actor>=last||(actor-first)%0x3478||!read(actor+0x78,slot)||slot<0||uintptr_t(slot)!=(actor-first)/0x3478||!read(actor+0x7dc,kind)||!read(actor+0x81,active)||!active)return answer;
     if(bot_layout&&ssc_auth::active()){
         int start=0,offset=0,count=0;
-        if(read(image_base+0xfad7bc,start)&&read(world+0x190,offset)&&read(world+0x28c,count))answer.bot=bot_range(slot,kind,start,offset,count,(last-first)/0x3478);
+        if(read(image_base+0xfae7cc,start)&&read(world+0x190,offset)&&read(world+0x28c,count))answer.bot=bot_range(slot,kind,start,offset,count,(last-first)/0x3478);
     }
     // e03370 is used by the native own-player formatter; bf48 may be spectated.
-    answer.local=kind==0&&read(image_base+ssc_compat::resolve(0xe17608),local_slot)&&slot==local_slot&&
-        read(image_base+ssc_compat::resolve(0xe1b088),registry)&&registry==first&&local_account(actor+0x6f0);
+    answer.local=kind==0&&read(image_base+ssc_compat::resolve(0xe18628),local_slot)&&slot==local_slot&&
+        read(image_base+ssc_compat::resolve(0xe1c0a8),registry)&&registry==first&&local_account(actor+0x6f0);
     return answer;
 }
 inline unsigned char __cdecl predicate(void* context,int id,void* owned_string){
@@ -117,11 +145,11 @@ inline unsigned char __cdecl predicate(void* context,int id,void* owned_string){
 // belongs to the local actor and no other actor is displaying that same key.
 inline bool unambiguous_event_account(uintptr_t text){
     std::string own_key,candidate;
-    if(!account_string(image_base+ssc_compat::resolve(0xdfd1c8),own_key)||!account_string(text,candidate)||own_key!=candidate)return false;
+    if(!account_string(image_base+ssc_compat::resolve(0xdfe1e8),own_key)||!account_string(text,candidate)||own_key!=candidate)return false;
     uintptr_t world=0,first=0,last=0;int slot=-1;
-    if(!read(image_base+ssc_compat::resolve(0xde35d0),world)||!read(world+0xa618,first)||!read(world+0xa620,last)||
+    if(!read(image_base+ssc_compat::resolve(0xde45d0),world)||!read(world+0xa618,first)||!read(world+0xa620,last)||
        !first||last<first||(last-first)%0x3478||(last-first)/0x3478>2048||
-       !read(image_base+ssc_compat::resolve(0xe17608),slot)||slot<0||size_t(slot)>=(last-first)/0x3478)return false;
+       !read(image_base+ssc_compat::resolve(0xe18628),slot)||slot<0||size_t(slot)>=(last-first)/0x3478)return false;
     const auto own=first+size_t(slot)*0x3478;
     if(!identify(own).local)return false;
     for(auto p=first;p<last;p+=0x3478){unsigned char active=0;
@@ -141,7 +169,8 @@ inline void __cdecl local_widget(uintptr_t widget,float p2,void* p3,void* p4,cha
     native_widget(widget,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13);
 }
 inline float __cdecl widget_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
-    if(drawing_local_widget&&cosmetics.load()&&local_account(reinterpret_cast<uintptr_t>(name))&&native_phase(phase)){++cosmetic_draws;solid(r,g,b,phase);}
+    const bool own=drawing_local_widget&&local_account(reinterpret_cast<uintptr_t>(name));ColorScope scope(own,drawing_local_widget);
+    if(own&&cosmetics.load()){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 inline void __cdecl overhead(uintptr_t actor,float alpha,unsigned char p3,uintptr_t p4,unsigned char p5,unsigned char p6){
@@ -150,60 +179,208 @@ inline void __cdecl overhead(uintptr_t actor,float alpha,unsigned char p3,uintpt
 }
 inline float __cdecl draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
     if(!cosmetics.load()&&!private_active())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
-    auto identity=identify(drawing_actor);
+    auto identity=identify(drawing_actor);ColorScope scope(identity.local);
     if(identity.bot&&private_active())bot_tint(r,g,b,alpha,phase);
-    if(cosmetics.load()&&identity.local){++cosmetic_draws;solid(r,g,b,phase);}
+    if(cosmetics.load()&&identity.local){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 extern "C" float __cdecl ssc_score_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase,uintptr_t row){
     if(!cosmetics.load()&&!private_active())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
     int slot=-1;uintptr_t world=0,first=0,last=0;
     Identity identity;
-    if(read(row+0x2c,slot)&&slot>=0&&read(image_base+ssc_compat::resolve(0xde35d0),world)&&read(world+0xa618,first)&&read(world+0xa620,last)&&last>=first&&size_t(slot)<(last-first)/0x3478)identity=identify(first+size_t(slot)*0x3478);
+    if(read(row+0x2c,slot)&&slot>=0&&read(image_base+ssc_compat::resolve(0xde45d0),world)&&read(world+0xa618,first)&&read(world+0xa620,last)&&last>=first&&size_t(slot)<(last-first)/0x3478)identity=identify(first+size_t(slot)*0x3478);
+    ColorScope scope(identity.local);
     if(identity.bot&&private_active())bot_tint(r,g,b,alpha,phase);
-    if(cosmetics.load()&&identity.local&&native_phase(phase)){++cosmetic_draws;solid(r,g,b,phase);}
+    if(cosmetics.load()&&identity.local){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 inline float __cdecl account_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
-    if(cosmetics.load()&&local_account(reinterpret_cast<uintptr_t>(name))){if(rainbow)native_phase(phase);else solid(r,g,b,phase);}
+    const bool own=local_account(reinterpret_cast<uintptr_t>(name));ColorScope scope(own);
+    if(cosmetics.load()&&own){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
+}
+// Chat labels are formatted (for example "Name:"). R13 still points to
+// the original sender record whose leading string is used by the native
+// account predicate. Never authorize a name tint by stripping display text.
+extern "C" void ssc_chat_name_bridge();
+extern "C" void ssc_actor_name_bridge();
+extern "C" float ssc_chat_name_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase,uintptr_t sender){
+ const bool own=local_account(sender);ColorScope scope(own);
+ if(own&&cosmetics.load()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
+ return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
+}
+// Actor-attached name labels have a separate render path from overhead names.
+extern "C" float ssc_actor_name_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase,uintptr_t actor){
+ const bool own=identify(actor).local;ColorScope scope(own);
+ if(own&&cosmetics.load()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
+ return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
+}
+// Main-menu account widget uses its stored wrapped label (+0xa8), not
+// the optional single-line argument. Keep the native layout/ownership intact.
+using Wrapped=int(*)(uintptr_t,float,float,float,float,void*,float,float,float,float,float,int,int,int,unsigned char,int,float,float,float);
+inline Wrapped native_wrapped=nullptr;
+inline int widget_wrapped(uintptr_t renderer,float x,float y,float width,float height,void* name,float size,float r,float g,float b,float alpha,int align,int vertical,int first,unsigned char flags,int limit,float start,float end,float phase){
+ const bool own=drawing_local_widget&&local_account(reinterpret_cast<uintptr_t>(name));ColorScope scope(own,drawing_local_widget);
+ if(own&&cosmetics.load()){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
+ return native_wrapped(renderer,x,y,width,height,name,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
+}
+// Shared native text adapters cover cached list/profile/leaderboard widgets as
+// well as direct name labels. Compare the COMPLETE UTF-16 text with the current
+// UTF-8 account name; never strip punctuation or recolor matching substrings.
+// This is presentation matching, not private-module authorization. Explicit
+// actor/sender ownership always wins, including an explicit non-local result.
+inline bool local_wide_label(uintptr_t object){
+ std::array<unsigned char,32> header{};size_t length=0,capacity=0;uintptr_t data=object;
+ if(!read_bytes(object,header.data(),header.size()))return false;
+ std::memcpy(&length,header.data()+16,8);std::memcpy(&capacity,header.data()+24,8);
+ if(!length||length>256||capacity<length)return false;
+ std::string account;if(!account_string(image_base+ssc_compat::resolve(0xdfe1e8),account))return false;
+ std::array<wchar_t,256> expected{},candidate{};
+ const int count=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,account.data(),int(account.size()),expected.data(),int(expected.size()));
+ if(count<=0||size_t(count)!=length)return false;
+ if(capacity>7){std::memcpy(&data,header.data(),8);if(!read_bytes(data,candidate.data(),length*sizeof(wchar_t)))return false;}
+ else{if(length>7)return false;std::memcpy(candidate.data(),header.data(),length*sizeof(wchar_t));}
+ for(size_t i=0;i<length;++i){auto c=candidate[i];if(c>=L'A'&&c<=L'Z')c+=L'a'-L'A';if(c!=expected[i])return false;}
+ return true;
+}
+inline bool shared_label_local(void* text){
+ return cosmetics.load()&&(identity_scope>=0?identity_scope==1:local_wide_label(reinterpret_cast<uintptr_t>(text)));
+}
+inline Draw native_wide_draw=nullptr;
+inline float wide_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
+ const bool own=shared_label_local(name);ColorScope scope(own);
+ if(own){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
+ // The native callee consumes this MSVC string. Inspect before calling and
+ // forward exactly once; do not free it or substitute a MinGW string object.
+ return native_wide_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
+}
+inline Wrapped native_wide_wrapped=nullptr;
+inline int wide_wrapped(uintptr_t renderer,float x,float y,float width,float height,void* name,float size,float r,float g,float b,float alpha,int align,int vertical,int first,unsigned char flags,int limit,float start,float end,float phase){
+ const bool own=shared_label_local(name);ColorScope scope(own);
+ if(own){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
+ return native_wide_wrapped(renderer,x,y,width,height,name,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
 }
 inline bool attach(){
     if(!ssc_compat::supports(1))return false;
     image_base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
-    native_predicate=reinterpret_cast<Predicate>(image_base+ssc_compat::resolve(0x3aa1a0));native_overhead=reinterpret_cast<Overhead>(image_base+ssc_compat::resolve(0x8466c0));native_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x47f990));
-    native_widget=reinterpret_cast<Widget>(image_base+ssc_compat::resolve(0x9990f0));
+    native_predicate=reinterpret_cast<Predicate>(image_base+ssc_compat::resolve(0x3aa310));native_overhead=reinterpret_cast<Overhead>(image_base+ssc_compat::resolve(0x8471c0));native_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x480120));
+    native_wrapped=reinterpret_cast<Wrapped>(image_base+ssc_compat::resolve(0x4802b0));
+    native_wide_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x480d60));
+    native_wide_wrapped=reinterpret_cast<Wrapped>(image_base+ssc_compat::resolve(0x480440));
+    native_palette=reinterpret_cast<Palette>(image_base+ssc_compat::resolve(0x1545d0));
+    native_widget=reinterpret_cast<Widget>(image_base+ssc_compat::resolve(0x9999a0));
     struct Site{uint32_t call,target;uintptr_t hook;};
     // Whitelist presentation calls only. Do not hook the predicate globally:
     // 5fb3b0/5fd316/6834a3/6b6db7 also service pass-related UI/cache logic.
     Site sites[]={
-        {0x4197f7,0x47f990,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x41987b,0x47f990,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x621cd4,0x47f990,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x63b527,0x47f990,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6aa0cc,0x47f990,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6aa354,0x47f990,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6aa572,0x47f990,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9e0873,0x47f990,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9abe4b,0x47f990,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9abfef,0x47f990,reinterpret_cast<uintptr_t>(account_draw)},
+        // Shared narrow-to-wide conversion and direct UTF-16 text paths.
+        {0x42e242,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x42e8ac,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x42ebd3,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x439bbd,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x480246,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x4803db,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x483fc0,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x52da4f,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x52f0b0,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x52f5aa,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x532272,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x533f18,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5343b5,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x534b7c,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x534fd1,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5352a8,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x535548,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5357e8,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x535ce8,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5368ed,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x536dd1,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x542054,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x54230a,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5435a3,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x543b26,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x544106,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x545480,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x54588e,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x545d5c,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x632b44,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x64ecec,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x64ee59,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x64efb0,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x64f0f9,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x64f1a6,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x64f33f,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x64f4eb,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x64f72f,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x657053,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6571ef,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x657382,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65777a,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65792b,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x657ad3,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x657c71,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65d4b8,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65e80e,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6618f8,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6619aa,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x664be8,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6bd928,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6bdae0,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6be0b5,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6be198,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6be63d,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6be96b,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6bec8d,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6befaf,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c1649,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c1964,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c1c7f,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c1ff2,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c23af,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6d3fca,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x7162ee,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x9a11fa,0x480d60,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x9a12d0,0x480440,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        // Both glyph palette paths (regular and alternate text rendering).
+        {0x489781,0x1545d0,reinterpret_cast<uintptr_t>(palette)},
+        {0x4897e2,0x1545d0,reinterpret_cast<uintptr_t>(palette)},
+        {0x3f5325,0x480120,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f53de,0x480120,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f5471,0x480120,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f5545,0x480120,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f55e1,0x480120,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f569c,0x480120,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
 
-        {0x33c1f4,0x8466c0,reinterpret_cast<uintptr_t>(overhead)},
-        {0x846b76,0x3aa1a0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x41960f,0x3aa1a0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x439565,0x3aa1a0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x62197c,0x3aa1a0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x63b1ee,0x3aa1a0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x6a8589,0x3aa1a0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9e07d5,0x3aa1a0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9abd7d,0x3aa1a0,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x9abf27,0x3aa1a0,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x6082a1,0x9990f0,reinterpret_cast<uintptr_t>(local_widget)},
-        {0x99b589,0x47f990,reinterpret_cast<uintptr_t>(widget_draw)},
-        {0x8473f8,0x47f990,reinterpret_cast<uintptr_t>(draw)},
-        {0x847484,0x47f990,reinterpret_cast<uintptr_t>(draw)},
-        {0x43603e,0x47f990,reinterpret_cast<uintptr_t>(ssc_score_bridge)},
-        {0x4360c3,0x47f990,reinterpret_cast<uintptr_t>(ssc_score_bridge)}};
+        {0x99bcff,0x4802b0,reinterpret_cast<uintptr_t>(widget_wrapped)},
+        {0x4890c9,0x1545d0,reinterpret_cast<uintptr_t>(palette)},
+        {0x489126,0x1545d0,reinterpret_cast<uintptr_t>(palette)},
+        {0x4197d7,0x480120,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x41985b,0x480120,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x622754,0x480120,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x63bfa7,0x480120,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6aab4c,0x480120,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6aadd4,0x480120,reinterpret_cast<uintptr_t>(ssc_chat_name_bridge)},
+        {0x6aaff2,0x480120,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9e1123,0x480120,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9ac6fb,0x480120,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9ac89f,0x480120,reinterpret_cast<uintptr_t>(account_draw)},
+
+        {0x33c364,0x8471c0,reinterpret_cast<uintptr_t>(overhead)},
+        {0x847676,0x3aa310,reinterpret_cast<uintptr_t>(predicate)},
+        {0x4195ef,0x3aa310,reinterpret_cast<uintptr_t>(predicate)},
+        {0x439545,0x3aa310,reinterpret_cast<uintptr_t>(predicate)},
+        {0x6223fc,0x3aa310,reinterpret_cast<uintptr_t>(predicate)},
+        {0x63bc6e,0x3aa310,reinterpret_cast<uintptr_t>(predicate)},
+        {0x6a9009,0x3aa310,reinterpret_cast<uintptr_t>(predicate)},
+        {0x9e1085,0x3aa310,reinterpret_cast<uintptr_t>(predicate)},
+        {0x9ac62d,0x3aa310,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x9ac7d7,0x3aa310,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x608d21,0x9999a0,reinterpret_cast<uintptr_t>(local_widget)},
+        {0x99be39,0x480120,reinterpret_cast<uintptr_t>(widget_draw)},
+        {0x847ef8,0x480120,reinterpret_cast<uintptr_t>(draw)},
+        {0x847f84,0x480120,reinterpret_cast<uintptr_t>(draw)},
+        {0x43601e,0x480120,reinterpret_cast<uintptr_t>(ssc_score_bridge)},
+        {0x4360a3,0x480120,reinterpret_cast<uintptr_t>(ssc_score_bridge)}};
     for(auto& site:sites){site.call=ssc_compat::resolve(uint32_t(site.call));site.target=ssc_compat::resolve(uint32_t(site.target));}
     for(auto site:sites){auto p=reinterpret_cast<unsigned char*>(image_base+site.call);int32_t relative;std::memcpy(&relative,p+1,4);if(p[0]!=0xe8||image_base+site.call+5+relative!=image_base+site.target)return false;}
     unsigned char* bridge=nullptr;
