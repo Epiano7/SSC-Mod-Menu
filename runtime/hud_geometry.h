@@ -83,7 +83,7 @@ inline void capture_cached_quad(){
  capture_vertex(0,0,0);capture_vertex(1,0,0);capture_vertex(1,1,0);capture_vertex(0,1,0);primitive_capture=false;
 }
 inline __attribute__((noinline)) void APIENTRY capture_call_list(GLuint list){
- if(reinterpret_cast<uintptr_t>(__builtin_return_address(0))==game_base+ssc_compat::resolve(0x47f0e6))capture_cached_quad();
+ if(reinterpret_cast<uintptr_t>(__builtin_return_address(0))==game_base+ssc_compat::resolve(0x47f436))capture_cached_quad();
  native_call_list(list);
 }
 inline bool writable_slot(uintptr_t address){MEMORY_BASIC_INFORMATION info{};return VirtualQuery(reinterpret_cast<void*>(address),&info,sizeof(info))&&info.State==MEM_COMMIT&&(info.Protect&(PAGE_READWRITE|PAGE_EXECUTE_READWRITE));}

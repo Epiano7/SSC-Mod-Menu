@@ -16,7 +16,7 @@ inline void sample_weapon(uintptr_t record,Values& values){
 }
 
 // Fingerprint both producers/consumers of world+6aa0 and the native send route.
-inline constexpr uint32_t native_dependencies[][3]={{0x88bf10,0x2ac450,0},{0x2e7e20,0x221690,0},{0x82da80,0x7ffd80,0},{0x229ea0,0x8957d0,0}};
+inline constexpr uint32_t native_dependencies[][3]={{0x88c210,0x2ac720,0},{0x2e80f0,0x221960,0},{0x82dda0,0x8000a0,0},{0x22a170,0x895ad0,0}};
 inline bool supported(){return ssc_compat::supports(32)&&ssc_compat::supports(4)&&ssc_compat::supports(8);}
 inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
  Observation o;actor=world=0;if(!supported())return o;using ssc_names::read;
@@ -63,7 +63,7 @@ inline bool send_native(uintptr_t base,uintptr_t world,uintptr_t actor,const std
  // The native client chat-input path calls this with flag=0. It deep-copies the
  // temporary native-layout string into its own outbound queue, then shows it locally.
  ssc_chat::NativeString message{reinterpret_cast<uintptr_t>(text.data()),0,text.size(),std::max(size_t(16),text.size())};
- if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x221690));
+ if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x221960));
  sender(world,0,actor,&message);
  // Engine::dispatch limits automatic messages. Observe the native wheel's
  // cooldown above, but never impose an additional lockout on manual input.

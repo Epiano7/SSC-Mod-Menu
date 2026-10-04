@@ -35,6 +35,10 @@ if (-not $GamePath) {
 }
 $exe=Get-Item -LiteralPath (Join-Path $GamePath 'SkillshotCity.exe')
 $hash=(Get-FileHash -LiteralPath $exe.FullName -Algorithm SHA256).Hash
-$supported=$exe.Length -eq 15221248 -and $hash -eq '34D8809E646C36E595FDB9DF072E09B31EA35108DEFF3B32EF40451695D05307'
+$source=Get-Content -LiteralPath (Join-Path $PSScriptRoot '../installer/Setup.cs') -Raw
+$sizes=[regex]::Matches($source,'GameSize\s*=\s*(\d+)')
+$hashes=[regex]::Matches($source,'GameHash\s*=\s*"([A-F0-9]{64})"')
+if($sizes.Count -ne 1 -or $hashes.Count -ne 1){throw 'Ambiguous approved installer game revision'}
+$supported=$exe.Length -eq [long]$sizes[0].Groups[1].Value -and $hash -eq $hashes[0].Groups[1].Value
 if(-not $supported) { throw "Unknown executable revision. No hooks or installation permitted. SHA256=$hash" }
 [pscustomobject]@{Executable=$exe.FullName;Size=$exe.Length;SHA256=$hash;RuntimeSupported=$true}
