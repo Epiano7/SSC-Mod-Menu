@@ -1,3 +1,5 @@
+[![Github All Releases](https://img.shields.io/github/downloads/Epiano7/SSC-Mod-Menu/total.svg)]()
+
 # SSC Mod Menu
 
 An unofficial client-side mod for Skillshot City, with a Windows installer and an experimental Linux installer for Steam Proton.
