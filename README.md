@@ -5,6 +5,7 @@
 
 An unofficial client-side mod for Skillshot City, with a Windows installer and an experimental Linux installer for Steam Proton.
 
+Join my discord [here](https://discord.gg/T5h5GUwEG7) and ping me for any help!
 ## Download
 
 [Download SSC Mod Menu for Windows](https://github.com/Epiano7/SSC-Mod-Menu/releases/latest/download/SSC-Mod-Menu-Setup.exe)
@@ -66,12 +67,13 @@ The menu will install into your Skillshot City Steam folder. Each native module 
 If something goes wrong, open **All Modules > About > Open logs**, and dm them to Epiano7 or make an issue here with them included. Startup checks are recorded in `runtime.log`; crash reports are saved under `diagnostics` when Windows allows the crash handler to run. These reports are not automatically uploaded to any servers and stay local. Minidumps can contain process data, so review them before sharing.
 
 ## Credits
-- bencelot (dev of SSC) for giving feedback before this released and for making the game ofc
-- everyone in the SSC discord that provided feedback regarding early module dev, thank you!
+- bencelot (dev of SSC) for giving feedback before this released and for making the game!
+- everyone in the [SSC discord](https://discord.gg/skillshotcity) that provided feedback regarding early module dev, thank you!
 - for some more specific names:
   - yari_check for testing out the Linux build and helping me suffer through an Arch VM install
   - jyxalag for reviewing early builds and testing out the private access feature
   - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk)
+  - 
 
 
 [Build instructions](docs/build.md) | [Contributing](CONTRIBUTING.md) | [Installer details](installer/README.md)
