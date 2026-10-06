@@ -1,0 +1,20 @@
+name: Traffic Badge
+
+on:
+  schedule:
+    - cron: '0 */3 * * *' # runs every 3 hours
+  workflow_dispatch:
+
+permissions:
+  contents: write           # required to push the badge to the data branch
+
+jobs:
+  update-badge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Epiano7/SSC-Mod-Menu
+        with:
+          token: ${{ secrets.TRAFFIC_TOKEN }}
+          metric: views
+          color: blue
+          label: 'Repo views'
