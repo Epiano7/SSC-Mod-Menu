@@ -8,13 +8,67 @@ on:
 permissions:
   contents: write           # required to push the badge to the data branch
 
+concurrency:
+  group: traffic-badge
+  cancel-in-progress: false
+
 jobs:
   update-badge:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: albertoarena/github-traffic-badge@56f6f3e0ed586f14440561758b197ca57a38f480 # v1
-        with:
-          token: ${{ secrets.TRAFFIC_TOKEN }}
-          metric: views
-          color: blue
-          label: 'Repo views'
+      # Use the pinned generator directly: its composite action uses the traffic
+      # PAT for git pushes too, but our traffic credential is deliberately read-only.
+      - name: Prepare pinned generator and traffic history
+        shell: bash
+        run: |
+          set -euo pipefail
+          generator="$RUNNER_TEMP/traffic-generator"
+          git init -q "$generator"
+          git -C "$generator" remote add origin https://github.com/albertoarena/github-traffic-badge.git
+          git -C "$generator" fetch --depth=1 origin 56f6f3e0ed586f14440561758b197ca57a38f480
+          git -C "$generator" checkout -q --detach FETCH_HEAD
+          workdir="$RUNNER_TEMP/traffic-data"
+          git init -q "$workdir"
+          cd "$workdir"
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          status=0
+          git ls-remote --exit-code --heads origin traffic-data > "$RUNNER_TEMP/traffic-ref" || status=$?
+          if [ "$status" -eq 0 ]; then
+            git fetch --depth=1 origin traffic-data
+            git checkout -q -b traffic-data FETCH_HEAD
+          elif [ "$status" -eq 2 ]; then
+            git checkout -q --orphan traffic-data
+          else
+            exit "$status"
+          fi
+
+      - name: Read traffic and generate badge
+        shell: bash
+        env:
+          INPUT_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
+          INPUT_METRIC: views
+          INPUT_COLOR: blue
+          INPUT_LABEL: Repo views
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/traffic-data"
+          node "$RUNNER_TEMP/traffic-generator/src/index.js"
+
+      - name: Publish badge with workflow token
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/traffic-data"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add badge.svg totals.json
+          if git diff --cached --quiet; then
+            echo 'Traffic badge is already up to date.'
+            exit 0
+          fi
+          git commit -q -m 'chore: update traffic badge'
+          gh auth setup-git
+          git push origin HEAD:traffic-data
