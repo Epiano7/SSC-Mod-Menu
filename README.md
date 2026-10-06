@@ -1,3 +1,4 @@
+<a href="https://epiano7.dev" target="_blank" rel="noopener noreferrer"><img src="https://epiano7.dev/assets/buttons/epiano7.png" width="88" height="31" alt="epiano7.dev"></a>
 [![Github All Releases](https://img.shields.io/github/downloads/Epiano7/SSC-Mod-Menu/total.svg)]()
 
 # SSC Mod Menu
