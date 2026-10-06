@@ -28,17 +28,15 @@ The installer runs natively; the game and mod use Proton. The native Linux game 
 ## Modules
 
 - **Sound Replacer:** import WAV or MP3 replacements for sound effects and music, preview clips, adjust individual volume, and replace related variants together. **All Music Tracks** uses one custom song across the music playlist. Track lengths are shown, and replacements apply after restarting the game
-- **Cosmetics:** customize your name with a solid color, animated rainbow, or a custom gradient with up to three colors. Choose colors with the in-game picker or hex fields. Overrides apply across name displays, including chat and leaderboards, and are visible only to you
-- **Discord Presence:** show game status, available round and level details, elapsed time, and ranked SSC rating. No developer setup or token is required. Linux connects to the native Discord app, with support for regular and Flatpak socket locations
-- **HUD Editor:** move and resize eight HUD groups, save layouts, and reset individual elements. Team-roster positioning is currently unavailable
-- **Custom Quick Chat:** customize the quick-react wheel with up to 12 messages per slot. The first message labels the wheel, and each use sends a randomly chosen message from that slot's list. Rearrange slots, choose icons or import images, and preview the in-round and round-ended layouts
-- **Auto Messages:** create optional Battle Royale message rules using events, conditions, variables, and repeat counts. Enable or rename rules, reference the variable guide, and share rules through compact import codes. Both `{variable}` and `[variable]` are supported
-
-Enable Auto Messages before a round starts for complete supported round counters. Online hit counts and impact-damage totals are currently unavailable. Saved rules using unavailable variables display a warning and skip sending rather than report incomplete values
+- **Cosmetics:** customize your name with a solid color, animated rainbow, or a custom gradient with up to three colors. Choose colors with the in-game picker or hex fields. Overrides apply across name displays, including chat and leaderboards, and are visible only to you (plans in the future to make this visible to all SSC mod users)
+- **Discord Presence:** shows game status, available round and level details, elapsed time, and SSC rating. Confirmed to work on the Windows Discord app, Linux is still experimental but should work for both flatpak and other installs
+- **HUD Editor:** move and resize most HUD elements, save layouts, and reset individual elements
+- **Custom Quick Chat:** customize the quick-react wheel with up to 12 messages per slot. The first message labels the wheel, and each use sends a randomly chosen message from that slot's list. Importing images is supported as well
+- **Auto Messages:** message rules using events, conditions, variables, and repeat counts. A condition can be set, and when it is fulfilled the message will auto-send in the chat. Currently there is around 50 working variables to use as conditions or send in the message
 
 ## Other features
 
-- **Weapon Lab:** search weapons by name, tier, or type; compare up to four weapons with stronger values highlighted; adjust health, shields, and miss chance; and watch a timed duel with reloads. Simulations are estimates and do not account for skills or every special effect
+- **Weapon Lab:** search weapons by name, tier, or type. Compare up to four weapons with stronger values highlighted; adjust health, shields, and miss chance; and watch a timed duel with reloads. Simulations are estimates and do not account for skills or other round perks like shop purchases 
 - **Local Round Recording:** optionally save Battle Royale round data on your PC, including class, level, health, and weapon inventory snapshots. Recording is disabled at each launch, only runs during rounds, and uploads nothing
 - **Interface:** adjust UI scale, choose which modules appear in the quick menu, and customize animation and HUD display preferences. Text edits save when leaving the field
 - **Geri Challenge:** hide the skill-draft and syringe selection panel from **All Modules > Misc**. Disabled by default; switch it off to restore the panel. This hides the UI and does not enforce challenge rules. [Details and testing limits](docs/geri-challenge.md)
@@ -50,26 +48,31 @@ For version-by-version changes, see the [GitHub releases](https://github.com/Epi
 
 A custom HUD layout in game:
 
-![Gameplay with a repositioned minimap, centered round timer, and custom HUD layout](docs/screenshots/custom-hud.png)
+![Gameplay with a custom HUD layout](docs/screenshots/custom-hud.png)
 
 <details>
 <summary>Cosmetics and Discord Presence settings</summary>
 
-![Cosmetics settings with rainbow and solid name-color options](docs/screenshots/cosmetics.png)
+![Cosmetics settings](docs/screenshots/cosmetics.png)
 
-![Discord Presence settings with game details, elapsed time and ranked-rating options](docs/screenshots/discord-presence.png)
+![Discord Presence settings](docs/screenshots/discord-presence.png)
 
 </details>
 
 ## Compatibility
 
-Installs into your Skillshot City Steam folder. Each native module checks its dependencies at startup. Updates that leave those dependencies unchanged can keep working; changed or ambiguous code pauses the affected module instead of using outdated addresses. Larger game changes may still require a mod update.
+The menu will install into your Skillshot City Steam folder. Each native module checks its dependencies at startup for compatibility issues. Game updates might break some modules depending on the update, in which a hotfix will be released Larger game changes may still require a mod update.
 
-If something goes wrong, open **All Modules > About > Open logs**. Startup checks are recorded in `runtime.log`; crash reports are saved under `diagnostics` when Windows allows the crash handler to run. Reports stay on your computer and are not uploaded automatically. Minidumps can contain process data, so review them before sharing.
+If something goes wrong, open **All Modules > About > Open logs**, and dm them to Epiano7 or make an issue here with them included. Startup checks are recorded in `runtime.log`; crash reports are saved under `diagnostics` when Windows allows the crash handler to run. These reports are not automatically uploaded to any servers and stay local. Minidumps can contain process data, so review them before sharing.
 
 ## Credits
 - bencelot (dev of SSC) for giving feedback before this released and for making the game ofc
 - everyone in the SSC discord that provided feedback regarding early module dev, thank you!
+- for some more specific names:
+  - yari_check for testing out the Linux build and helping me suffer through an Arch VM install
+  - jyxalag for reviewing early builds and
+  - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk)
+
 
 [Build instructions](docs/build.md) | [Contributing](CONTRIBUTING.md) | [Installer details](installer/README.md)
 
