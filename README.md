@@ -73,7 +73,7 @@ If something goes wrong, open **All Modules > About > Open logs**, and dm them t
   - yari_check for testing out the Linux build and helping me suffer through an Arch VM install
   - jyxalag for reviewing early builds and testing out the private access feature
   - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk)
-  - 
+  - chill for being a chill guy (and for giving some great suggestions)
 
 
 [Build instructions](docs/build.md) | [Contributing](CONTRIBUTING.md) | [Installer details](installer/README.md)
