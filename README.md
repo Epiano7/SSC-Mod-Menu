@@ -16,7 +16,7 @@ Run the installer and select your Skillshot City Steam folder. After installatio
 
 [Download SSC Mod Menu for Linux](https://github.com/Epiano7/SSC-Mod-Menu/releases/latest/download/SSC-Mod-Menu-Linux.tar.gz)
 
-**Installation has been confirmed on Arch Linux with regular Steam and Proton Experimental. Most mod features are still untested on Linux.** Other distributions, Flatpak Steam, and in-game updating have not been verified
+**Installation has been tested on Arch Linux with regular Steam and Proton Experimental. Some mod features are still untested on Linux.** Other distributions, Flatpak Steam, and in-game updating have not been verified
 
 In **Skillshot City → Properties → Compatibility**, enable **Force the use of a specific Steam Play compatibility tool** and choose **Proton Experimental**. Let Steam download the Windows build and launch it once, then close the game and fully exit Steam
 
