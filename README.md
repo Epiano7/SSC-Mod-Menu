@@ -72,8 +72,12 @@ If something goes wrong, open **All Modules > About > Open logs**, and dm them t
 - for some more specific names:
   - yari_check for testing out the Linux build and helping me suffer through an Arch VM install
   - jyxalag for reviewing early builds and testing out the private access feature
-  - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk)
+  - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk), and for putting up with me 
+  joining his lobbies in the last 2 minutes and winning
   - chill for being a chill guy (and for giving some great suggestions)
+  - geri for popularizing the Geri Challenge (fan-made challenge where you aren't allowed to draft skills)
+  - mang for answering a ton of questions I had as a new player and for their work on a synergy chart (which is planned to be implemented in the mod soon)
+  - deus for building my hatred for snipers so much that I always keep one in my second weapon slot :D
 
 
 [Build instructions](docs/build.md) | [Contributing](CONTRIBUTING.md) | [Installer details](installer/README.md)
