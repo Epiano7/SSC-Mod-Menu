@@ -14,6 +14,7 @@ if($LASTEXITCODE) {throw 'Proxy generation failed (Python pefile is required)'}
 if($LASTEXITCODE) {throw 'Proxy compilation failed'}
 & $Compiler "-ffile-prefix-map=$root=." -O2 -std=c++17 -shared -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/runtime/overlay.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" @authFlags -o "$build\runtime.dll" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 "$audioCodec" -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32 -lwindowscodecs
 if($LASTEXITCODE) {throw 'Runtime compilation failed'}
+& "$PSScriptRoot/Test-Statistics.ps1" -Compiler $Compiler -BuildDirectory $build -AuthCrypto $authCrypto -AudioCodec $audioCodec
 if(-not(Test-Path -LiteralPath "$root/tests")) {
     Write-Host 'Runtime built; local test suite is not present'
     Get-FileHash -LiteralPath "$build/runtime.dll" -Algorithm SHA256

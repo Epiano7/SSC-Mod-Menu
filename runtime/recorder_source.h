@@ -1,7 +1,14 @@
 #pragma once
 #include "presence_source.h"
 #include "local_recorder.h"
+#include "build_recording_source.h"
 namespace ssc_record {
+inline bool build_code_supported(uintptr_t base){
+ static uintptr_t checked=0;static bool valid=false;
+ if(checked!=base){checked=base;valid=validate_build_code(base,[](uintptr_t p,auto& v){return ssc_names::read(p,v);});}
+ return valid;
+}
+
 // BR uses a native pre-round counter and countdown. Unknown round layouts
 // fail closed rather than collecting lobby activity.
 inline bool active_round(uintptr_t base,int phase){
@@ -13,7 +20,7 @@ inline bool active_round(uintptr_t base,int phase){
         std::isfinite(countdown)&&countdown<=0&&read(world+0x6ae8,ending)&&std::isfinite(ending)&&ending<=0;
 }
 inline Json sample_local_build(uintptr_t base){
-    Json result={{"class_id",nullptr},{"level",nullptr},{"health",nullptr},{"max_health",nullptr},{"inventory_weapons",nullptr}};
+    Json result={{"class_id",nullptr},{"level",nullptr},{"health",nullptr},{"max_health",nullptr},{"inventory_weapons",nullptr},{"build_schema",1},{"skills",nullptr},{"skills_status","actor_unavailable"},{"stim_source","replicated_skill_ids"}};
     if(!ssc_compat::supports(4))return result;
     using ssc_names::read;uintptr_t world=0,first=0,last=0,steam_first=0;int local=-1,slot=-1,kind=-1;unsigned char active=0;
     if(!read(base+ssc_compat::resolve(0xde45d0),world)||!world||!read(world+0xa618,first)||!read(world+0xa620,last)||!first||last<first||(last-first)%0x3478||(last-first)/0x3478>2048
@@ -25,6 +32,11 @@ inline Json sample_local_build(uintptr_t base){
     if(read(actor+0x870,level)&&level>=0&&level<=10000)result["level"]=level;
     if(read(world+0x128,mode))result["native_mode_id"]=mode;
     if(read(world+0x3e0,round)&&round>=0&&round<1000)result["native_round_index"]=round;
+    result["skills_status"]="unsupported_game_layout";
+    if(build_code_supported(base)){
+        result["skills"]=read_acquired_skills(actor+0xa0,[](uintptr_t p,auto& v){return read(p,v);});
+        result["skills_status"]=result["skills"].is_array()?"observed":"invalid_or_changing_state";
+    }
     // These layouts are covered by the Weapon Lab's health and weapon-HUD checks.
     if(!ssc_compat::supports(8))return result;
     float hp=0,max_hp=0;

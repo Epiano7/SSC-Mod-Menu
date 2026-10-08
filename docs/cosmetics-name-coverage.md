@@ -1,6 +1,8 @@
 # Cosmetics name rendering coverage
 
-The Cosmetics override uses the current local account name and, where available, the native actor or chat-sender record. It is a local presentation change. It does not change names or colors sent to other players and is not an authorization mechanism.
+The local Cosmetics override uses the current local account name and, where available, the native actor or chat-sender record. It does not alter the game's networked player name and is not an authorization mechanism. The October 8 shared-cosmetics candidate separately publishes an opted-in appearance to the cosmetics service for other opted-in mod clients; unmodified clients retain the game's appearance.
+
+Shared appearances are applied only to attributed human actor, scoreboard row and chat-sender paths using the native account key. Nested text rendering preserves the scoped remote palette. Own cosmetics take priority; private bot authorization remains independent. Remote cached leaderboard/profile labels without verified account attribution are not overridden. See [shared cosmetics](shared-cosmetics.md) for enrollment, limits and validation status.
 
 The October 3 candidate covers both common native text paths: narrow strings converted by the game and directly rendered UTF-16 strings. This includes cached list/profile/leaderboard labels that bypass the older screen-specific adapters. Solid colors, rainbow, and custom gradients use the same selection logic. Both native glyph palette paths respect the scoped custom palette.
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "compatibility.h"
 #include "private_auth.h"
+#include "shared_cosmetics.h"
 #include <atomic>
 #include <array>
 #include <string>
@@ -24,13 +25,17 @@ inline thread_local int color_scope=0;
 // -1 means a shared text path with no owner attribution; 0/1 are explicit
 // other/local decisions from actor, sender or account-specific adapters.
 inline thread_local int identity_scope=-1;
+inline thread_local ssc_shared::Style shared_style;
 struct ColorScope {
  int previous,previous_identity;
+ ssc_shared::Style previous_style=shared_style;
  explicit ColorScope(bool local,bool attributed=true):previous(color_scope),previous_identity(identity_scope){
   if(attributed)identity_scope=local?1:0;
   color_scope=local&&cosmetics.load()?(gradient?2:(!rainbow?1:0)):0;
  }
- ~ColorScope(){color_scope=previous;identity_scope=previous_identity;}
+ void remote(const ssc_shared::Style& value){shared_style=value;identity_scope=2;color_scope=value.mode==ssc_shared::Mode::solid?3:value.mode==ssc_shared::Mode::gradient?4:0;}
+ void inherit_remote(){if(previous_identity==2){identity_scope=2;color_scope=previous;shared_style=previous_style;}}
+ ~ColorScope(){color_scope=previous;identity_scope=previous_identity;shared_style=previous_style;}
 };
 using Palette=float*(*)(uintptr_t,float*,float,float,unsigned char,unsigned char);
 inline Palette native_palette=nullptr;
@@ -38,6 +43,10 @@ inline float* palette(uintptr_t context,float* output,float position,float lift,
  if(!color_scope)return native_palette(context,output,position,lift,gray,balance);
  auto color=gradient_rgb(position/255.f);
  if(color_scope==1)for(int k=0;k<3;++k)color[k]=float((solid_rgb>>(16-8*k))&255)/255;
+ if(color_scope==3||color_scope==4){
+  float t=position/255.f;t=(t-std::floor(t))*shared_style.count;unsigned a=std::min(unsigned(t),shared_style.count-1),b=(a+1)%shared_style.count;t-=a;
+  for(int k=0;k<3;++k){unsigned shift=16-8*k;float first=float((shared_style.colors[a]>>shift)&255)/255,second=float((shared_style.colors[b]>>shift)&255)/255;color[k]=first+(second-first)*t;}
+ }
  for(int k=0;k<3;++k){output[k]=color[k];}return output;
 }
 
@@ -98,7 +107,7 @@ inline void validate_bot_layout(){
 }
 inline bool private_visible(){return attached&&bot_layout&&ssc_auth::available();}
 inline bool private_active(){return attached&&bot_layout&&ssc_auth::active();}
-struct Identity {bool local=false,bot=false;};
+struct Identity {bool local=false,bot=false;std::string account;};
 // Native MSVC account string, not actor+0x798 (the editable display name).
 inline bool account_string(uintptr_t object,std::string& value){
     std::array<unsigned char,32> header{};size_t length=0,capacity=0;uintptr_t data=object;
@@ -125,7 +134,8 @@ inline Identity identify(uintptr_t actor){
     Identity answer;uintptr_t world=0,first=0,last=0,registry=0;int slot=-1,kind=-1,local_slot=-1;unsigned char active=0;
     if(!read(image_base+ssc_compat::resolve(0xde45d0),world)||!world||!read(world+0xa618,first)||!read(world+0xa620,last)||!first||last<first||(last-first)%0x3478||(last-first)/0x3478>2048)return answer;
     if(actor<first||actor>=last||(actor-first)%0x3478||!read(actor+0x78,slot)||slot<0||uintptr_t(slot)!=(actor-first)/0x3478||!read(actor+0x7dc,kind)||!read(actor+0x81,active)||!active)return answer;
-    if(bot_layout&&ssc_auth::active()){
+    if(kind==0){std::string key;if(account_string(actor+0x6f0,key)&&ssc_shared::account_valid(key))answer.account=key;}
+    if(kind==1&&bot_layout&&ssc_auth::active()){
         int start=0,offset=0,count=0;
         if(read(image_base+0xfae7cc,start)&&read(world+0x190,offset)&&read(world+0x28c,count))answer.bot=bot_range(slot,kind,start,offset,count,(last-first)/0x3478);
     }
@@ -133,6 +143,22 @@ inline Identity identify(uintptr_t actor){
     answer.local=kind==0&&read(image_base+ssc_compat::resolve(0xe18628),local_slot)&&slot==local_slot&&
         read(image_base+ssc_compat::resolve(0xe1c0a8),registry)&&registry==first&&local_account(actor+0x6f0);
     return answer;
+}
+inline bool shared_account(uintptr_t string,ssc_shared::Style& style){
+ std::string key;return attached&&account_string(string,key)&&ssc_shared::account_valid(key)&&!local_account(string)&&ssc_shared::service().get(key,style);
+}
+inline void shared_tint(ColorScope& scope,const ssc_shared::Style& value,float& r,float& g,float& b,float& phase){
+ scope.remote(value);if(value.mode==ssc_shared::Mode::solid){auto c=value.colors[0];r=float((c>>16)&255)/255;g=float((c>>8)&255)/255;b=float(c&255)/255;phase=0;}
+ else if(!native_phase(phase))phase=0;
+}
+inline void shared_actor_tint(ColorScope& scope,const Identity& identity,float& r,float& g,float& b,float& phase){
+ ssc_shared::Style value;if(!identity.local&&!identity.bot&&!identity.account.empty()&&ssc_shared::service().get(identity.account,value))shared_tint(scope,value,r,g,b,phase);
+}
+inline std::vector<std::string> shared_accounts(){
+ std::set<std::string> keys;uintptr_t world=0,first=0,last=0;
+ if(!attached||!read(image_base+ssc_compat::resolve(0xde45d0),world)||!world||!read(world+0xa618,first)||!read(world+0xa620,last)||!first||last<first||(last-first)%0x3478||(last-first)/0x3478>2048)return {};
+ for(auto actor=first;actor<last&&keys.size()<32;actor+=0x3478){auto identity=identify(actor);if(!identity.account.empty()&&!identity.local)keys.insert(identity.account);}
+ return {keys.begin(),keys.end()};
 }
 inline unsigned char __cdecl predicate(void* context,int id,void* owned_string){
     bool apply=cosmetics.load()&&local_account(reinterpret_cast<uintptr_t>(owned_string));
@@ -178,18 +204,18 @@ inline void __cdecl overhead(uintptr_t actor,float alpha,unsigned char p3,uintpt
     native_overhead(actor,alpha,p3,p4,p5,p6);
 }
 inline float __cdecl draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
-    if(!cosmetics.load()&&!private_active())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
     auto identity=identify(drawing_actor);ColorScope scope(identity.local);
+    shared_actor_tint(scope,identity,r,g,b,phase);
     if(identity.bot&&private_active())bot_tint(r,g,b,alpha,phase);
     if(cosmetics.load()&&identity.local){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 extern "C" float __cdecl ssc_score_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase,uintptr_t row){
-    if(!cosmetics.load()&&!private_active())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
     int slot=-1;uintptr_t world=0,first=0,last=0;
     Identity identity;
     if(read(row+0x2c,slot)&&slot>=0&&read(image_base+ssc_compat::resolve(0xde45d0),world)&&read(world+0xa618,first)&&read(world+0xa620,last)&&last>=first&&size_t(slot)<(last-first)/0x3478)identity=identify(first+size_t(slot)*0x3478);
     ColorScope scope(identity.local);
+    shared_actor_tint(scope,identity,r,g,b,phase);
     if(identity.bot&&private_active())bot_tint(r,g,b,alpha,phase);
     if(cosmetics.load()&&identity.local){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
@@ -206,12 +232,14 @@ extern "C" void ssc_chat_name_bridge();
 extern "C" void ssc_actor_name_bridge();
 extern "C" float ssc_chat_name_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase,uintptr_t sender){
  const bool own=local_account(sender);ColorScope scope(own);
+ ssc_shared::Style remote;if(!own&&shared_account(sender,remote))shared_tint(scope,remote,r,g,b,phase);
  if(own&&cosmetics.load()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 // Actor-attached name labels have a separate render path from overhead names.
 extern "C" float ssc_actor_name_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase,uintptr_t actor){
- const bool own=identify(actor).local;ColorScope scope(own);
+ const auto identity=identify(actor);const bool own=identity.local;ColorScope scope(own);
+ shared_actor_tint(scope,identity,r,g,b,phase);
  if(own&&cosmetics.load()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
@@ -249,6 +277,7 @@ inline bool shared_label_local(void* text){
 inline Draw native_wide_draw=nullptr;
 inline float wide_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
  const bool own=shared_label_local(name);ColorScope scope(own);
+ scope.inherit_remote();
  if(own){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  // The native callee consumes this MSVC string. Inspect before calling and
  // forward exactly once; do not free it or substitute a MinGW string object.
@@ -257,6 +286,7 @@ inline float wide_draw(void* renderer,float x,float y,void* name,float size,floa
 inline Wrapped native_wide_wrapped=nullptr;
 inline int wide_wrapped(uintptr_t renderer,float x,float y,float width,float height,void* name,float size,float r,float g,float b,float alpha,int align,int vertical,int first,unsigned char flags,int limit,float start,float end,float phase){
  const bool own=shared_label_local(name);ColorScope scope(own);
+ scope.inherit_remote();
  if(own){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  return native_wide_wrapped(renderer,x,y,width,height,name,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
 }

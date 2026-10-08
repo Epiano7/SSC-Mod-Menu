@@ -26,6 +26,7 @@
 #include "quick_chat.h"
 #include "auto_messages_source.h"
 #include "tracking_recording.h"
+#include "statistics_reader.h"
 #include "update_module.h"
 #include "diagnostics.h"
 
@@ -87,6 +88,15 @@ void render(HDC dc) {
     ULONGLONG now=GetTickCount64();float seconds=last_frame?float(now-last_frame)/1000.f:0.f;last_frame=now;
     static ULONGLONG auth_start_at=0;
     if(now-auth_start_at>=1000){auth_start_at=now;ssc_auth::service().start();}
+    static ULONGLONG shared_at=0;
+    if(now-shared_at>=1000){shared_at=now;
+      std::string own;if(ssc_names::attached)ssc_names::account_string(ssc_names::image_base+ssc_compat::resolve(0xdfe1e8),own);
+      ssc_shared::Style appearance;appearance.mode=ssc_names::gradient?ssc_shared::Mode::gradient:ssc_names::rainbow?ssc_shared::Mode::rainbow:ssc_shared::Mode::solid;
+      appearance.count=ssc_names::gradient?unsigned(std::clamp(ssc_names::gradient_count,2,3)):ssc_names::rainbow?0:1;
+      appearance.colors=ssc_names::gradient?ssc_names::gradient_colors:std::array<unsigned,3>{ssc_names::solid_rgb,0,0};
+      ssc_shared::service().update(own,shared_receive?ssc_names::shared_accounts():std::vector<std::string>{},appearance,shared_receive&&ssc_names::attached,shared_publish&&ssc_names::cosmetics.load());
+      if(settings_page==22)dirty=true;
+    }
     static uint64_t private_cleared=0;auto cleared=ssc_auth::service().cleared();if(cleared!=private_cleared){private_cleared=cleared;ssc_auth::license::wipe(private_code);private_editing=false;dirty=true;}
     static auto private_last=ssc_auth::license::State::idle;auto private_state=ssc_auth::service().state();if(private_state!=private_last){private_last=private_state;if(settings_page==19)dirty=true;}
     static bool private_was_visible=false;
@@ -251,9 +261,9 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     if(n&&n<32768) state_dir=path;
     else {n=GetEnvironmentVariableW(L"LOCALAPPDATA",path,32768);if(!n||n>=32768)return;state_dir=std::filesystem::path(path)/L"SkillshotCityMod";}
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
-    ssc_diagnostics::initialize(state_dir);ssc_auth::service().configure(state_dir);
+    ssc_diagnostics::initialize(state_dir);ssc_auth::service().configure(state_dir);ssc_shared::service().configure(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
-    log("SSC Mod Menu 0.1.11 startup");log_game_build();
+    log("SSC Mod Menu 0.1.12 startup");log_game_build();
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
     presence_supported=(supported&4)!=0;native_supported=true;
     log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");
