@@ -42,7 +42,7 @@ bool statistics_graph_visible(){return manager&&settings_page==21&&!ssc_hud::edi
 bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hud::editing;}
 
 // Advance this ID when publishing a new set of release notes.
-constexpr int release_notes_id=20261008;
+constexpr int release_notes_id=20261010;
 bool update_popup=false;
 bool show_update_notes=true;int seen_release_notes=0;
 bool update_notes_due(int phase){return presence_supported&&phase==1&&welcome_seen&&show_update_notes&&seen_release_notes!=release_notes_id&&!opened;}
@@ -870,12 +870,11 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"0.1.12 SHARING AND STATISTICS",cyan);
-        bullet(201,L"Optional name-color sharing between mod users" );
-        bullet(233,L"Personal statistics with level, XP and cash graphs" );
-        bullet(265,L"Match recordings with skills, levels and stim state" );
-        bullet(297,L"Persistent recording and improved late-join tracking" );
-        bullet(329,L"More people added to Credits" );
+        text(50,153,L"0.1.13 COMPATIBILITY HOTFIX",cyan);
+        bullet(201,L"Restored support for the latest Skillshot City update" );
+        bullet(233,L"Updated native module and recording checks" );
+        bullet(265,L"Shared cosmetics and personal statistics retained" );
+        bullet(297,L"Existing settings and custom sounds are preserved" );
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
@@ -1208,7 +1207,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.12",cyan);
+            text(266,157,L"0.1.13",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");

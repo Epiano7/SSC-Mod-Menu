@@ -79,7 +79,7 @@ inline void round_state(bool active){auto& s=state();if(!s.enabled||!active){end
     if(s.match_id.empty()){s.match_id=new_match_id();s.match_started=GetTickCount64();}
     ++s.segment;s.active=true;s.tracking=nullptr;s.last_build=nullptr;s.build_sampled=0;s.previous.clear();s.last_sample=0;
     if(!s.match_open){s.match_open=true;s.status=4;s.started=GetTickCount64();s.sequence=0;
-        Json header={{"schema",4},{"started_utc_ms",utc_milliseconds()},{"event","recording_started"},{"source","native_status_1hz"},{"tracking_schema",1},{"combat_counters_available",false},{"roster_available",false},{"skill_choices_available",false},{"build_schema",1},{"skill_snapshots","per_sample_availability"},{"random_class_choice",nullptr},{"timeline",timeline_stamp(s.started)},{"sampling_interval_ms",1000},{"mod_version","0.1.12"}};
+        Json header={{"schema",4},{"started_utc_ms",utc_milliseconds()},{"event","recording_started"},{"source","native_status_1hz"},{"tracking_schema",1},{"combat_counters_available",false},{"roster_available",false},{"skill_choices_available",false},{"build_schema",1},{"skill_snapshots","per_sample_availability"},{"random_class_choice",nullptr},{"timeline",timeline_stamp(s.started)},{"sampling_interval_ms",1000},{"mod_version","0.1.13"}};
         enqueue({1,header.dump(),s.folder},true);
     }
 }

@@ -44,7 +44,7 @@ int main(int argc,char** argv){
  for(int page=0;page<3;++page){credits_page=page;paint_panel();picture(folder/("credits-"+std::to_string(page)+".bmp"));for(const auto& c:controls)assert(c.id>=571&&c.id<=573);}
  activate(571);assert(!credits_popup);paint_panel();
  {
-  ssc_shared::Style shared;shared.mode=ssc_shared::Mode::gradient;shared.count=3;shared.colors={0xff0000,0x00ff00,0x0000ff};
+  ssc_shared::Style shared;shared.mode=ssc_shared::Mode::gradient;shared.count=3;shared.colors={0xff0000,0xff00,0xff};
   float r=1,g=1,b=1,phase=0,out[3]{};const auto old_color=ssc_names::color_scope,old_identity=ssc_names::identity_scope;
   {ssc_names::ColorScope outer(false);ssc_names::shared_tint(outer,shared,r,g,b,phase);
    {ssc_names::ColorScope nested(false);nested.inherit_remote();ssc_names::palette(0,out,85,0,0,0);assert(out[0]<.001f&&out[1]>.999f&&out[2]<.001f);}

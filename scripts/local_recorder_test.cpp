@@ -7,7 +7,7 @@ template<class T> void put(unsigned char* p,size_t offset,T value){std::memcpy(p
 void test_source(){
  auto base=static_cast<unsigned char*>(VirtualAlloc(nullptr,0x1000000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));assert(base);
  std::vector<unsigned char> world(0xa680),actor(0x3478),weapons(0x748);auto a=reinterpret_cast<uintptr_t>(actor.data());
- put(base,0xde45d0,reinterpret_cast<uintptr_t>(world.data()));put(base,0xe1c0a8,a);put(base,0xe18628,0);
+ put(base,0xde55d0,reinterpret_cast<uintptr_t>(world.data()));put(base,0xe1d0b8,a);put(base,0xe19638,0);
  put(world.data(),0xa618,a);put(world.data(),0xa620,a+actor.size());put(world.data(),0x128,6);put(world.data(),0x3e0,3);
  put(world.data(),0x46c,5);auto address=reinterpret_cast<uintptr_t>(base);
  assert(ssc_record::active_round(address,2));assert(!ssc_record::active_round(address,1));assert(!ssc_record::active_round(address,3));
@@ -18,7 +18,7 @@ void test_source(){
  put(actor.data(),0x78,0);put(actor.data(),0x81,(unsigned char)1);put(actor.data(),0x350,5);put(actor.data(),0x870,7);put(actor.data(),0x13a4,75.f);put(actor.data(),0x858,100.f);
  auto w=reinterpret_cast<uintptr_t>(weapons.data());put(actor.data(),0x12a0,w);put(actor.data(),0x12a8,w+weapons.size());std::memcpy(weapons.data()+0x48,"Fixture",7);put(weapons.data(),0x58,size_t(7));put(weapons.data(),0x60,size_t(15));
  auto snapshot=ssc_record::sample_local_build(reinterpret_cast<uintptr_t>(base));assert(snapshot["class_id"]==5&&snapshot["health"]==75&&snapshot["inventory_weapons"][0]=="Fixture");
- put(base,0xe1c0a8,uintptr_t(0));snapshot=ssc_record::sample_local_build(reinterpret_cast<uintptr_t>(base));assert(snapshot["class_id"].is_null());
+ put(base,0xe1d0b8,uintptr_t(0));snapshot=ssc_record::sample_local_build(reinterpret_cast<uintptr_t>(base));assert(snapshot["class_id"].is_null());
  VirtualFree(base,0,MEM_RELEASE);
 }
 int main(int argc,char**argv){test_source();assert(argc==2);using namespace ssc_record;auto folder=std::filesystem::path(argv[1]);assert(!std::filesystem::exists(folder));

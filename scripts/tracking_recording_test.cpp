@@ -37,7 +37,7 @@ void test_late_join_recovery(){
 void test_xp_source(const unsigned char* reviewed=nullptr){
  auto* base=static_cast<unsigned char*>(VirtualAlloc(nullptr,0x1000000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));assert(base);
  std::vector<unsigned char> world(0xa680),actor(0x3478);auto a=reinterpret_cast<uintptr_t>(actor.data()),w=reinterpret_cast<uintptr_t>(world.data());
- fixture_put(base,0xfac614,2);fixture_put(base,0xde45d0,w);fixture_put(base,0xe1c0a8,a);fixture_put(base,0xe18628,0);
+ fixture_put(base,0xfad634,2);fixture_put(base,0xde55d0,w);fixture_put(base,0xe1d0b8,a);fixture_put(base,0xe19638,0);
  fixture_put(world.data(),0x128,6);fixture_put(world.data(),0x3e0,2);fixture_put(world.data(),0x46c,3);fixture_put(world.data(),0xa618,a);fixture_put(world.data(),0xa620,a+actor.size());
  fixture_put(actor.data(),0x81,(unsigned char)1);fixture_put(actor.data(),0x870,5);fixture_put(actor.data(),0x13a4,100.f);fixture_put(actor.data(),0x858,100.f);
  uintptr_t got_actor=0,got_world=0;fixture_put(actor.data(),0x878,1250.5f);
@@ -48,10 +48,10 @@ void test_xp_source(const unsigned char* reviewed=nullptr){
  if(reviewed){
   // Use a distinct allocation: guards cache their decision per module base.
   auto* native=static_cast<unsigned char*>(VirtualAlloc(nullptr,0x1000000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));assert(native);
-  for(auto span:std::vector<std::pair<size_t,size_t>>{{0x240920,247},{0x22f220,36},{0x3b9d69,91},{0x3bc717,70},{0xc76920,4},{0xc767a4,4},{0xc75d20,8},{0xc7726c,4}})std::memcpy(native+span.first,reviewed+span.first,span.second);
+  for(auto span:std::vector<std::pair<size_t,size_t>>{{0x240cc0,247},{0x22f5c0,36},{0x3b9f09,91},{0x3bc8b7,70},{0xc78068,4},{0xc77eec,4},{0xc77468,8},{0xc789b4,4}})std::memcpy(native+span.first,reviewed+span.first,span.second);
   // Reset the guard's last checked base before testing a potentially reused allocation.
   assert(ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(reviewed)));
-  fixture_put(native,0xfac614,2);fixture_put(native,0xde45d0,w);fixture_put(native,0xe1c0a8,a);fixture_put(native,0xe18628,0);
+  fixture_put(native,0xfad634,2);fixture_put(native,0xde55d0,w);fixture_put(native,0xe1d0b8,a);fixture_put(native,0xe19638,0);
   fixture_put(world.data(),0x488,180.f);fixture_put(world.data(),0x3bc,-31.243f);fixture_put(world.data(),0x3cc,179.9f);
   auto native_o=ssc_auto::sample(reinterpret_cast<uintptr_t>(native),got_actor,got_world);
   assert(native_o.valid&&native_o.recording_countdown_seconds==-179&&native_o.recording_round_seconds==359);
