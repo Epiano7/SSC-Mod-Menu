@@ -25,8 +25,8 @@ int cosmetic_stop=-1;
 int color_popup=-2,picker_drag=0;unsigned picker_original=0;bool picker_old_gradient=false,picker_old_rainbow=false,picker_editing=false;
 ssc_color::HSV picker_hsv;std::wstring picker_hex;
 void close_color_picker(bool cancel=false);
-unsigned quick_mask=63;
-int quick_count(){int n=0;for(int i=0;i<6;++i)n+=(quick_mask>>i)&1;return n;}
+unsigned quick_mask=127;
+int quick_count(){int n=0;for(int i=0;i<8;++i)n+=(quick_mask>>i)&1;return n;}
 int quick_height(){return 186+64*quick_count();}
 bool auto_rule_editor=false,auto_guide=false;int auto_list_page=0,auto_guide_page=0;
 int dropdown=-1,dropdown_choice=0,chat_field=0,chat_variant=0;std::vector<std::wstring> dropdown_items;
@@ -34,7 +34,7 @@ bool chat_editing=false,chat_select_all=false,chat_new=false;std::string chat_bu
 ssc_edit::Cursor edit_cursor;
 struct EditVisual {std::wstring value;int id=0,x=0,y=0,w=0,size=15;size_t first=0;};
 std::vector<EditVisual> edit_visuals;
-int lab_drag=-1;
+int lab_drag=-1;bool speed_dragging=false,slow_binding=false,photo_binding=false;
 bool scale_dragging=false;int scale_preview=100;float scale_drag_left=0,scale_drag_width=1;
 bool bot_color_error=false;
 bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buffer;
@@ -42,7 +42,7 @@ bool statistics_graph_visible(){return manager&&settings_page==21&&!ssc_hud::edi
 bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hud::editing;}
 
 // Advance this ID when publishing a new set of release notes.
-constexpr int release_notes_id=20261010;
+constexpr int release_notes_id=20261012;
 bool update_popup=false;
 bool show_update_notes=true;int seen_release_notes=0;
 bool update_notes_due(int phase){return presence_supported&&phase==1&&welcome_seen&&show_update_notes&&seen_release_notes!=release_notes_id&&!opened;}
@@ -73,7 +73,7 @@ void log(const char* message) {
 }
 void activate(int id);
 void commit_text(){if(color_editing&&settings_page==4&&color_buffer.size()==6)activate(189);if(chat_editing)activate(321);if(color_editing&&settings_page==18&&ssc_names::private_visible()){unsigned rgb,alpha;if(ssc_names::parse_bot_color(color_buffer,rgb,alpha))activate(537);}}
-void cancel_edit(){close_color_picker();private_editing=false;private_label_editing=false;credits_popup=false;commit_text();dropdown=-1;chat_editing=false;sound_search_editing=false;color_editing=false;rpc_editing=false;rpc_error=false;dirty=true;}
+void cancel_edit(){photo_binding=false;slow_binding=false;speed_dragging=false;close_color_picker();private_editing=false;private_label_editing=false;credits_popup=false;commit_text();dropdown=-1;chat_editing=false;sound_search_editing=false;color_editing=false;rpc_editing=false;rpc_error=false;dirty=true;}
 void save() {
     ssc_names::cosmetics=cosmetic_requested&&ssc_compat::supports(1);
     ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);
@@ -84,9 +84,20 @@ void save() {
     std::ofstream out(temp);
     out<<"private_menu_label="<<private_label<<"\n";
     auto bot_hex=ssc_names::bot_color_hex();out<<"bot_name_hex="<<std::string(bot_hex.begin(),bot_hex.end())<<"\n";
-    out<<"quick_modules="<<quick_mask<<"\n";
+    out<<"quick_modules="<<quick_mask<<"\nquick_freecam_known=1\n";
     out<<"ignored_update_version="<<ssc_update::ignored_version<<"\n";
     out<<"show_update_notes="<<show_update_notes<<"\nseen_release_notes="<<seen_release_notes<<"\n";
+    out<<"camera_relative_driving="<<ssc_vehicle::enabled.load()<<"\n";
+    out<<"freecam_hide_shadows="<<ssc_freecam::hide_shadows<<"\n";
+    out<<"freecam_hide_diagnostics="<<ssc_freecam::hide_diagnostics<<"\n";
+    out<<"freecam_hide_hud="<<ssc_freecam::hide_hud<<"\n";
+    out<<"freecam_fly="<<ssc_freecam::fly<<"\n";
+    out<<"freecam_photo_enabled="<<ssc_freecam::photo_enabled<<"\n";out<<"freecam_photo_key="<<ssc_freecam::photo_key<<"\n";
+    out<<"freecam_slow_key="<<ssc_freecam::slow_key<<"\n";out<<"freecam_slow_toggle="<<ssc_freecam::slow_toggle<<"\n";
+    out<<"freecam_fly_speed="<<int(ssc_freecam::fly_speed)<<"\n";
+    out<<"freecam_speed="<<int(ssc_freecam::state.speed)<<"\n";
+    out<<"freecam_draw_distance="<<ssc_freecam::draw_distance<<"\n";
+    out<<"hide_crosshair="<<ssc_creator::hide_crosshair.load()<<"\n";
     out<<"geri_mode="<<ssc_geri::enabled.load()<<"\n";
     out<<"cooldown_pulse="<<ssc_cooldown::settings.enabled<<"\ncooldown_duration_ms="<<ssc_cooldown::settings.duration_ms<<"\n";
     out<<"hud_hover_fade="<<ssc_hud::hover_fade<<"\n";out<<"hud_enabled="<<ssc_hud::enabled<<"\n";for(const auto& item:ssc_hud::items){out<<"hud_box_"<<item.key<<"="<<item.home_x<<","<<item.home_y<<","<<item.w<<","<<item.h<<"\n";out<<"hud_"<<item.key<<"="<<item.x<<","<<item.y<<","<<item.scale<<"\n";}
@@ -116,7 +127,7 @@ void move_hud(float x,float y){
 }
 void load_settings() {
     ssc_chat::load(state_dir);ssc_auto::load(state_dir);
-    std::ifstream in(state_dir/L"menu.ini");std::string line;bool version2=false;
+    std::ifstream in(state_dir/L"menu.ini");std::string line;bool version2=false,quick_freecam_known=false;
     // Defaults are inert. Only v2 carries the test clock forward.
     while(std::getline(in,line)) {
         auto at=line.find('=');if(at==std::string::npos)continue;
@@ -130,9 +141,23 @@ void load_settings() {
         if(key=="ignored_update_version"){if(ssc_update::valid_version(value))ssc_update::ignored_version=value;continue;}
         if(key=="rpc_id"){if(value.empty()||ssc_rpc::valid_id(value))rpc_id=value.empty()?ssc_rpc::bundled_application_id:value;continue;}
         try {size_t used=0;number=std::stoi(value,&used);if(used!=value.size())continue;}catch(...){continue;}
-        if(key=="quick_modules"&&number>=0&&number<64)quick_mask=unsigned(number);
+        if(key=="quick_modules"&&number>=0&&number<256)quick_mask=unsigned(number);
+        else if(key=="quick_freecam_known")quick_freecam_known=number==1;
         else if(key=="show_update_notes")show_update_notes=number!=0;
         else if(key=="seen_release_notes")seen_release_notes=number;
+        else if(key=="camera_relative_driving")ssc_vehicle::enabled=number!=0;
+        else if(key=="freecam_hide_shadows")ssc_freecam::hide_shadows=number!=0;
+        else if(key=="freecam_hide_diagnostics")ssc_freecam::hide_diagnostics=number!=0;
+        else if(key=="freecam_hide_hud")ssc_freecam::hide_hud=number!=0;
+        else if(key=="freecam_fly")ssc_freecam::fly=number!=0;
+        else if(key=="freecam_photo_enabled")ssc_freecam::photo_enabled=number!=0;
+        else if(key=="freecam_photo_key")ssc_freecam::photo_key=ssc_freecam::valid_slow_key(number)?number:VK_F8;
+        else if(key=="freecam_slow_key")ssc_freecam::slow_key=ssc_freecam::valid_slow_key(number)?number:VK_F6;
+        else if(key=="freecam_slow_toggle")ssc_freecam::slow_toggle=number!=0;
+        else if(key=="freecam_fly_speed")ssc_freecam::fly_speed=float(std::clamp(number,30,12000));
+        else if(key=="freecam_speed")ssc_freecam::state.speed=float(std::clamp(number,30,600));
+        else if(key=="freecam_draw_distance")ssc_freecam::draw_distance=(number==1000||number==2000||number==4000||number==8000)?number:0;
+        else if(key=="hide_crosshair")ssc_creator::hide_crosshair=number!=0;
         else if(key=="geri_mode")ssc_geri::enabled=number!=0;
         else if(key=="cooldown_pulse")ssc_cooldown::settings.enabled=number!=0;
         else if(key=="cooldown_duration_ms"&&(number==1000||number==1500||number==2500))ssc_cooldown::settings.duration_ms=unsigned(number);
@@ -156,6 +181,8 @@ void load_settings() {
         else if(key=="animations")animations=number!=0;
         else if(key=="ui_scale"&&number>=50&&number<=200)ui_scale=number;
     }
+    if(!quick_freecam_known)quick_mask|=64;
+    if(ssc_freecam::photo_key==ssc_freecam::slow_key)ssc_freecam::photo_key=ssc_freecam::slow_key==VK_F8?VK_F9:VK_F8;
     if(!version2||!developer_tools)clock_enabled=false;
     if(recording_requested)ssc_record::start(state_dir/L"recordings");
 }
@@ -171,13 +198,22 @@ void advance_animation(float seconds) {
 }
 void refresh_dynamic_panel(ULONGLONG now,bool presence_tick=false) {
     if(!opened||!manager||ssc_hud::editing)return;
+    static bool freecam_notice=false;bool notice=now<ssc_freecam::notice_until;if(notice!=freecam_notice){freecam_notice=notice;dirty=true;}
     static unsigned statistics_revision=0;auto revision=ssc_stats::reader().revision.load();if(statistics_revision!=revision){statistics_revision=revision;if(statistics_select_latest){statistics_round=0;statistics_select_latest=false;}if(settings_page==20||settings_page==21)dirty=true;}
     if(presence_tick&&(settings_page==5||settings_page==16))dirty=true;
     static ULONGLONG caret_at=0;if((picker_editing||private_editing||chat_editing||sound_search_editing||color_editing||rpc_editing||(settings_page==11&&(ssc_lab::picker>=0||ssc_lab::editing>=0)))&&now/500!=caret_at){caret_at=now/500;dirty=true;}
     static ULONGLONG rainbow_at=0;
-    if(settings_page==4&&(ssc_names::rainbow||ssc_names::gradient)&&now-rainbow_at>=50){rainbow_at=now;dirty=true;}
+    if(((settings_page==4&&(ssc_names::rainbow||ssc_names::gradient))||(settings_page==13&&credits_popup&&credits_page==0))&&now-rainbow_at>=50){rainbow_at=now;dirty=true;}
 }
 void close_menu(bool immediate=false) {if(update_popup)immediate=true;update_popup=false;finish_scale();finish_lab_slider();if(manager&&settings_page==8){welcome_seen=true;seen_release_notes=release_notes_id;save();}if(manager&&settings_page==14){seen_release_notes=release_notes_id;save();}if(ssc_hud::editing){ssc_hud::editing=false;save();}finish_hud_drag();opened=false;dirty=true;pressed=0;keyboard_focus=0;cancel_edit();if(immediate){visibility=0;modal_visibility=0;}ReleaseCapture();log("Menu closed");}
+void finish_freecam_entry(){
+    if(previous_proc&&game_window){
+        for(int key=8;key<256;++key)CallWindowProcW(previous_proc,game_window,WM_KEYUP,key,(1LL<<31)|(1LL<<30)|1);
+        CallWindowProcW(previous_proc,game_window,WM_LBUTTONUP,0,0);
+        CallWindowProcW(previous_proc,game_window,WM_RBUTTONUP,0,0);
+    }
+    close_menu(true);
+}
 void show_manager(int page=-1) {
     if(page==18&&!ssc_names::private_visible())page=-1;
     update_popup=false;
@@ -216,11 +252,11 @@ void live_hud_wheel(int delta,int hovered_item){if(hud_drag>=0){finish_hud_drag(
 bool module_ready(int id){
     if(id==510||id==511||(id>=530&&id<=537))return ssc_names::private_visible();
     if(!ssc_compat::initialized)return true;
-    return id==570?ssc_geri::attached:id==330?ssc_auto::supported():id==80?ssc_sound::attached:id==81?ssc_names::attached:id==83?presence_supported:(id==86||id==193)?ssc_hud::attached:true;
+    return id==981?ssc_vehicle::attached:id==586?ssc_creator::attached:id==570?ssc_geri::attached:id==330?ssc_auto::supported():id==80?ssc_sound::attached:id==81?ssc_names::attached:id==83?presence_supported:(id==86||id==193)?ssc_hud::attached:true;
 }
 bool wheel_round_ended=false;
 void open_dropdown(int id,std::vector<std::wstring> labels,int choice){dropdown=dropdown==id?-1:id;dropdown_items=std::move(labels);dropdown_choice=choice;dirty=true;}
-void select_dropdown(int value){int id=dropdown;dropdown=-1;dirty=true;if(id==602){statistics_class=std::clamp(value,0,8);statistics_round=0;return;}if(id==610){statistics_round=std::max(0,value);return;}if(id==611){statistics_intervals=4+2*std::clamp(value,0,2);return;}auto& r=ssc_auto::current();if(id==500){chat_variant=std::clamp(value,0,int(ssc_chat::message_count(ssc_chat::slots[ssc_chat::order[ssc_chat::selected]]))-1);chat_editing=false;}else if(id==488){const int levels[]={0,50,75,100,125,150,200,250,300};if(value>=0&&value<9)ssc_sound::set_volume(levels[value]);}else if(id==462){wheel_round_ended=value==1;auto visible=ssc_chat::visible_order(wheel_round_ended);if(std::find(visible.begin(),visible.end(),ssc_chat::selected)==visible.end())ssc_chat::selected=visible.back();chat_variant=0;chat_editing=false;}else if(id==324){auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];slot.icon=value;slot.custom=false;}else if(id==326)r.event=ssc_auto::choice_event(value);else if(id==344)ssc_auto::variable=value;else if(id==405)r.any=value==1;else if(id==406)r.repeats=value+1;else if(id==208){ssc_lab::sort_mode=value;ssc_lab::picker_page=0;}else if(id>=410&&id<413)r.conditions[id-410].stat=value;else if(id>=420&&id<423)r.conditions[id-420].comparison=value;save();}
+void select_dropdown(int value){int id=dropdown;dropdown=-1;dirty=true;if(id==602){statistics_class=std::clamp(value,0,8);statistics_round=0;return;}if(id==610){statistics_round=std::max(0,value);return;}if(id==611){statistics_intervals=4+2*std::clamp(value,0,2);return;}auto& r=ssc_auto::current();if(id==500){chat_variant=std::clamp(value,0,int(ssc_chat::message_count(ssc_chat::slots[ssc_chat::order[ssc_chat::selected]]))-1);chat_editing=false;}else if(id==488){const int levels[]={0,50,75,100,125,150,200,250,300};if(value>=0&&value<9)ssc_sound::set_volume(levels[value]);}else if(id==462){wheel_round_ended=value==1;auto visible=ssc_chat::visible_order(wheel_round_ended);if(std::find(visible.begin(),visible.end(),ssc_chat::selected)==visible.end())ssc_chat::selected=visible.back();chat_variant=0;chat_editing=false;}else if(id==324){auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];slot.icon=value;slot.custom=false;}else if(id==581)r.hold_seconds=value;else if(id==582)r.delay_seconds=value;else if(id==326)r.event=ssc_auto::choice_event(value);else if(id==344)ssc_auto::variable=value;else if(id==405)r.any=value==1;else if(id==406)r.repeats=value+1;else if(id==208){ssc_lab::sort_mode=value;ssc_lab::picker_page=0;}else if(id>=410&&id<413)r.conditions[id-410].stat=value;else if(id>=420&&id<423)r.conditions[id-420].comparison=value;save();}
 unsigned& picker_value(){return color_popup<0?ssc_names::solid_rgb:ssc_names::gradient_colors[color_popup];}
 void picker_refresh_hex(){wchar_t buffer[8];swprintf(buffer,8,L"%06X",picker_value());picker_hex=buffer;}
 void picker_apply(){picker_value()=picker_hsv.rgb();ssc_names::gradient=color_popup>=0;if(color_popup<0)ssc_names::rainbow=false;picker_refresh_hex();dirty=true;}
@@ -242,7 +278,27 @@ void activate(int id) {
     if(id>=1000&&dropdown>=0&&id-1000<int(dropdown_items.size())){select_dropdown(id-1000);return;}
     if(id!=521)private_editing=false;
     if(id!=566&&id!=567&&private_label_editing){if(ssc_names::private_visible()&&valid_private_label(private_label_buffer))private_label=private_label_buffer;private_label_editing=false;save();}
-    if(id==560){shared_notice.clear();show_manager(22);}
+    if(id==585){show_manager(24);}
+    else if(id==980){show_manager(26);}
+    else if(id==981){if(ssc_vehicle::attached){ssc_vehicle::enabled=!ssc_vehicle::enabled.load();save();}}
+    else if(id==586){if(ssc_creator::attached){ssc_creator::hide_crosshair=!ssc_creator::hide_crosshair.load();save();}}
+    else if(id==587){show_manager(9);}
+    else if(id==588){if(ssc_freecam::state.active||ssc_freecam::pending_since){ssc_freecam::stop();dirty=true;}else {if(ssc_freecam::request_start(GetTickCount64()))finish_freecam_entry();dirty=true;}}
+    else if(id==592||id==593){if(!ssc_freecam::state.active){ssc_freecam::fly=id==593;save();}}
+    else if(id==962){show_manager(25);}
+    else if(id==963){ssc_freecam::photo_enabled=!ssc_freecam::photo_enabled;ssc_freecam::photo_frozen=false;save();}
+    else if(id==964){photo_binding=true;slow_binding=true;dirty=true;}
+    else if(id==960){photo_binding=false;slow_binding=true;dirty=true;}
+    else if(id==961){ssc_freecam::slow_toggle=!ssc_freecam::slow_toggle;ssc_freecam::slow_latched=false;save();}
+    else if(id==589){ssc_freecam::hide_hud=!ssc_freecam::hide_hud;save();}
+    else if(id==590){ssc_freecam::state.speed=std::clamp(ssc_freecam::state.speed-30,30.f,600.f);save();}
+    else if(id==591){ssc_freecam::state.speed=std::clamp(ssc_freecam::state.speed+30,30.f,600.f);save();}
+    else if(id>=594&&id<=598){constexpr int distances[]={1000,2000,4000,8000,0};ssc_freecam::draw_distance=distances[id-594];save();}
+    else if(id==580){show_manager(23);}
+    else if(id==584){auto_rule_editor=true;show_manager(16);}
+    else if(id==581||id==582){std::vector<std::wstring> labels;for(int seconds=0;seconds<=60;++seconds)labels.push_back(seconds?std::to_wstring(seconds)+L" seconds":L"Off / immediate");open_dropdown(id,labels,id==581?ssc_auto::current().hold_seconds:ssc_auto::current().delay_seconds);}
+    else if(id==583){ssc_auto::current().cancel_on_death=!ssc_auto::current().cancel_on_death;save();}
+    else if(id==560){shared_notice.clear();show_manager(22);}
     else if(id==561){shared_receive=!shared_receive;save();}
     else if(id==562){shared_publish=!shared_publish;save();}
     else if(id==566&&ssc_names::private_visible()){private_label_buffer=private_label;private_label_editing=true;edit_cursor.begin(private_label_buffer.size());dirty=true;}
@@ -266,6 +322,10 @@ void activate(int id) {
     else if(id==488){if(ssc_sound::selection<ssc_sound::entries.size()){auto v=ssc_sound::clip_volume(ssc_sound::entries[ssc_sound::selection]);open_dropdown(id,{L"0%",L"50%",L"75%",L"100%",L"125%",L"150%",L"200%",L"250%",L"300%"},v==0?0:v==50?1:v==75?2:v==100?3:v==125?4:v==150?5:v==200?6:v==250?7:8);}}
     else if(id==489){ssc_sound::preview_custom(game_window);dirty=true;}
     else if(id==480){show_manager(17);}
+    else if(id==967){ssc_freecam::hide_shadows=!ssc_freecam::hide_shadows;save();}
+    else if(id==966){ssc_freecam::hide_diagnostics=!ssc_freecam::hide_diagnostics;save();}
+    else if(id==982){quick_mask^=128;save();}
+    else if(id==965){quick_mask^=64;save();}
     else if(id>=481&&id<=486){quick_mask^=1u<<(id-481);save();}
     else if(id==300&&ssc_chat::attached){ssc_chat::enabled=!ssc_chat::enabled;save();}
     else if(id==301){show_manager(15);}
@@ -339,7 +399,7 @@ void activate(int id) {
     else if(id==105){ssc_sound::preview_original();dirty=true;}
     else if(id==1)close_menu();
     else if(id==3)show_manager();
-    else if(id==4){ssc_geri::enabled=false;ssc_auth::service().enable(false);ssc_auto::enabled=false;ssc_auto::engine.reset();ssc_chat::enabled=false;ssc_hud::enabled=false;sound_requested=false;cosmetic_requested=false;rpc_requested=false;clock_enabled=false;save();}
+    else if(id==4){ssc_vehicle::enabled=false;ssc_freecam::stop();ssc_creator::hide_crosshair=false;ssc_geri::enabled=false;ssc_auth::service().enable(false);ssc_auto::enabled=false;ssc_auto::engine.reset();ssc_chat::enabled=false;ssc_hud::enabled=false;sound_requested=false;cosmetic_requested=false;rpc_requested=false;clock_enabled=false;save();}
     else if(id==5)show_quick();
     else if(id>=10&&id<=12){show_manager(id==10?-1:id-10);}
     else if(id==40){animations=!animations;visibility=opened?1.f:0.f;modal_visibility=opened&&manager?1.f:0.f;save();}
@@ -435,7 +495,10 @@ template<class S,class Accept> bool edit_input(S& value,UINT message,WPARAM wp,s
  return false;
 }
 LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
-    if(message==WM_POWERBROADCAST&&(wp==PBT_APMSUSPEND||wp==PBT_APMRESUMEAUTOMATIC||wp==PBT_APMRESUMESUSPEND||wp==PBT_APMRESUMECRITICAL)){ssc_beta::service().invalidate();ssc_auth::service().invalidate();dirty=true;}
+    if(message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wp))ssc_freecam::suspend_focus();
+    if(message==WM_SETFOCUS||(message==WM_ACTIVATEAPP&&wp))ssc_freecam::resume_focus();
+    if(message==WM_DESTROY)ssc_freecam::lose_focus();
+    if(message==WM_POWERBROADCAST&&(wp==PBT_APMSUSPEND||wp==PBT_APMRESUMEAUTOMATIC||wp==PBT_APMRESUMESUSPEND||wp==PBT_APMRESUMECRITICAL)){ssc_freecam::lose_focus();ssc_beta::service().invalidate();ssc_auth::service().invalidate();dirty=true;}
     if(message==WM_DESTROY){ssc_beta::service().stop();ssc_auth::service().stop();}
     if(opened&&dropdown>=0){if(message==WM_MOUSEWHEEL){dropdown_choice=std::clamp(dropdown_choice-GET_WHEEL_DELTA_WPARAM(wp)/WHEEL_DELTA,0,int(dropdown_items.size())-1);dirty=true;return 0;}if(message==WM_KEYDOWN){if(wp==VK_ESCAPE){dropdown=-1;dirty=true;suppress_escape_up=true;return 0;}if(wp==VK_UP||wp==VK_DOWN||wp==VK_TAB){dropdown_choice=std::clamp(dropdown_choice+(wp==VK_UP?-1:1),0,int(dropdown_items.size())-1);dirty=true;return 0;}if(wp==VK_RETURN){select_dropdown(dropdown_choice);return 0;}}if(message==WM_LBUTTONDOWN&&hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp))==0){dropdown=-1;pressed=0;dirty=true;return 0;}}
 
@@ -454,6 +517,17 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         }return 0;
     }
     if(message==WM_KEYUP&&menu_key)return 0;
+    if(opened&&manager&&(settings_page==24||settings_page==25)&&slow_binding&&(message==WM_KEYDOWN||message==WM_SYSKEYDOWN)){
+        if(wp==VK_ESCAPE){photo_binding=false;slow_binding=false;suppress_escape_up=true;dirty=true;}
+        else if(ssc_freecam::valid_slow_key(int(wp))&&int(wp)!=(photo_binding?ssc_freecam::slow_key:ssc_freecam::photo_key)){if(photo_binding)ssc_freecam::photo_key=int(wp);else ssc_freecam::slow_key=int(wp);photo_binding=false;ssc_freecam::slow_latched=false;slow_binding=false;save();}
+        return 0;
+    }
+    if(message==WM_CAPTURECHANGED||message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wp)){if(speed_dragging){speed_dragging=false;save();}slow_binding=false;}
+    if(message==WM_KEYDOWN&&wp==VK_ESCAPE&&ssc_freecam::state.active){ssc_freecam::stop();suppress_escape_up=true;dirty=true;return 0;}
+    if(message==WM_SYSKEYDOWN&&wp==VK_F4&&ssc_freecam::state.active){ssc_freecam::stop();return CallWindowProcW(previous_proc,window,message,wp,lp);}
+    if(ssc_freecam::key(message,wp,opened))return 0;
+    if(ssc_freecam::state.active&&!opened){if(message==WM_MOUSEWHEEL){ssc_freecam::camera.wheel(float(GET_WHEEL_DELTA_WPARAM(wp))/WHEEL_DELTA,(GET_KEYSTATE_WPARAM(wp)&MK_SHIFT)!=0,ssc_freecam::fly);return 0;}if(message==WM_SETCURSOR&&ssc_freecam::mouse_window){SetCursor(nullptr);return TRUE;}if(message==WM_INPUT){ssc_freecam::raw_motion(lp);return DefWindowProcW(window,message,wp,lp);}if(message==WM_CHAR||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;}
+
     if(message==WM_KEYUP&&wp==VK_ESCAPE&&suppress_escape_up){suppress_escape_up=false;return 0;}
     if(message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wp)){
         // Keep the current panel and unfinished text edits across Alt+Tab,
@@ -475,7 +549,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         if(message==WM_MOUSEMOVE){if(picker_drag)move_color_picker(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));return 0;}
         if(message==WM_LBUTTONUP){if(picker_drag){move_color_picker(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));picker_drag=0;ReleaseCapture();save();}else{int id=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));if(id==pressed&&(id==553||id==554))activate(id);}pressed=0;return 0;}
         if((message>=WM_KEYFIRST&&message<=WM_KEYLAST)||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;
-        if(message==WM_INPUT)return DefWindowProcW(window,message,wp,lp);
+        if(message==WM_INPUT){ssc_freecam::raw_motion(lp);return DefWindowProcW(window,message,wp,lp);}
     }
     if(ssc_hud::editing){
         if(message==WM_SETCURSOR){SetCursor(LoadCursor(nullptr,IDC_ARROW));return TRUE;}
@@ -491,7 +565,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         if(message==WM_MOUSEWHEEL){live_hud_wheel(GET_WHEEL_DELTA_WPARAM(wp),live_hud_hit(x,y));return 0;}
         if(message==WM_CAPTURECHANGED){if(hud_drag>=0)log("HUD mouse capture lost");finish_hud_drag();return 0;}
         if((message>=WM_KEYFIRST&&message<=WM_KEYLAST)||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;
-        if(message==WM_INPUT)return DefWindowProcW(window,message,wp,lp);
+        if(message==WM_INPUT){ssc_freecam::raw_motion(lp);return DefWindowProcW(window,message,wp,lp);}
     }
     if(opened||visibility>0.f) {
         if(opened&&credits_popup&&message==WM_KEYDOWN&&wp==VK_ESCAPE){credits_popup=false;dirty=true;suppress_escape_up=true;return 0;}
@@ -515,6 +589,15 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
             if(message==WM_KEYDOWN&&wp==VK_RETURN){activate(321);return 0;}
             if(edit_input(chat_buffer,message,wp,chat_field==1&&settings_page==16?32:100,[](unsigned c){return c>=32&&c<=126;},window))return 0;
         }
+        if(opened&&manager&&settings_page==24){
+            auto move_speed=[&](int x){ssc_freecam::selected_speed()=float(std::lround(30+(ssc_freecam::speed_limit()-30)*std::clamp(((x-panel_x)/draw_scale-560)/460.f,0.f,1.f)));dirty=true;};
+            if(message==WM_LBUTTONDOWN&&hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp))==599){keyboard_focus=599;speed_dragging=true;move_speed(GET_X_LPARAM(lp));SetCapture(window);return 0;}
+            if(message==WM_MOUSEMOVE&&speed_dragging){move_speed(GET_X_LPARAM(lp));return 0;}
+            if(message==WM_LBUTTONUP&&speed_dragging){move_speed(GET_X_LPARAM(lp));speed_dragging=false;save();ReleaseCapture();return 0;}
+            if(message==WM_KEYDOWN&&keyboard_focus==599&&(wp==VK_LEFT||wp==VK_RIGHT||wp==VK_UP||wp==VK_DOWN||wp==VK_HOME||wp==VK_END)){
+                ssc_freecam::selected_speed()=wp==VK_HOME?30:wp==VK_END?ssc_freecam::speed_limit():std::clamp(ssc_freecam::selected_speed()+((wp==VK_RIGHT||wp==VK_UP)?1.f:-1.f)*ssc_freecam::speed_step(),30.f,ssc_freecam::speed_limit());save();return 0;
+            }
+        }
         if(opened&&manager&&settings_page==11&&ssc_lab::tab==2&&ssc_lab::picker<0){
             if(message==WM_LBUTTONDOWN){int id=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));if(id>=250&&id<=252){keyboard_focus=id;lab_drag=id-250;move_lab_slider(GET_X_LPARAM(lp));SetCapture(window);return 0;}}
             if(message==WM_MOUSEMOVE&&lab_drag>=0){move_lab_slider(GET_X_LPARAM(lp));return 0;}
@@ -537,7 +620,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
             if(edit_input(ssc_lab::edit_buffer,message,wp,7,[](unsigned c){return c>='0'&&c<='9';},window)){ssc_lab::edit_error=false;return 0;}
         }
         if(opened&&manager&&settings_page==1){
-            if(message==WM_LBUTTONDOWN&&hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp))==53){scale_dragging=true;scale_drag_left=panel_x+282*draw_scale;scale_drag_width=650*draw_scale;scale_preview=ui_scale;move_scale(GET_X_LPARAM(lp));SetCapture(window);return 0;}
+            if(message==WM_LBUTTONDOWN&&hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp))==53){keyboard_focus=53;scale_dragging=true;scale_drag_left=panel_x+282*draw_scale;scale_drag_width=650*draw_scale;scale_preview=ui_scale;move_scale(GET_X_LPARAM(lp));SetCapture(window);return 0;}
             if(message==WM_MOUSEMOVE&&scale_dragging){move_scale(GET_X_LPARAM(lp));return 0;}
             if(message==WM_LBUTTONUP&&scale_dragging){move_scale(GET_X_LPARAM(lp));finish_scale();finish_lab_slider();ReleaseCapture();return 0;}
             if(message==WM_CAPTURECHANGED){finish_scale();finish_lab_slider();}
@@ -584,7 +667,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         if(message==WM_LBUTTONDOWN){pressed=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));dirty=true;}
         if(message==WM_LBUTTONUP){int id=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));int down=pressed;pressed=0;if(id&&id==down){activate(id);place_caret(id,GET_X_LPARAM(lp));}else if(!id){commit_text();}dirty=true;}
         if((message>=WM_KEYFIRST&&message<=WM_KEYLAST)||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;
-        if(message==WM_INPUT)return DefWindowProcW(window,message,wp,lp);
+        if(message==WM_INPUT){ssc_freecam::raw_motion(lp);return DefWindowProcW(window,message,wp,lp);}
     }
     if(message==WM_NCDESTROY){opened=false;visibility=0;game_window=nullptr;}
     return CallWindowProcW(previous_proc,window,message,wp,lp);
@@ -870,19 +953,20 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"0.1.13 COMPATIBILITY HOTFIX",cyan);
-        bullet(201,L"Restored support for the latest Skillshot City update" );
-        bullet(233,L"Updated native module and recording checks" );
-        bullet(265,L"Shared cosmetics and personal statistics retained" );
+        text(50,153,L"0.1.14 CREATOR CONTROLS",cyan);
+        bullet(201,L"Freecam with 2D pan, 3D flight and creator settings" );
+        bullet(233,L"Optional camera-relative driving in singleplayer" );
+        bullet(265,L"Auto-message timing controls and updated credits" );
         bullet(297,L"Existing settings and custom sounds are preserved" );
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
-        const wchar_t* names[]={L"SOUND REPLACER",L"COSMETICS",L"DISCORD PRESENCE",L"HUD EDITOR",L"CUSTOM QUICK CHAT",L"AUTO MESSAGES"};
-        const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled};const int ids[]={80,81,83,86,300,330},settings[]={91,92,93,94,301,302};
-        int row=0;for(int i=0;i<6;++i)if(quick_mask&(1u<<i)){int y=100+row++*64;rectangle(20,y,600,56,RGB(16,37,62));text(32,y+20,names[i],ink,false,15);toggle(ids[i],350,y+10,enabled[i]);button(settings[i],456,y+10,146,36,L"SETTINGS");}
+        const wchar_t* names[]={L"SOUND REPLACER",L"COSMETICS",L"DISCORD PRESENCE",L"HUD EDITOR",L"CUSTOM QUICK CHAT",L"AUTO MESSAGES",L"FREECAM",L"DRIVING"};
+        const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load()};const int ids[]={80,81,83,86,300,330,588,981},settings[]={91,92,93,94,301,302,585,980};
+        int row=0;for(int i=0;i<8;++i)if(quick_mask&(1u<<i)){int y=100+row++*64;rectangle(20,y,600,56,RGB(16,37,62));text(32,y+20,names[i],ink,false,15);toggle(ids[i],350,y+10,enabled[i]);button(settings[i],456,y+10,146,36,L"SETTINGS");}
         int bottom=118+row*64;button(3,20,bottom,366,42,L"ALL MODULES",true,true,true);button(4,402,bottom,218,42,L"DISABLE ALL");
         if(save_failed)text(24,bottom+51,L"Could not save settings",RGB(247,191,83));
+        else if(GetTickCount64()<ssc_freecam::notice_until)text(24,bottom+51,ssc_freecam::entry_status,RGB(255,190,120),false,11);
     } else {
         button(10,24,108,192,44,L"MODULES",settings_page==-1||(settings_page>=3&&settings_page<=6));
         button(11,24,166,192,44,L"INTERFACE",settings_page==1);
@@ -893,7 +977,21 @@ void paint_panel() {
         if(ssc_names::private_visible())button(510,24,572,192,44,ssc_chat::widen(private_label).c_str(),settings_page==18);
         rectangle(238,108,1,546,RGB(38,65,101));
 
-        if(settings_page==22){
+        if(settings_page==23){
+            auto& r=ssc_auto::current();text(266,111,L"MESSAGE TIMING",ink,true);
+            button(584,850,106,236,38,L"< EDIT RULE");
+            text(282,180,ssc_chat::widen(r.name).c_str(),cyan);
+            text(282,243,L"CONDITION MUST STAY TRUE",ink,false,15);
+            button(581,786,231,300,38,(std::to_wstring(r.hold_seconds)+L" seconds").c_str());
+            text(282,285,L"Restarts if a condition fails or data becomes unavailable.",muted,false,13);
+            text(282,350,L"DELAY BEFORE SENDING",ink,false,15);
+            button(582,786,338,300,38,(std::to_wstring(r.delay_seconds)+L" seconds").c_str());
+            text(282,392,L"Starts after the trigger and condition duration are satisfied.",muted,false,13);
+            text(282,457,L"CANCEL IF YOU DIE",ink,false,15);toggle(583,978,445,r.cancel_on_death);
+            text(282,499,L"Also prevents this rule from triggering while you are dead.",muted,false,13);
+            text(282,561,L"Pending messages cancel on round changes, disconnects or rule edits.",muted,false,12);
+            text(282,596,L"Each rule still triggers at most once per round.",muted,false,12);
+        } else if(settings_page==22){
             text(266,111,L"SHARED COSMETICS",ink,true);
             text(266,188,L"SEE OTHER PLAYERS' COLORS",ink);toggle(561,986,176,shared_receive);
             text(266,252,L"SHARE MY COLORS",ink);toggle(562,986,240,shared_publish);
@@ -928,15 +1026,15 @@ void paint_panel() {
             text(266,500,bot_color_error?L"Enter 6 or 8 hex digits":L"Applies to overhead names and the scoreboard",bot_color_error?RGB(255,120,100):muted,false,13);
         } else if(settings_page==17){
             text(266,111,L"QUICK MENU",ink,true);
-            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages"};
-            for(int i=0;i<6;++i){int y=188+i*70;text(282,y+9,names[i]);toggle(481+i,978,y,(quick_mask&(1u<<i))!=0);}
+            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving"};
+            for(int i=0;i<8;++i){int y=168+i*58;text(282,y+9,names[i]);toggle(i==7?982:i==6?965:481+i,978,y,(quick_mask&(1u<<i))!=0);}
         } else if(settings_page==-1) {
             text(266,111,L"MODULES",ink,true);
-            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor"};
-            const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled};const int ids[]={80,81,83,86};
-            for(int i=0;i<4;++i){int y=174+i*80;rectangle(266,y,820,66,RGB(16,37,62));text(284,y+22,names[i],ink,true);toggle(ids[i],822,y+15,enabled[i]);button(91+i,932,y+15,138,36,L"SETTINGS");}
-            rectangle(266,494,820,66,RGB(16,37,62));text(284,516,L"Custom quick chat",ink,true);toggle(300,822,509,ssc_chat::enabled);button(301,932,509,138,36,L"SETTINGS");
-            rectangle(266,574,820,66,RGB(16,37,62));text(284,596,L"Auto messages",ink,true);toggle(330,822,589,ssc_auto::enabled);button(302,932,589,138,36,L"SETTINGS");
+            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving"};
+            const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load()};
+            const int ids[]={80,81,83,86,300,330,588,981},settings[]={91,92,93,94,301,302,585,980};
+            for(int i=0;i<8;++i){int y=168+i*58;rectangle(266,y,820,54,RGB(16,37,62));text(284,y+15,names[i],ink,true);toggle(ids[i],822,y+9,enabled[i]);button(settings[i],932,y+9,138,36,L"SETTINGS");}
+            if(GetTickCount64()<ssc_freecam::notice_until){rectangle(266,636,820,26,RGB(50,37,53));text(276,640,ssc_freecam::entry_status,RGB(255,190,120),false,12);}
         } else if(settings_page==15){
             text(266,111,L"CUSTOM QUICK CHAT",ink,true);toggle(300,986,106,ssc_chat::enabled);
             wheel_preview();auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];
@@ -958,12 +1056,12 @@ void paint_panel() {
             text(266,111,L"AUTO MESSAGES",ink,true);
             auto& r=ssc_auto::current();
             if(ssc_auto::import_pending){
-                const auto& incoming=ssc_auto::imported;text(266,185,ssc_chat::widen(incoming.name).c_str(),cyan,true);auto event=std::wstring(ssc_auto::events[incoming.event]);if(incoming.event>=3)event+=L" "+std::to_wstring(incoming.threshold);text(266,234,event.c_str());
+                const auto& incoming=ssc_auto::imported;text(266,185,ssc_chat::widen(incoming.name).c_str(),cyan,true);auto event=std::wstring(ssc_auto::events[incoming.event]);if(incoming.event==3||incoming.event==4)event+=L" "+std::to_wstring(incoming.threshold);text(266,234,event.c_str());
                 text(266,275,(L"Send "+std::to_wstring(incoming.repeats)+(incoming.repeats==1?L" time":L" times")).c_str());
                 if(incoming.min_level)text(660,275,(L"Minimum level: "+std::to_wstring(incoming.min_level)).c_str(),muted,false,14);
                 if(!incoming.conditions.empty()){text(266,311,incoming.any?L"Any condition (OR)":L"All conditions (AND)",muted,false,14);const auto& stats=ssc_auto::condition_labels;const wchar_t* op[]={L"at least",L"at most",L"equal to"};for(int i=0;i<int(incoming.conditions.size());++i){auto& c=incoming.conditions[i];auto line=std::wstring(stats[c.stat])+L" "+op[c.comparison]+L" "+std::to_wstring(c.value);text(266,340+i*27,line.c_str(),ink,false,14);}}
                 text(266,438,ssc_chat::widen(incoming.message.substr(0,65)).c_str(),ink,false,14);if(incoming.message.size()>65)text(266,465,ssc_chat::widen(incoming.message.substr(65)).c_str(),ink,false,14);
-                text(266,514,L"The imported rule starts disabled",muted,false,14);button(338,266,561,300,40,L"IMPORT RULE",true,ssc_auto::rules.size()<12);button(339,590,561,180,40,L"CANCEL");
+                text(266,481,(L"Hold: "+std::to_wstring(incoming.hold_seconds)+L"s / Delay: "+std::to_wstring(incoming.delay_seconds)+L"s / Cancel on death: "+(incoming.cancel_on_death?L"Yes":L"No")).c_str(),muted,false,12);text(266,514,L"The imported rule starts disabled",muted,false,14);button(338,266,561,300,40,L"IMPORT RULE",true,ssc_auto::rules.size()<12);button(339,590,561,180,40,L"CANCEL");
 
             }else if(!auto_rule_editor){
                 button(334,266,163,220,40,L"NEW RULE",true,ssc_auto::rules.size()<12);button(337,502,163,200,40,L"IMPORT CODE");button(346,718,163,250,40,L"VARIABLE GUIDE",auto_guide);
@@ -981,14 +1079,14 @@ void paint_panel() {
             }else{
                 button(348,266,157,205,34,L"< ALL RULES");button(335,822,157,156,34,ssc_auto::delete_pending?L"CONFIRM":L"DELETE");toggle(331,986,155,r.enabled);
                 text(266,209,L"NAME",muted,false,13);editbox(400,366,201,720,34,ssc_chat::widen(chat_editing&&chat_field==1?chat_buffer:r.name),chat_editing&&chat_field==1);
-                text(266,252,L"WHEN",muted,false,13);button(326,366,244,510,34,ssc_auto::events[r.event]);if(r.event>=3)editbox(401,894,244,192,34,ssc_chat::widen(chat_editing&&chat_field==2?chat_buffer:std::to_string(r.threshold)),chat_editing&&chat_field==2);
+                text(266,252,L"WHEN",muted,false,13);button(326,366,244,510,34,ssc_auto::events[r.event]);if(r.event==3||r.event==4)editbox(401,894,244,192,34,ssc_chat::widen(chat_editing&&chat_field==2?chat_buffer:std::to_string(r.threshold)),chat_editing&&chat_field==2);
                 text(266,295,L"ONLY IF",muted,false,13);if(!r.conditions.empty())button(405,366,287,330,32,r.any?L"ANY CONDITION (OR)":L"ALL CONDITIONS (AND)");else text(366,296,L"No conditions",muted,false,14);button(407,826,287,260,32,L"ADD CONDITION",false,r.conditions.size()<3);
                 const auto& stats=ssc_auto::condition_labels;const wchar_t* comparisons[]={L"At least",L"At most",L"Equal to"};
                 for(int i=0;i<int(r.conditions.size());++i){auto& c=r.conditions[i];int y=326+i*36;button(410+i,366,y,245,30,stats[c.stat]);button(420+i,621,y,205,30,comparisons[c.comparison]);editbox(450+i,836,y,196,30,ssc_chat::widen(chat_editing&&chat_field==3+i?chat_buffer:std::to_string(c.value)),chat_editing&&chat_field==3+i);button(430+i,1044,y,42,30,L"X");}
                 text(266,447,L"MESSAGE",muted,false,13);auto value=chat_editing&&chat_field==0?chat_buffer:r.message;editbox(320,366,437,720,36,ssc_chat::widen(value),chat_editing&&chat_field==0);
                 text(266,490,L"SEND",muted,false,13);button(406,366,479,160,34,(std::to_wstring(r.repeats)+(r.repeats==1?L" time":L" times")).c_str());button(344,546,479,295,34,ssc_auto::variable_labels[ssc_auto::variable]);button(345,853,479,233,34,L"INSERT VARIABLE");
                 std::string preview,error;auto previewRule=r;previewRule.message=value;error=ssc_auto::rule_warning(previewRule);if(error.empty())ssc_auto::format(value,ssc_auto::examples(),preview,error);text(266,528,L"EXAMPLE",cyan,false,12);text(366,528,ssc_chat::widen((error.empty()?preview:error).substr(0,76)).c_str(),ink,false,12);
-                button(321,266,562,150,36,L"SAVE",true,chat_editing);button(336,432,562,302,36,L"COPY RULE CODE");button(346,750,562,336,36,L"VARIABLE GUIDE",auto_guide);
+                button(321,266,562,150,36,L"SAVE",true,chat_editing);button(336,432,562,302,36,L"COPY RULE CODE");button(580,750,562,336,36,L"TIMING / CANCELLATION");
                 auto warning=ssc_auto::rule_warning(r);auto ruleStatus=warning.empty()?ssc_auto::status:ssc_chat::widen(warning)+L" - this rule cannot send with the current counter";if(!ruleStatus.empty())text(266,616,ruleStatus.substr(0,88).c_str(),cyan,false,12);
 
             }
@@ -1069,6 +1167,43 @@ void paint_panel() {
             text(282,480,L"UI only; challenge rules are not enforced.",muted,false,12);
             text(282,518,L"PULSE DURATION");
             button(197,282,554,210,38,L"1 SECOND",ssc_cooldown::settings.duration_ms==1000);button(198,508,554,210,38,L"1.5 SECONDS",ssc_cooldown::settings.duration_ms==1500);button(199,734,554,210,38,L"2.5 SECONDS",ssc_cooldown::settings.duration_ms==2500);
+            button(585,282,606,350,38,L"FREECAM");text(670,619,L"HIDE CROSSHAIR",muted,false,12);toggle(586,978,606,ssc_creator::hide_crosshair.load());
+        } else if(settings_page==26){
+            text(266,111,L"DRIVING",ink,true);
+            text(282,204,L"CAMERA-RELATIVE CONTROLS");toggle(981,978,195,ssc_vehicle::enabled.load());
+            text(282,272,L"Experimental: singleplayer only.",muted);
+            text(282,330,L"Your movement bindings follow the screen directions.",muted,false,15);
+            text(282,372,L"Controls switch as the car crosses each 45-degree boundary.",muted,false,14);
+            text(282,414,L"Native braking, acceleration and steering stay in use.",muted,false,14);
+            text(282,470,L"Only the driver is affected. Passengers keep normal controls.",muted,false,14);
+            text(282,526,ssc_vehicle::attached?L"Multiplayer keeps the original driving controls.":L"Unavailable for this game build.",muted,false,14);
+        } else if(settings_page==25){
+            text(266,111,L"FREECAM PHOTO",ink,true);button(585,850,106,236,38,L"< FREECAM");
+            text(282,204,L"PHOTO FREEZE");toggle(963,978,195,ssc_freecam::photo_enabled);
+            text(282,254,L"Freeze offline simulation while keeping the camera movable.",muted,false,13);
+            text(282,286,L"Only available while Freecam is active in offline single-player.",muted,false,13);
+            text(282,350,L"FREEZE KEY");{std::wstring key=ssc_freecam::photo_key>=VK_F1&&ssc_freecam::photo_key<=VK_F12?L"F"+std::to_wstring(ssc_freecam::photo_key-VK_F1+1):std::wstring(1,wchar_t(ssc_freecam::photo_key));button(964,600,337,430,40,photo_binding?L"PRESS KEY (ESC CANCEL)":key.c_str());}
+            text(282,420,L"Press again to resume. Leaving Freecam always resumes.",muted,false,13);
+            text(282,464,L"Use your usual screenshot key after composing the shot.",muted,false,13);
+            text(282,520,L"HIDE SHADOWS IN FREECAM",muted,false,16);toggle(967,978,510,ssc_freecam::hide_shadows);
+            text(282,560,L"Normal shadows return when you exit Freecam.",muted,false,13);
+        } else if(settings_page==24){
+            text(266,111,L"FREECAM",ink,true);button(962,610,106,220,38,L"PHOTO SETTINGS");button(587,850,106,236,38,L"< MISC");
+            button(592,282,190,240,38,L"PAN",!ssc_freecam::fly,!ssc_freecam::state.active);button(593,538,190,300,38,L"3D FREECAM",ssc_freecam::fly,!ssc_freecam::state.active);
+            button(588,282,244,400,40,ssc_freecam::pending_since?L"CANCEL REQUEST":ssc_freecam::state.active?L"EXIT FREECAM":L"ENTER FREECAM",ssc_freecam::state.active,true);
+            text(282,298,ssc_freecam::fly?L"Mouse: look. W / S: forward / back. A / D: strafe.":L"WASD / arrows: pan. Scroll: zoom. Shift + scroll: fine zoom.",muted,false,12);
+            text(282,325,ssc_freecam::fly?L"Space / Shift: up / down. Scroll: move. Shift + scroll: fine.":L"Multiplayer: dead or spectating. Single-player: unrestricted.",muted,false,12);
+            text(282,352,L"Escape: exit camera. Right Shift: menu. Alt-tab retains your view.",muted,false,12);
+            text(282,405,L"HIDE HUD",muted,false,14);toggle(589,460,395,ssc_freecam::hide_hud);text(600,405,L"HIDE VERSION / FPS / PING",muted,false,12);toggle(966,978,395,ssc_freecam::hide_diagnostics);
+            text(282,453,L"SPEED (UNITS / SEC)",muted,false,12);text(490,453,std::to_wstring(int(ssc_freecam::selected_speed())).c_str(),cyan,false,14);
+            controls.push_back({599,550,430,480,44,true});rectangle(560,455,460,6,muted);{int knob=560+int(460*(ssc_freecam::selected_speed()-30)/(ssc_freecam::speed_limit()-30));rectangle(560,455,knob-560,6,cyan);rectangle(knob-6,445,12,26,keyboard_focus==599?ink:cyan);}
+            text(282,494,L"Drag or click, then use arrow keys for fine adjustments.",muted,false,12);
+            text(282,543,L"SLOW MOVEMENT",muted,false,14);
+            {std::wstring key=ssc_freecam::slow_key>=VK_F1&&ssc_freecam::slow_key<=VK_F12?L"F"+std::to_wstring(ssc_freecam::slow_key-VK_F1+1):std::wstring(1,wchar_t(ssc_freecam::slow_key));button(960,530,530,260,36,slow_binding?L"PRESS KEY (ESC CANCEL)":key.c_str());}
+            button(961,806,530,224,36,ssc_freecam::slow_toggle?L"TOGGLE":L"HOLD");
+            text(282,596,L"DRAW DISTANCE (UNITS)",muted,false,12);
+            {constexpr int distances[]={1000,2000,4000,8000,0};const wchar_t* labels[]={L"1,000",L"2,000",L"4,000",L"8,000",L"FULL"};for(int i=0;i<5;++i)button(594+i,530+110*i,582,100,32,labels[i],ssc_freecam::draw_distance==distances[i],ssc_freecam::fly);}
+            text(282,636,(GetTickCount64()<ssc_freecam::notice_until)?ssc_freecam::entry_status:L"Draw distance controls scenery range, not texture resolution.",muted,false,12);
         } else if(settings_page==13){
             text(266,111,L"CREDITS",ink,true);
             text(282,204,L"bencelot",cyan,true);text(282,248,L"Skillshot City developer.",muted,false,14);
@@ -1207,7 +1342,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.13",cyan);
+            text(266,157,L"0.1.14",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
@@ -1234,12 +1369,13 @@ void paint_panel() {
         static const Credit people[]={
           {L"yari_check",{L"For testing out the Linux build and helping me suffer through",L"an Arch VM install",nullptr,nullptr}},
           {L"jyxalag",{L"For reviewing early builds and testing out the private access feature",nullptr,nullptr,nullptr}},
+          {L"alsamandal",{L"For resisting against the Manga Recruit monopoly!",nullptr,nullptr,nullptr}},
           {L"ironmonkey808",{L"For giving great feedback and making a really cool SSC Starter Guide!",L"And for putting up with me joining his lobbies in the last 2 minutes",L"and winning",nullptr}},
           {L"chill",{L"For being a chill guy (and for giving some great suggestions)",nullptr,nullptr,nullptr}},
-          {L"geri",{L"For popularizing the Geri Challenge (fan-made challenge where",L"you aren't allowed to draft skills)",nullptr,nullptr}},
+          {L"geri",{L"Founder of the Geri Challenge (fan-made challenge where",L"you aren't allowed to draft skills or use stims)",nullptr,nullptr}},
           {L"mang",{L"For answering a ton of questions I had as a new player and for their",L"work on a synergy chart (which is planned to be implemented in",L"the mod soon)",nullptr}},
           {L"deus",{L"For building my hatred for snipers so much that I always keep one",L"in my second weapon slot :D",nullptr,nullptr}}};
-        for(int row=0;row<3;++row){int index=credits_page*3+row;if(index>=7)break;int y=193+row*126;text(146,y,people[index].name,cyan,true,20);for(int line=0;line<4&&people[index].lines[line];++line)text(146,y+33+line*23,people[index].lines[line],muted,false,14);}
+        for(int row=0;row<3;++row){int index=credits_page*3+row;if(index>=int(std::size(people)))break;int y=193+row*126;bool acid=std::wcscmp(people[index].name,L"alsamandal")==0;COLORREF name_color=std::wcscmp(people[index].name,L"mang")==0?RGB(60,179,113):std::wcscmp(people[index].name,L"deus")==0?RGB(207,196,0):std::wcscmp(people[index].name,L"jyxalag")==0?RGB(239,191,4):cyan;text(146,y,people[index].name,name_color,true,20,acid?float(GetTickCount64()%6000)/6000.f:-1.f);for(int line=0;line<4&&people[index].lines[line];++line)text(146,y+33+line*23,people[index].lines[line],muted,false,14);}
         button(572,146,590,100,36,L"<",false,credits_page>0);button(573,260,590,100,36,L">",false,credits_page<2);
         auto page=std::to_wstring(credits_page+1)+L" / 3";text(390,599,page.c_str(),muted,false,14);button(571,794,590,180,36,L"CLOSE");
     }

@@ -23,6 +23,9 @@
 #include "recorder_source.h"
 #include "hud_editor.h"
 #include "geri_mode.h"
+#include "creator_controls.h"
+#include "freecam.h"
+#include "vehicle_adapter.h"
 #include "quick_chat.h"
 #include "auto_messages_source.h"
 #include "tracking_recording.h"
@@ -105,6 +108,12 @@ void render(HDC dc) {
     static ULONGLONG diagnostics_at=0;
     if(developer_tools&&now-diagnostics_at>15000){diagnostics_at=now;char report[160];snprintf(report,sizeof(report),"Draw diagnostics: rainbow=%u audio=%u",ssc_names::cosmetic_draws.load(),ssc_sound::substituted.load());log(report);}
     ssc_auto::tick(now,ssc_record::state().enabled);
+    if(rpc_preview.phase==1)ssc_freecam::stop();
+    bool was_freecam=ssc_freecam::state.active;auto pending_freecam=ssc_freecam::pending_since;
+    ssc_freecam::tick(now,opened,game_window,ssc_freecam::frame_seconds());
+    if(!was_freecam&&ssc_freecam::state.active)finish_freecam_entry();
+    if(pending_freecam!=ssc_freecam::pending_since)dirty=true;
+    ssc_vehicle::blocked=opened||ssc_freecam::state.active||GetForegroundWindow()!=game_window;
     ssc_record::track_observation(now);
     static ULONGLONG presence_at=0;
     if(now-presence_at>=1000){presence_at=now;rpc_preview=presence_supported?ssc_rpc::sample_steam(rpc_rating):ssc_rpc::Snapshot{};static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);refresh_dynamic_panel(now,true);if(ssc_record::state().enabled){auto observed=presence_supported?ssc_rpc::native_fallback(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_rpc::Snapshot{};ssc_record::sample(observed.phase,observed.details,observed.state,now,observed.phase==2?ssc_record::sample_local_build(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_record::Json(nullptr));if(opened&&manager&&settings_page==12)dirty=true;}}
@@ -121,7 +130,9 @@ void render(HDC dc) {
     if(opened&&manager&&settings_page==11&&ssc_lab::duel_animating()){ssc_lab::advance_duel(seconds);static ULONGLONG duel_paint_at=0;if(now-duel_paint_at>=16||!ssc_lab::duel_animating()){duel_paint_at=now;dirty=true;}}
     poll_live_hud_drag(window);
     advance_animation(seconds);
-    if(window!=game_window||(!opened&&visibility==0.f&&modal_visibility==0.f&&!clock_enabled))return;
+    bool freecam_notice=now<ssc_freecam::notice_until;
+    if(!freecam_notice&&!opened&&visibility==0.f&&ssc_freecam::state.active&&ssc_freecam::hide_hud)return;
+    if(window!=game_window||(!opened&&visibility==0.f&&modal_visibility==0.f&&!clock_enabled&&!freecam_notice))return;
     RECT client;GetClientRect(window,&client);int width=client.right,height=client.bottom;
     if(width<=0||height<=0)return;
     layout_panel(width,height);
@@ -174,7 +185,7 @@ void render(HDC dc) {
             glBegin(GL_QUADS);glVertex2f(x+w-5,y+h-5);glVertex2f(x+w+5,y+h-5);glVertex2f(x+w+5,y+h+5);glVertex2f(x+w-5,y+h+5);glEnd();
         }
     }
-    if(opened||visibility>0.f||clock_enabled) {
+    if(opened||visibility>0.f||clock_enabled||freecam_notice) {
     if(!texture){glGenTextures(1,&texture);dirty=true;}
     glEnable(GL_TEXTURE_2D);glBindTexture(GL_TEXTURE_2D,texture);glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
@@ -188,14 +199,14 @@ void render(HDC dc) {
         SYSTEMTIME time;GetLocalTime(&time);
         if(dirty||clock_second!=time.wSecond) {
             clock_second=time.wSecond;prepare_canvas();std::memset(pixels,0,raster_w*raster_h*4);
-            panel_w=310;panel_h=42;rectangle(0,0,panel_w,panel_h,RGB(8,21,41));
+            panel_w=freecam_notice?640:310;panel_h=42;rectangle(0,0,panel_w,panel_h,RGB(8,21,41));
             wchar_t value[80];swprintf(value,80,L"TEST CLOCK  %02u:%02u:%02u",time.wHour,time.wMinute,time.wSecond);
-            text(12,13,value);finish_canvas();upload_canvas_texture();
+            text(12,13,freecam_notice?ssc_freecam::entry_status:value,freecam_notice?RGB(255,190,120):ink,false,14);finish_canvas();upload_canvas_texture();
         }
     }
     float x=menu_visible?float(panel_x):24.f,y=menu_visible?float(panel_y):24.f;
-    float w=menu_visible?std::round(panel_w*draw_scale):310.f,h=menu_visible?std::round(panel_h*draw_scale):42.f;
-    float u=std::round((menu_visible?panel_w:310.f)*raster_scale)/raster_w,v=std::round((menu_visible?panel_h:42.f)*raster_scale)/raster_h;
+    float w=menu_visible?std::round(panel_w*draw_scale):(freecam_notice?640.f:310.f),h=menu_visible?std::round(panel_h*draw_scale):42.f;
+    float u=std::round((menu_visible?panel_w:(freecam_notice?640.f:310.f))*raster_scale)/raster_w,v=std::round((menu_visible?panel_h:42.f)*raster_scale)/raster_h;
     glColor4f(1,1,1,menu_visible?opacity:1.f);
     glBegin(GL_QUADS);glTexCoord2f(0,0);glVertex2f(x,y);glTexCoord2f(u,0);glVertex2f(x+w,y);
     glTexCoord2f(u,v);glVertex2f(x+w,y+h);glTexCoord2f(0,v);glVertex2f(x,y+h);glEnd();
@@ -263,11 +274,13 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
     ssc_diagnostics::initialize(state_dir);ssc_auth::service().configure(state_dir);ssc_shared::service().configure(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
-    log("SSC Mod Menu 0.1.13 startup");log_game_build();
+    log("SSC Mod Menu 0.1.14 startup");log_game_build();
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
     presence_supported=(supported&4)!=0;native_supported=true;
     log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");
     char result[128];std::snprintf(result,sizeof(result),"Compatibility: cosmetics=%d HUD=%d presence=%d scan=%llums",int((supported&1)!=0),int((supported&2)!=0),int(presence_supported),static_cast<unsigned long long>(GetTickCount64()-started));log(result);
+    ssc_vehicle::attached=ssc_vehicle::attach();log(ssc_vehicle::attached?"Driving adapter attached":"Driving adapter unavailable");
+    ssc_freecam::attached=ssc_freecam::attach();log(ssc_freecam::attached?"Freecam adapter attached":"Freecam adapter unavailable");
     load_settings();ssc_chat::attached=ssc_chat::attach();log(ssc_chat::attached?"Custom quick chat adapter attached":"Custom quick chat unavailable");
     ssc_names::cosmetics=cosmetic_requested&&ssc_compat::supports(1);
     ssc_combat::attached=ssc_combat::attach();log(ssc_combat::attached?"Combat event counters attached":"Combat event counters unavailable");
@@ -277,6 +290,8 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
         if(length&&length<32768){ssc_sound::initialize(std::filesystem::path(executable).parent_path(),state_dir,sound_requested);ssc_sound::attached=attach_sound();log(ssc_music::attach()?"Music file adapter attached":"Music file adapter unavailable");log(ssc_sound::attached?"Audio buffer adapter attached (WAV effects / OGG music; restart applies changes)":"Audio adapter unavailable");}
     }catch(const std::exception&){log("Sound catalog unavailable; originals preserved");}
     ssc_geri::attached=ssc_geri::attach();log(ssc_geri::attached?"Geri panel adapter attached":"Geri panel adapter unavailable");
+    ssc_creator::attached=ssc_creator::attach();log(ssc_creator::attached?"Creator crosshair adapter attached":"Creator crosshair adapter unavailable");
+    ssc_hud::diagnostics_draw=ssc_freecam::attached?reinterpret_cast<uintptr_t>(ssc_freecam::debug_draw):0;
     ssc_hud::attached=ssc_hud::attach();log(ssc_hud::attached?"HUD draw groups attached":"HUD adapter unavailable");
     log(attach_swap()?"Compatibility checks complete; SwapBuffers import attached":"SwapBuffers attachment refused");
 }

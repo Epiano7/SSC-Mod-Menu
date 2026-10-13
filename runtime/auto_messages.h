@@ -10,12 +10,12 @@
 namespace ssc_auto {
 using Json=nlohmann::json;
 struct Condition {int stat=0,comparison=0,value=1;};
-struct Rule {bool enabled=false;int event=0,threshold=5,min_level=0;std::string message="GG!";std::string name="New rule";int repeats=1;bool any=false;std::vector<Condition> conditions{};};
-inline const wchar_t* events[]={L"Any round ends",L"Round 3 ends",L"Final round ends",L"Level reaches",L"Health falls below"};
+struct Rule {bool enabled=false;int event=0,threshold=5,min_level=0;std::string message="GG!";std::string name="New rule";int repeats=1;bool any=false;std::vector<Condition> conditions{};int hold_seconds=0,delay_seconds=0;bool cancel_on_death=false;};
+inline const wchar_t* events[]={L"Any round ends",L"Round 3 ends",L"Final round ends",L"Level reaches",L"Health falls below",L"Conditions are met"};
 // Persisted trigger IDs remain stable for existing rules and share codes.
-inline constexpr int selectable_events[]={0,2,3,4};
-inline int event_choice(int event){for(int i=0;i<4;++i)if(selectable_events[i]==event)return i;return event==1?1:0;}
-inline int choice_event(int choice){return choice>=0&&choice<4?selectable_events[choice]:0;}
+inline constexpr int selectable_events[]={0,2,3,4,5};
+inline int event_choice(int event){for(int i=0;i<5;++i)if(selectable_events[i]==event)return i;return event==1?1:0;}
+inline int choice_event(int choice){return choice>=0&&choice<5?selectable_events[choice]:0;}
 inline const char* variables[]={"roundNumber","level","healthRemaining","maxHealth","className","shieldRemaining","shieldPercent","healthPercent","weaponName","weaponCount","roundsTotal","levelsGained","roundTime","timeAlive","roundDeaths","damageTaken","healthMissing","roundsRemaining","deadTime","alivePercent","weaponTier","weaponType","weaponMagazineSize","weaponFireRate","weaponReloadSeconds","weaponProjectilesPerShot","weapon1","weapon2","weapon3","ammoRemaining","money","syringes","shotsFired","projectilesFired","bulletHits","playerHits","npcHits","impactDamage"};
 inline const wchar_t* variable_labels[]={L"Round number",L"Current level",L"Health remaining",L"Maximum health",L"Class name",L"Shield remaining",L"Shield percentage",L"Health percentage",L"Equipped weapon",L"Weapon count",L"Total rounds",L"Levels gained",L"Round time",L"Time alive",L"Deaths this round",L"HP damage taken",L"Missing health",L"Rounds remaining",L"Time dead",L"Time alive percentage",L"Weapon tier",L"Weapon type",L"Weapon magazine size",L"Weapon fire rate",L"Weapon reload seconds",L"Projectiles per shot",L"Inventory weapon 1",L"Inventory weapon 2",L"Inventory weapon 3",L"Ammo remaining",L"Money",L"Syringes",L"Weapon shots fired",L"Weapon projectiles fired",L"Projectile hit events",L"Player hit events",L"NPC hit events",L"Pre-defense impact damage"};
 inline const wchar_t* variable_details[]={L"The displayed BR round",L"Your current level",L"Your remaining HP",L"Your maximum HP",L"Your selected class",L"Your current shield points",L"Shield / max HP (no % sign)",L"HP / max HP (no % sign)",L"Your equipped weapon",L"Weapons in your inventory",L"Rounds in this match",L"Net levels gained this round",L"Seconds into the round",L"Observed seconds alive",L"Native deaths this round",L"HP lost, including environment",L"Maximum HP minus current HP",L"Rounds left after this one",L"Observed seconds dead",L"Alive / round time (no % sign)",L"Tier 1-3; 0 if not tiered",L"Equipped weapon type",L"Before actor modifiers",L"RPM before actor modifiers",L"Seconds before modifiers",L"Definition projectile count",L"Inventory slot 1, or None",L"Inventory slot 2, or None",L"Inventory slot 3, or None",L"Loaded ammo before modifiers",L"Your current displayed money",L"Your current syringe counter",L"Primary weapon shots",L"Spawned weapon projectiles",L"Unavailable: online hits unverified",L"Unavailable: online hits unverified",L"Unavailable: incomplete coverage",L"Unavailable: incomplete coverage"};
@@ -52,15 +52,15 @@ inline bool format(const std::string& text,const Values& values,std::string& out
  if(!printable(out)){error="Completed message exceeds 100 characters or contains unsupported text";return false;}return true;
 }
 inline Values examples(){return {{"roundNumber","3"},{"level","8"},{"healthRemaining","42"},{"maxHealth","150"},{"className","Example class"},{"shieldRemaining","75"},{"shieldPercent","50"},{"healthPercent","28"},{"weaponName","UZI"},{"weaponCount","2"},{"roundsTotal","4"},{"levelsGained","5"},{"roundTime","120"},{"timeAlive","95"},{"roundDeaths","1"},{"damageTaken","108"},{"healthMissing","108"},{"roundsRemaining","1"},{"deadTime","25"},{"alivePercent","79"},{"weaponTier","1"},{"weaponType","SMG"},{"weaponMagazineSize","30"},{"weaponFireRate","600"},{"weaponReloadSeconds","1.50"},{"weaponProjectilesPerShot","1"},{"weapon1","Knife"},{"weapon2","UZI"},{"weapon3","None"},{"ammoRemaining","18"},{"money","250"},{"syringes","2"},{"shotsFired","25"},{"projectilesFired","30"},{"bulletHits","12"},{"playerHits","10"},{"npcHits","2"},{"impactDamage","108"}};}
-inline bool valid(const Rule& r){if(r.name.empty()||r.name.size()>32||!printable(r.name)||r.repeats<1||r.repeats>5||r.conditions.size()+size_t(r.min_level>0)>3)return false;for(auto& c:r.conditions)if(c.stat<0||c.stat>=condition_count||c.comparison<0||c.comparison>2||c.value<0||c.value>10000)return false;std::string out,error;return r.event>=0&&r.event<5&&r.threshold>=1&&r.threshold<=1000&&r.min_level>=0&&r.min_level<=1000&&format(r.message,examples(),out,error);}
-inline Json pack(const Rule& r){Json conditions=Json::array();for(auto& c:r.conditions)conditions.push_back(Json::array({c.stat,c.comparison,c.value}));return Json::array({r.event,r.threshold,r.min_level,r.message,r.name,r.repeats,r.any,conditions});}
-inline Rule unpack(const Json& j){if(!j.is_array()||(j.size()!=4&&j.size()!=8)||!j[0].is_number_integer()||!j[1].is_number_integer()||!j[2].is_number_integer()||!j[3].is_string())throw std::runtime_error("Invalid rule");if(j[0]<0||j[0]>4||j[1]<1||j[1]>1000||j[2]<0||j[2]>1000)throw std::runtime_error("Range");Rule r;r.event=j[0].get<int>();r.threshold=j[1].get<int>();r.min_level=j[2].get<int>();r.message=j[3].get<std::string>();if(j.size()==8){r.name=j[4].get<std::string>();if(!j[5].is_number_integer()||j[5]<1||j[5]>5)throw std::runtime_error("Repeat range");r.repeats=j[5].get<int>();r.any=j[6].get<bool>();if(!j[7].is_array()||j[7].size()>3)throw std::runtime_error("Conditions");for(auto& c:j[7]){if(!c.is_array()||c.size()!=3||!c[0].is_number_integer()||!c[1].is_number_integer()||!c[2].is_number_integer()||c[0]<0||c[0]>=condition_count||c[1]<0||c[1]>2||c[2]<0||c[2]>10000)throw std::runtime_error("Condition");r.conditions.push_back({c[0].get<int>(),c[1].get<int>(),c[2].get<int>()});}}else r.name=(r.event==0&&(r.message=="GG"||r.message=="GG!"))?"Auto-GG":"Imported rule";if(!valid(r))throw std::runtime_error("Unsupported rule");return r;}
-inline std::string code(const Rule& r){if(!valid(r))return {};auto bytes=Json::to_msgpack(pack(r));const char* alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";std::string out="SSC-AM2:";unsigned bits=0;int count=0;for(auto b:bytes){bits=(bits<<8)|b;count+=8;while(count>=6){count-=6;out+=alphabet[(bits>>count)&63];}}if(count)out+=alphabet[(bits<<(6-count))&63];return out;}
-inline bool decode(const std::string& s,Rule& out){try{if(s.size()>512||(s.rfind("SSC-AM1:",0)!=0&&s.rfind("SSC-AM2:",0)!=0))return false;std::string alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";std::vector<uint8_t> bytes;unsigned bits=0;int count=0;for(size_t i=8;i<s.size();++i){auto v=alphabet.find(s[i]);if(v==std::string::npos)return false;bits=(bits<<6)|unsigned(v);count+=6;if(count>=8){count-=8;bytes.push_back(uint8_t(bits>>count));}}// Bound structure before parsing; a rule is a bounded versioned MessagePack array.
- if(bytes.empty()||(bytes[0]!=0x94&&bytes[0]!=0x98))return false;
- auto candidate=unpack(Json::from_msgpack(bytes));if(s.rfind("SSC-AM2:",0)==0&&code(candidate)!=s)return false;out=candidate;out.enabled=false;return true;}catch(...){return false;}}
-inline bool save(const std::filesystem::path& dir){try{Json j={{"schema",2},{"enabled",enabled},{"rules",Json::array()}};for(auto& r:rules)j["rules"].push_back({{"on",r.enabled},{"rule",pack(r)}});auto tmp=dir/L"auto-messages.json.tmp";std::ofstream out(tmp);out<<j.dump(2);out.close();return out&&MoveFileExW(tmp.c_str(),(dir/L"auto-messages.json").c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);}catch(...){return false;}}
-inline void load(const std::filesystem::path& dir){diagnostic_dir=dir;try{auto p=dir/L"auto-messages.json";if(!std::filesystem::exists(p))return;if(std::filesystem::file_size(p)>16384)throw std::runtime_error("size");std::ifstream in(p);Json j;in>>j;if((j.at("schema")!=1&&j.at("schema")!=2)||!j.at("rules").is_array()||j.at("rules").size()>12)throw std::runtime_error("schema");std::vector<Rule> next;for(auto& e:j.at("rules")){auto r=unpack(e.at("rule"));r.enabled=e.at("on").get<bool>();next.push_back(r);}bool on=j.at("enabled").get<bool>();rules=next;enabled=on;selected=0;}catch(...){status=L"Could not load message rules";}}
+inline bool valid(const Rule& r){if(r.name.empty()||r.name.size()>32||!printable(r.name)||r.repeats<1||r.repeats>5||r.conditions.size()+size_t(r.min_level>0)>3)return false;for(auto& c:r.conditions)if(c.stat<0||c.stat>=condition_count||c.comparison<0||c.comparison>2||c.value<0||c.value>10000)return false;std::string out,error;return r.hold_seconds>=0&&r.hold_seconds<=60&&r.delay_seconds>=0&&r.delay_seconds<=60&&r.event>=0&&r.event<6&&r.threshold>=1&&r.threshold<=1000&&r.min_level>=0&&r.min_level<=1000&&format(r.message,examples(),out,error);}
+inline Json pack(const Rule& r){Json conditions=Json::array();for(auto& c:r.conditions)conditions.push_back(Json::array({c.stat,c.comparison,c.value}));return Json::array({r.event,r.threshold,r.min_level,r.message,r.name,r.repeats,r.any,conditions,r.hold_seconds,r.delay_seconds,r.cancel_on_death});}
+inline Rule unpack(const Json& j){if(!j.is_array()||(j.size()!=4&&j.size()!=8&&j.size()!=11)||!j[0].is_number_integer()||!j[1].is_number_integer()||!j[2].is_number_integer()||!j[3].is_string())throw std::runtime_error("Invalid rule");if(j[0]<0||j[0]>5||j[1]<1||j[1]>1000||j[2]<0||j[2]>1000)throw std::runtime_error("Range");Rule r;r.event=j[0].get<int>();r.threshold=j[1].get<int>();r.min_level=j[2].get<int>();r.message=j[3].get<std::string>();if(j.size()>=8){r.name=j[4].get<std::string>();if(!j[5].is_number_integer()||j[5]<1||j[5]>5)throw std::runtime_error("Repeat range");r.repeats=j[5].get<int>();r.any=j[6].get<bool>();if(!j[7].is_array()||j[7].size()>3)throw std::runtime_error("Conditions");for(auto& c:j[7]){if(!c.is_array()||c.size()!=3||!c[0].is_number_integer()||!c[1].is_number_integer()||!c[2].is_number_integer()||c[0]<0||c[0]>=condition_count||c[1]<0||c[1]>2||c[2]<0||c[2]>10000)throw std::runtime_error("Condition");r.conditions.push_back({c[0].get<int>(),c[1].get<int>(),c[2].get<int>()});}}else r.name=(r.event==0&&(r.message=="GG"||r.message=="GG!"))?"Auto-GG":"Imported rule";if(j.size()==11){if(!j[8].is_number_integer()||!j[9].is_number_integer()||j[8]<0||j[8]>60||j[9]<0||j[9]>60||!j[10].is_boolean())throw std::runtime_error("Timing range");r.hold_seconds=j[8].get<int>();r.delay_seconds=j[9].get<int>();r.cancel_on_death=j[10].get<bool>();}if(!valid(r))throw std::runtime_error("Unsupported rule");return r;}
+inline std::string code(const Rule& r){if(!valid(r))return {};auto bytes=Json::to_msgpack(pack(r));const char* alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";std::string out="SSC-AM3:";unsigned bits=0;int count=0;for(auto b:bytes){bits=(bits<<8)|b;count+=8;while(count>=6){count-=6;out+=alphabet[(bits>>count)&63];}}if(count)out+=alphabet[(bits<<(6-count))&63];return out;}
+inline bool decode(const std::string& s,Rule& out){try{if(s.size()>512||(s.rfind("SSC-AM1:",0)!=0&&s.rfind("SSC-AM2:",0)!=0&&s.rfind("SSC-AM3:",0)!=0))return false;std::string alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";std::vector<uint8_t> bytes;unsigned bits=0;int count=0;for(size_t i=8;i<s.size();++i){auto v=alphabet.find(s[i]);if(v==std::string::npos)return false;bits=(bits<<6)|unsigned(v);count+=6;if(count>=8){count-=8;bytes.push_back(uint8_t(bits>>count));}}if(count&&(bits&((1u<<count)-1)))return false;// Bound structure before parsing; a rule is a bounded versioned MessagePack array.
+ if(bytes.empty()||(bytes[0]!=0x94&&bytes[0]!=0x98&&bytes[0]!=0x9b))return false;
+ auto packed=Json::from_msgpack(bytes);if(s.rfind("SSC-AM2:",0)==0&&packed.size()!=8)return false;if(s.rfind("SSC-AM3:",0)==0&&packed.size()!=11)return false;auto candidate=unpack(packed);if(s.rfind("SSC-AM3:",0)==0&&code(candidate)!=s)return false;out=candidate;out.enabled=false;return true;}catch(...){return false;}}
+inline bool save(const std::filesystem::path& dir){try{Json j={{"schema",3},{"enabled",enabled},{"rules",Json::array()}};for(auto& r:rules)j["rules"].push_back({{"on",r.enabled},{"rule",pack(r)}});auto tmp=dir/L"auto-messages.json.tmp";std::ofstream out(tmp);out<<j.dump(2);out.close();return out&&MoveFileExW(tmp.c_str(),(dir/L"auto-messages.json").c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);}catch(...){return false;}}
+inline void load(const std::filesystem::path& dir){diagnostic_dir=dir;try{auto p=dir/L"auto-messages.json";if(!std::filesystem::exists(p))return;if(std::filesystem::file_size(p)>16384)throw std::runtime_error("size");std::ifstream in(p);Json j;in>>j;if((j.at("schema")!=1&&j.at("schema")!=2&&j.at("schema")!=3)||!j.at("rules").is_array()||j.at("rules").size()>12)throw std::runtime_error("schema");std::vector<Rule> next;for(auto& e:j.at("rules")){auto r=unpack(e.at("rule"));r.enabled=e.at("on").get<bool>();next.push_back(r);}bool on=j.at("enabled").get<bool>();rules=next;enabled=on;selected=0;}catch(...){status=L"Could not load message rules";}}
 inline std::string read_clipboard(HWND window){std::string value;if(!OpenClipboard(window))return value;HANDLE h=GetClipboardData(CF_UNICODETEXT);if(h){auto p=static_cast<const wchar_t*>(GlobalLock(h));if(p){size_t cap=GlobalSize(h)/sizeof(wchar_t),n=0;while(n<cap&&n<=512&&p[n])++n;if(n<cap&&n<=512){for(size_t i=0;i<n;++i){if(p[i]<32||p[i]>126){value.clear();break;}value+=char(p[i]);}}GlobalUnlock(h);}}CloseClipboard();return value;}
 inline bool copy_clipboard(HWND window,const std::string& value){if(value.empty())return false;auto h=GlobalAlloc(GMEM_MOVEABLE,(value.size()+1)*sizeof(wchar_t));if(!h)return false;auto p=static_cast<wchar_t*>(GlobalLock(h));if(!p){GlobalFree(h);return false;}for(size_t i=0;i<value.size();++i)p[i]=wchar_t(value[i]);p[value.size()]=0;GlobalUnlock(h);if(!OpenClipboard(window)){GlobalFree(h);return false;}bool ok=EmptyClipboard()&&SetClipboardData(CF_UNICODETEXT,h);CloseClipboard();if(!ok)GlobalFree(h);return ok;}
 struct Observation {bool valid=false,active=false,ending=false,eligible=true,preparing=true,connected=false;uintptr_t session=0,actor=0;int round=0,last_round=0;Values values;double damage_total=-1,recording_round_seconds=-1,recording_countdown_seconds=NAN;int death_total=-1;};
@@ -97,31 +97,61 @@ struct RoundTracker {
  }
 };
 inline RoundTracker round_tracker;
-struct Pending {std::string text;uint64_t expires=0;size_t rule=0;std::string signature;};
+struct Pending {std::string text;uint64_t expires=0;size_t rule=0;std::string signature;uint64_t due=0;};
+struct Waiting {std::string signature;uint64_t since=0;bool holding=false;};
 struct Engine {
- uintptr_t session=0;int round=0;bool participated=false,ended=false;Values previous;
- std::wstring round_error;std::set<size_t> fired;std::vector<Pending> pending;uint64_t last_send=0,invalid_since=0;
- void reset(){session=0;round=0;participated=ended=false;invalid_since=0;previous.clear();fired.clear();pending.clear();round_error.clear();}
+ uintptr_t session=0,actor=0;int round=0,deaths=-1;bool participated=false,ended=false;Values previous;
+ std::wstring round_error;std::set<size_t> fired;std::vector<Pending> pending;std::map<size_t,Waiting> waiting;
+ uint64_t last_send=0,invalid_since=0,seen=0;
+ void reset(){session=actor=0;round=0;deaths=-1;participated=ended=false;invalid_since=seen=0;previous.clear();fired.clear();pending.clear();waiting.clear();round_error.clear();}
  static int number(const Values& v,const char* key){try{auto it=v.find(key);return it==v.end()?-1:std::stoi(it->second);}catch(...){return -1;}}
+ static bool conditions_met(const Rule& r,const Values& values){
+  if(r.min_level&&number(values,"level")<r.min_level)return false;
+  bool result=r.conditions.empty()||!r.any;
+  for(const auto& c:r.conditions){if(c.stat<0||c.stat>=condition_count)return false;int value=number(values,condition_keys[c.stat]);if(value<0)return false;bool pass=c.comparison==0?value>=c.value:c.comparison==1?value<=c.value:value==c.value;result=r.any?(result||pass):(result&&pass);}
+  return result;
+ }
  void observe(const Observation& o,uint64_t now){
-  if(!enabled){reset();return;}if(!o.valid){if(o.connected&&session){if(!invalid_since)invalid_since=now;if(now>=invalid_since&&now-invalid_since<=2000)return;}reset();return;}invalid_since=0;
-  if(session!=o.session||round!=o.round){reset();session=o.session;round=o.round;}
-  bool was_active=participated;
-  if(o.active&&!o.ending&&o.eligible)participated=true;
+  if(!enabled){reset();return;}
+  // Unknown samples cannot establish continuous eligibility or safe delayed sends.
+  if(!o.valid){pending.clear();waiting.clear();if(o.connected&&session){if(!invalid_since)invalid_since=now;if(now>=invalid_since&&now-invalid_since<=2000)return;}reset();return;}invalid_since=0;
+  if(session!=o.session||actor!=o.actor||round!=o.round){reset();session=o.session;actor=o.actor;round=o.round;}
+  bool gap=seen&&(now<seen||now-seen>2000);
+  if(gap){pending.clear();waiting.clear();previous.clear();}seen=now;
+  bool died=!o.eligible||(deaths>=0&&o.death_total>deaths);deaths=o.death_total;
+  pending.erase(std::remove_if(pending.begin(),pending.end(),[&](const Pending& p){return p.rule>=rules.size()||!rules[p.rule].enabled||code(rules[p.rule])!=p.signature||(rules[p.rule].cancel_on_death&&died);}),pending.end());
+  for(auto it=waiting.begin();it!=waiting.end();){auto i=it->first;if(i>=rules.size()||!rules[i].enabled||code(rules[i])!=it->second.signature||(rules[i].cancel_on_death&&died))it=waiting.erase(it);else ++it;}
+  bool was_active=participated;if(o.active&&!o.ending&&o.eligible)participated=true;
   bool finish=was_active&&!ended&&o.ending;
-  for(size_t i=0;i<rules.size();++i){auto& r=rules[i];if(!r.enabled||fired.count(i))continue;bool trigger=false;
+  for(size_t i=0;i<rules.size();++i){auto& r=rules[i];if(!r.enabled||fired.count(i)||!valid(r))continue;
+   bool trigger=false;
    if(r.event<3)trigger=finish&&(r.event==0||(r.event==1&&o.round==3)||(r.event==2&&o.round==o.last_round));
+   else if(r.event==5)trigger=participated&&o.active&&!o.ending&&!r.conditions.empty()&&conditions_met(r,o.values);
    else if(participated&&o.active&&!o.ending&&!previous.empty()){const char* key=r.event==3?"level":"healthRemaining";int a=number(previous,key),b=number(o.values,key);trigger=a>=0&&b>=0&&(r.event==3?(a<r.threshold&&b>=r.threshold):(a>=r.threshold&&b<r.threshold));}
-   if(!trigger)continue;
-   fired.insert(i);if(r.min_level&&number(o.values,"level")<r.min_level)continue;
-   bool conditions=r.conditions.empty()||!r.any;bool missing=false;for(auto& c:r.conditions){int value=number(o.values,condition_keys[c.stat]);if(value<0){missing=true;break;}bool pass=c.comparison==0?value>=c.value:c.comparison==1?value<=c.value:value==c.value;if(r.any)conditions=conditions||pass;else conditions=conditions&&pass;}if(missing||!conditions)continue;
+   if(r.cancel_on_death&&died)continue;
+   if(trigger&&!waiting.count(i))waiting[i]={code(r),now,false};
+   auto it=waiting.find(i);if(it==waiting.end())continue;
+   auto& timer=it->second;
+   bool pass=conditions_met(r,o.values);
+   if(r.hold_seconds&&r.event>=3){pass=pass&&o.active&&!o.ending;if(r.event==3)pass=pass&&number(o.values,"level")>=r.threshold;if(r.event==4){int hp=number(o.values,"healthRemaining");pass=pass&&hp>=0&&hp<r.threshold;}}
+   if(!pass){timer.holding=false;if(!r.hold_seconds){fired.insert(i);waiting.erase(it);}continue;}
+   if(!timer.holding){timer.since=now;timer.holding=true;}
+   if(now<timer.since||now-timer.since<uint64_t(r.hold_seconds)*1000)continue;
+   fired.insert(i);waiting.erase(it);
    std::string text,error;if(!format(r.message,o.values,text,error)){auto detail=r.name+": "+error;round_error=std::wstring(detail.begin(),detail.end());status=round_error;continue;}
-   for(int repeat=0;repeat<r.repeats&&pending.size()<60;++repeat)pending.push_back({text,now+15000+uint64_t(repeat)*message_interval_ms,i,code(r)});
+   uint64_t due=now+uint64_t(r.delay_seconds)*1000;
+   for(int repeat=0;repeat<r.repeats&&pending.size()<60;++repeat)pending.push_back({text,due+15000+uint64_t(repeat)*message_interval_ms,i,code(r),due});
   }
   if(finish)ended=true;
   previous=o.values;
  }
- template<class Sender> void dispatch(uint64_t now,Sender send){while(!pending.empty()){const auto& p=pending.front();if(now<p.expires&&p.rule<rules.size()&&rules[p.rule].enabled&&code(rules[p.rule])==p.signature)break;pending.erase(pending.begin());}if(pending.empty()||(last_send&&now-last_send<message_interval_ms))return;if(send(pending.front().text)){last_send=now;pending.erase(pending.begin());status=round_error.empty()?L"Message sent":L"Another rule sent; "+round_error;}}
+ template<class Sender> void dispatch(uint64_t now,Sender send){
+  if(!enabled){reset();return;}
+  pending.erase(std::remove_if(pending.begin(),pending.end(),[&](const Pending& p){return now>=p.expires||p.rule>=rules.size()||!rules[p.rule].enabled||code(rules[p.rule])!=p.signature;}),pending.end());
+  if(last_send&&(now<last_send||now-last_send<message_interval_ms))return;
+  auto it=std::find_if(pending.begin(),pending.end(),[&](const Pending& p){return now>=p.due;});
+  if(it!=pending.end()&&send(it->text)){last_send=now;pending.erase(it);status=round_error.empty()?L"Message sent":L"Another rule sent; "+round_error;}
+ }
 };
 inline Engine engine;
 }

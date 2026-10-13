@@ -87,6 +87,8 @@ inline Hook hooks[]={
  {0x40ee0e,0x962bd0,-4,0},{0x40f582,0x486d60,-5,80}
 };
 inline uintptr_t game_base=0;
+// One owner for the version/FPS call; Freecam can wrap its native target.
+inline uintptr_t diagnostics_draw=0;
 inline bool changed(const Item& item){return item.scale!=1||item.x!=item.home_x||item.y!=item.home_y;}
 #include "hud_geometry.h"
 inline thread_local const float* map_projection=nullptr;
@@ -179,6 +181,7 @@ extern "C" __attribute__((used,noinline)) uintptr_t ssc_hud_before(unsigned inde
     if(hook.item==-3)capture_queued_rectangle(stack);
     if(hook.item==-4)return reinterpret_cast<uintptr_t>(skill_ready_hook);
     // The group fade hook now restores the complete native appearance.
+    if(hook.item==3&&diagnostics_draw)return diagnostics_draw;
     return hook.fade?reinterpret_cast<uintptr_t>(fade_hook):game_base+hook.target;
 }
 extern "C" __attribute__((used,noinline)) void ssc_hud_after(Scope* scope){end(*scope);}
