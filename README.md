@@ -79,7 +79,7 @@ If something goes wrong, open **All Modules > About > Open logs**, and dm them t
   - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk), and for putting up with me 
   joining his lobbies in the last 2 minutes and winning
   - chill for being a chill guy (and for giving some great suggestions)
-  - geri, founder of the Geri Challenge (fan-made challenge where you aren't allowed to draft skills or use stims)
+  - geri, founder of the Geri Challenge (fan-made challenge where you aren't allowed to draft skills)
   - mang for answering a ton of questions I had as a new player and for their work on a synergy chart (which is planned to be implemented in the mod soon)
   - deus for building my hatred for snipers so much that I always keep one in my second weapon slot :D
 
@@ -88,4 +88,4 @@ If something goes wrong, open **All Modules > About > Open logs**, and dm them t
 
 ## Private access
 
-Privately approved beta testers can enter an activation code under **Private access**. Later launches check access automatically. Public modules do not require a code. Private activation currently requires native Windows; see the [Linux guide](linux/README.md) for platform limits
+Privately approved beta testers can enter an activation code under **Private access**. Later launches check access automatically. Private activation currently requires native Windows; see the [Linux guide](linux/README.md) for platform limits
