@@ -33,7 +33,7 @@ int main(int argc,char** argv){
  put(profile,0x1018,s);put(profile,0x1020,s+skills.size());put(profile,0x1028,s+skills.size());
  std::memcpy(actor.data()+0xa0,profile.data(),profile.size());
  auto actor_ptr=reinterpret_cast<uintptr_t>(actor.data()),world_ptr=reinterpret_cast<uintptr_t>(world.data());
- std::memcpy(fixture+0xde55d0,&world_ptr,8);std::memcpy(fixture+0xe1d0b8,&actor_ptr,8);
+ std::memcpy(fixture+0xde65d0,&world_ptr,8);std::memcpy(fixture+0xe1e0b8,&actor_ptr,8);
  put(world,0xa618,actor_ptr);put(world,0xa620,actor_ptr+actor.size());
  put(actor,0x78,0);put(actor,0x81,(unsigned char)1);put(actor,0x350,3);put(actor,0x870,10);
  auto integrated=sample_local_build(reinterpret_cast<uintptr_t>(fixture));
