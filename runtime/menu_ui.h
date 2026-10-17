@@ -997,7 +997,7 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"v0.1.16",cyan);
+        text(50,153,L"v0.1.17",cyan);
         bullet(201,L"Updated compatibility, quick chat and settings fixes" );
         bullet(233,L"Name-color fixes; sharing is now on by default" );
         bullet(265,L"Compressed recordings and performance logging" );
@@ -1413,7 +1413,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.16",cyan);
+            text(266,157,L"0.1.17",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");

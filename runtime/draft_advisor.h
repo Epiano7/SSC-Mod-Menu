@@ -36,7 +36,7 @@ template<class T> bool read(uintptr_t p,T& v){return ssc_freecam::read(p,v);}
 inline bool build_snapshot(uintptr_t context,Build& b,uintptr_t& actor,uintptr_t& world){
  b=Build{};
  int slot=-1,local=-2,kind=-1;unsigned char active=0;
- if(!read(context,actor)||!actor||!read(game+0xde65d0,world)||!world||!read(actor+0x78,slot)||!read(world+0x6b98,local)||slot!=local||slot<0||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active||!read(actor+0x350,b.player_class)||b.player_class<1||b.player_class>8)return false;
+ if(!read(context,actor)||!actor||!read(game+0xde85d0,world)||!world||!read(actor+0x78,slot)||!read(world+0x6b98,local)||slot!=local||slot<0||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active||!read(actor+0x350,b.player_class)||b.player_class<1||b.player_class>8)return false;
  --b.player_class;
  uintptr_t acquired=0,end=0;if(!read(actor+0x10b8,acquired)||!read(actor+0x10c0,end)||end<acquired||(end-acquired)%0x240||(end-acquired)/0x240>54||(!acquired&&end))return false;
  for(uintptr_t p=acquired;p<end;p+=0x240){int id=-1,level=-1;unsigned char excluded=0;if(!read(p,id)||!read(p+0x1f8,level)||!read(p+0x1dc,excluded)||id<0||id>=54||level<0||level>300||excluded>1)return false;if(!excluded)b.levels[size_t(id)]=level;}
@@ -48,7 +48,7 @@ inline bool snapshot(uintptr_t context,Build& b,std::array<int,54>& offers,unsig
  uintptr_t actor=0,world=0,first=0,last=0;int points=0;
  if(!build_snapshot(context,b,actor,world)||!read(actor+0x1240,points)||points<=0)return false;
  float animation=0;if(!read(context+0x3148,animation)||!std::isfinite(animation)||animation>0)return false;
- if(!read(game+0xe01350,first)||!read(game+0xe01358,last)||!first||last<first||(last-first)%12||(last-first)/12>3)return false;
+ if(!read(game+0xe03350,first)||!read(game+0xe03358,last)||!first||last<first||(last-first)%12||(last-first)/12>3)return false;
  const unsigned native_count=unsigned((last-first)/12);if(native_count<2)return false;count=0;
  uintptr_t own=0,own_end=0;if(!read(actor+0x558,own)||!read(actor+0x560,own_end)||own_end<own||own_end-own!=last-first)return false;
  for(unsigned i=0;i<native_count;++i){int id=-1,own_id=-2;if(!read(first+i*12,id)||!read(own+i*12,own_id)||id!=own_id)return false;
@@ -86,7 +86,7 @@ inline void draw(uintptr_t context,uintptr_t out,float a,float b,char c,uint64_t
  if(allowed()&&!ssc_freecam::clean_view()&&!ssc_geri::enabled.load()){ssc_perf::Scope timing(ssc_perf::advisor);Build build;uintptr_t actor=0,world=0;int syringes=0;
   if(build_snapshot(context,build,actor,world)&&read(actor+0x8d0,syringes)&&syringes>0){prepare(build,actor,world);const auto& scores=cached_mutation_scores;std::array<int,54> choices{};unsigned count=0;
    for(int i=0;i<54;++i)if(build.levels[size_t(i)]>0&&!build.mutated[size_t(i)])choices[count++]=i;
-   int best=count==1?choices[0]:choose(scores,choices,count);uintptr_t table=0;if(best>=0&&read(game+0xfacf78,table)&&table)read(table+uintptr_t(best)*0x240+0x10,recommended_icon);
+   int best=count==1?choices[0]:choose(scores,choices,count);uintptr_t table=0;if(best>=0&&read(game+0xfaef98,table)&&table)read(table+uintptr_t(best)*0x240+0x10,recommended_icon);
    audit(true,build,choices,count,best,scores);
   }
  }
@@ -108,14 +108,14 @@ inline void panel(uintptr_t context,uintptr_t output,float a,uint64_t b,char c,c
  recommended=-1;border.pending=false;
  if(!allowed()||!selection_held()||ssc_geri::enabled.load()||ssc_freecam::clean_view())return;
  ssc_perf::Scope timing(ssc_perf::advisor);Build build;std::array<int,54> offers{};std::array<unsigned,54> slots{};unsigned count=0;if(!snapshot(context,build,offers,count,&slots))return;
- uintptr_t actor=0,world=0;if(!read(context,actor)||!read(game+0xde65d0,world))return;prepare(build,actor,world);
+ uintptr_t actor=0,world=0;if(!read(context,actor)||!read(game+0xde85d0,world))return;prepare(build,actor,world);
  auto scores=cached_scores;bool api_valid=false,api_used=false;
  // Highlight only the interactive Ctrl draft, never the collapsed preview.
  if(use_api){auto key=api_key(build,offers,count);if(!key.empty()){auto answer=api().request(key,GetTickCount64());api_valid=answer.valid;if(answer.valid){for(unsigned i=0;i<count;++i){auto id=size_t(offers[i]);if(answer.samples[id]>=5){scores[id].value+=2.f*std::tanh(answer.edge[id]/10.f);api_used=true;}}advice_status=L"Local research + API";}}}
  recommended=choose(scores,offers,count);if(recommended<0)return;
  for(unsigned i=0;i<count;++i)if(offers[i]==recommended){uintptr_t button=context+0x310+slots[i]*0x170;int x=0,y=0,w=0,h=0,ax=0,ay=0,width=0,height=0;
   unsigned char interactive=0;if(!read(button+0x44,interactive)||!interactive)return;
-  if(!read(button+0x14,x)||!read(button+0x18,y)||!read(button+0x1c,w)||!read(button+0x20,h)||!read(button+0x70,ax)||!read(button+0x74,ay)||!read(game+0xfada10,width)||!read(game+0xfada14,height)||w<=0||h<=0||width<=0||height<=0)return;
+  if(!read(button+0x14,x)||!read(button+0x18,y)||!read(button+0x1c,w)||!read(button+0x20,h)||!read(button+0x70,ax)||!read(button+0x74,ay)||!read(game+0xfafa40,width)||!read(game+0xfafa44,height)||w<=0||h<=0||width<=0||height<=0)return;
   x+=ax==1?width/2:ax==2?width:0;y+=ay==1?height/2:ay==2?height:0;
   border={x,y,w,h,width,height,true};
   audit(false,build,offers,count,recommended,scores,api_valid,api_used);
@@ -136,8 +136,8 @@ inline void icon(uintptr_t renderer,uintptr_t sheet,float x,float y,float w,floa
 }
 inline bool attach(){
  game=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));auto bytes=reinterpret_cast<unsigned char*>(game);
- if(ssc_creator::hash(bytes+0x3df940,14780)!=0xe0e30f3df56a113dULL||!ssc_compat::supports(128)||!ssc_record::validate_build_code(game,[](uintptr_t p,auto& v){return read(p,v);})||ssc_creator::hash(bytes+0x94fcd0,1212)!=0x7bb9885853f4a417ULL||ssc_creator::hash(bytes+0x3daf80,14692)!=0x248a3031448ec31fULL)return false;
- struct Site{uint32_t call,target;uintptr_t hook;};const Site sites[]={{0x3d8bb4,0x3df940,reinterpret_cast<uintptr_t>(panel)},{0x3dfd43,0x3daf80,reinterpret_cast<uintptr_t>(draw)},{0x3de110,0x487890,reinterpret_cast<uintptr_t>(icon)}};
+ if(ssc_creator::hash(bytes+0x3e02d0,14780)!=0x813076afd467a2fdULL||!ssc_compat::supports(128)||!ssc_record::validate_build_code(game,[](uintptr_t p,auto& v){return read(p,v);})||ssc_creator::hash(bytes+0x951420,1212)!=0x81cc28d5b7af6e4eULL||ssc_creator::hash(bytes+0x3db910,14692)!=0xd2c61ba0847b5400ULL)return false;
+ struct Site{uint32_t call,target;uintptr_t hook;};const Site sites[]={{0x3d9544,0x3e02d0,reinterpret_cast<uintptr_t>(panel)},{0x3e06d3,0x3db910,reinterpret_cast<uintptr_t>(draw)},{0x3deaa0,0x488300,reinterpret_cast<uintptr_t>(icon)}};
  for(auto s:sites){int32_t rel=0;std::memcpy(&rel,bytes+s.call+1,4);if(bytes[s.call]!=0xe8||int64_t(s.call)+5+rel!=s.target)return false;}
  unsigned char* bridge=nullptr;for(uintptr_t n=0x10000;n<0x60000000&&!bridge;n+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((game+n)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
  const unsigned char jump[]={0xff,0x25,0,0,0,0};for(unsigned i=0;i<3;++i){std::memcpy(bridge+i*16,jump,6);std::memcpy(bridge+i*16+6,&sites[i].hook,8);}DWORD old=0;if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}DWORD protections[3]{};
