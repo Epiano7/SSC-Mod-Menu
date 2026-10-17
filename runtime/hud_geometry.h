@@ -83,7 +83,7 @@ inline void capture_cached_quad(){
  capture_vertex(0,0,0);capture_vertex(1,0,0);capture_vertex(1,1,0);capture_vertex(0,1,0);primitive_capture=false;
 }
 inline __attribute__((noinline)) void APIENTRY capture_call_list(GLuint list){
- if(reinterpret_cast<uintptr_t>(__builtin_return_address(0))==game_base+ssc_compat::resolve(0x47fbe6))capture_cached_quad();
+ if(reinterpret_cast<uintptr_t>(__builtin_return_address(0))==game_base+ssc_compat::resolve(0x47ff16))capture_cached_quad();
  native_call_list(list);
 }
 inline bool writable_slot(uintptr_t address){MEMORY_BASIC_INFORMATION info{};return VirtualQuery(reinterpret_cast<void*>(address),&info,sizeof(info))&&info.State==MEM_COMMIT&&(info.Protect&(PAGE_READWRITE|PAGE_EXECUTE_READWRITE));}
@@ -91,10 +91,10 @@ inline bool start_capture(){
  if(!game_base||!capture_frame||game_base!=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))return false;
  if(capture_depth){++capture_depth;return true;}
  auto b=reinterpret_cast<BeginProc*>(game_base+ssc_compat::resolve(0xdec708));auto v2=reinterpret_cast<Vertex2Proc*>(game_base+ssc_compat::resolve(0xdec7a0));auto v3=reinterpret_cast<Vertex3Proc*>(game_base+ssc_compat::resolve(0xdec788));
- auto c4=reinterpret_cast<Color4Proc*>(game_base+ssc_compat::resolve(0xdec688));auto c3=reinterpret_cast<Color3Proc*>(game_base+ssc_compat::resolve(0xdec840));auto end=reinterpret_cast<EndProc*>(game_base+ssc_compat::resolve(0xdec6b0));
+ auto c4=reinterpret_cast<Color4Proc*>(game_base+ssc_compat::resolve(0xdec688));auto c3=reinterpret_cast<Color3Proc*>(game_base+ssc_compat::resolve(0xdec838));auto end=reinterpret_cast<EndProc*>(game_base+ssc_compat::resolve(0xdec6b0));
  if(!writable_slot(reinterpret_cast<uintptr_t>(c4))||!writable_slot(reinterpret_cast<uintptr_t>(c3))||!writable_slot(reinterpret_cast<uintptr_t>(end))||!*c4||!*c3||!*end)return false;
  if(!writable_slot(reinterpret_cast<uintptr_t>(b))||!writable_slot(reinterpret_cast<uintptr_t>(v2))||!writable_slot(reinterpret_cast<uintptr_t>(v3))||!*b||!*v2||!*v3)return false;
- auto list=reinterpret_cast<CallListProc*>(game_base+ssc_compat::resolve(0xdec670));
+ auto list=reinterpret_cast<CallListProc*>(game_base+ssc_compat::resolve(0xdec668));
  if(!writable_slot(reinterpret_cast<uintptr_t>(list))||!*list)return false;
  native_call_list=*list;*list=capture_call_list;
  native_color4=*c4;native_color3=*c3;native_end=*end;*c4=capture_color4;*c3=capture_color3;*end=capture_end;
@@ -103,9 +103,9 @@ inline bool start_capture(){
 }
 inline void stop_capture(){
  if(!capture_depth||--capture_depth)return;
- *reinterpret_cast<CallListProc*>(game_base+ssc_compat::resolve(0xdec670))=native_call_list;
+ *reinterpret_cast<CallListProc*>(game_base+ssc_compat::resolve(0xdec668))=native_call_list;
  *reinterpret_cast<Color4Proc*>(game_base+ssc_compat::resolve(0xdec688))=native_color4;
- *reinterpret_cast<Color3Proc*>(game_base+ssc_compat::resolve(0xdec840))=native_color3;
+ *reinterpret_cast<Color3Proc*>(game_base+ssc_compat::resolve(0xdec838))=native_color3;
  *reinterpret_cast<EndProc*>(game_base+ssc_compat::resolve(0xdec6b0))=native_end;
  *reinterpret_cast<BeginProc*>(game_base+ssc_compat::resolve(0xdec708))=native_begin;
  *reinterpret_cast<Vertex2Proc*>(game_base+ssc_compat::resolve(0xdec7a0))=native_vertex2;

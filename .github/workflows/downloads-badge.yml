@@ -1,0 +1,47 @@
+name: Downloads Badge
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: traffic-badge
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Generate and publish downloads badge
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '[.[] | select(.draft == false) | .assets[].download_count] | add // 0' > "$RUNNER_TEMP/download-counts"
+          git clone --depth=1 --branch traffic-data "https://github.com/$GITHUB_REPOSITORY.git" "$RUNNER_TEMP/downloads-badge"
+          cd "$RUNNER_TEMP/downloads-badge"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          total = sum(int(v) for v in (Path(os.environ['RUNNER_TEMP']) / 'download-counts').read_text().splitlines())
+          value = str(total)
+          right = max(30, len(value) * 7 + 12)
+          width = 70 + right
+          center = 70 + right / 2
+          Path('downloads.svg').write_text(f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="20" role="img" aria-label="downloads: {value}"><title>downloads: {value}</title><linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="r"><rect width="{width}" height="20" rx="3"/></clipPath><g clip-path="url(#r)"><path fill="#555" d="M0 0h70v20H0z"/><path fill="#007ec6" d="M70 0h{right}v20H70z"/><path fill="url(#s)" d="M0 0h{width}v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11"><text x="35" y="15" fill="#010101" fill-opacity=".3">downloads</text><text x="35" y="14">downloads</text><text x="{center}" y="15" fill="#010101" fill-opacity=".3">{value}</text><text x="{center}" y="14">{value}</text></g></svg>''', encoding='utf-8')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads.svg
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'chore: update downloads badge'
+          gh auth setup-git
+          git push origin HEAD:traffic-data

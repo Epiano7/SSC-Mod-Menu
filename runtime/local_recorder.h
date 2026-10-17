@@ -9,6 +9,7 @@
 #include <mutex>
 #include <thread>
 #include "third_party/json.hpp"
+#include "recording_archive.h"
 namespace ssc_record {
 using Json=nlohmann::json;
 struct Message { int kind=0;std::string line;std::filesystem::path folder; };
@@ -39,20 +40,20 @@ inline std::string executable_hash(){
     if(hash){BCryptDestroyHash(hash);}BCryptCloseAlgorithmProvider(algorithm,0);return result;
 }
 inline void worker(State* s){
-    std::ofstream file;size_t bytes=0,limit=10*1024*1024;unsigned serial=0;
+    std::filesystem::path current_folder;std::ofstream file;size_t bytes=0,limit=file_budget_bytes;unsigned serial=0;
     for(;;){Message message;{std::unique_lock<std::mutex> lock(s->mutex);s->wake.wait(lock,[&]{return !s->queue.empty();});message=std::move(s->queue.front());s->queue.pop_front();}
         try {
-            if(message.kind==1){file.close();file.clear();bytes=0;std::filesystem::create_directories(message.folder);uintmax_t total=0;
-                for(const auto& entry:std::filesystem::directory_iterator(message.folder))if(entry.is_regular_file()&&entry.path().extension()==L".jsonl")total+=entry.file_size();
-                if(total>=100*1024*1024){s->status=3;s->enabled=false;continue;}
-                SYSTEMTIME now{};GetSystemTime(&now);limit=size_t(std::min<uintmax_t>(10*1024*1024,100*1024*1024-total));wchar_t name[100];swprintf(name,100,L"session-%04u%02u%02u-%02u%02u%02u-%llu-%u-%u.jsonl",now.wYear,now.wMonth,now.wDay,now.wHour,now.wMinute,now.wSecond,GetTickCount64(),GetCurrentProcessId(),++serial);
+            if(message.kind==1){file.close();file.clear();bytes=0;std::filesystem::create_directories(message.folder);current_folder=message.folder;ssc_record_archive::try_compact(current_folder);uintmax_t total=0;
+                for(const auto& entry:std::filesystem::directory_iterator(message.folder))if(entry.is_regular_file()&&(entry.path().extension()==L".jsonl"||entry.path().filename()==L"recordings.zip"))total+=entry.file_size();
+                if(total>=archive_budget_bytes){s->status=3;s->enabled=false;continue;}
+                SYSTEMTIME now{};GetSystemTime(&now);limit=size_t(std::min<uintmax_t>(file_budget_bytes,archive_budget_bytes-total));wchar_t name[100];swprintf(name,100,L"session-%04u%02u%02u-%02u%02u%02u-%llu-%u-%u.jsonl",now.wYear,now.wMonth,now.wDay,now.wHour,now.wMinute,now.wSecond,GetTickCount64(),GetCurrentProcessId(),++serial);
                 file.open(message.folder/name,std::ios::binary|std::ios::out);if(!file){s->status=2;s->enabled=false;continue;}s->status=1;auto header=Json::parse(message.line);auto hash=executable_hash();header["game_sha256"]=hash.empty()?Json(nullptr):Json(hash);message.line=header.dump();
             }
             if(file.is_open()&&!message.line.empty()){
                 if(bytes+message.line.size()+1>limit){file.close();s->status=3;s->enabled=false;continue;}
                 file<<message.line<<'\n';file.flush();if(!file){file.close();s->status=2;s->enabled=false;continue;}bytes+=message.line.size()+1;++s->written;
             }
-            if(message.kind==2){file.close();if(s->status==1||s->status==5)s->status=s->enabled?6:0;}
+            if(message.kind==2){file.close();ssc_record_archive::try_compact(current_folder);if(s->status==1||s->status==5)s->status=s->enabled?6:0;}
         }catch(...){file.close();s->status=2;s->enabled=false;}
     }
 }
@@ -60,6 +61,11 @@ inline void enqueue(Message message,bool control=false){auto& s=state();std::uni
     if(control)lock.lock();else if(!lock.try_lock()){++s.dropped;return;}
     if(s.queue.size()>=(control?2048u:2046u)){++s.dropped;if(!control)return;s.queue.pop_back();}
     s.queue.push_back(std::move(message));s.wake.notify_one();
+}
+// Diagnostics share the bounded asynchronous match writer, never a render-thread file write.
+inline void diagnostic(Json event){auto& s=state();if(!s.enabled||!s.match_open)return;
+    event["timeline"]=timeline_stamp(GetTickCount64());event["utc_ms"]=utc_milliseconds();
+    enqueue({0,event.dump(),{}});
 }
 // The UI toggle arms observation; opening a file requires an active round.
 inline void start(const std::filesystem::path& folder){auto& s=state();if(s.enabled.exchange(true))return;
@@ -79,7 +85,7 @@ inline void round_state(bool active){auto& s=state();if(!s.enabled||!active){end
     if(s.match_id.empty()){s.match_id=new_match_id();s.match_started=GetTickCount64();}
     ++s.segment;s.active=true;s.tracking=nullptr;s.last_build=nullptr;s.build_sampled=0;s.previous.clear();s.last_sample=0;
     if(!s.match_open){s.match_open=true;s.status=4;s.started=GetTickCount64();s.sequence=0;
-        Json header={{"schema",4},{"started_utc_ms",utc_milliseconds()},{"event","recording_started"},{"source","native_status_1hz"},{"tracking_schema",1},{"combat_counters_available",false},{"roster_available",false},{"skill_choices_available",false},{"build_schema",1},{"skill_snapshots","per_sample_availability"},{"random_class_choice",nullptr},{"timeline",timeline_stamp(s.started)},{"sampling_interval_ms",1000},{"mod_version","0.1.15"}};
+        Json header={{"schema",4},{"started_utc_ms",utc_milliseconds()},{"event","recording_started"},{"source","native_status_1hz"},{"tracking_schema",1},{"combat_counters_available",false},{"roster_available",false},{"skill_choices_available",false},{"build_schema",1},{"skill_snapshots","per_sample_availability"},{"random_class_choice",nullptr},{"timeline",timeline_stamp(s.started)},{"sampling_interval_ms",1000},{"mod_version","0.1.16"}};
         enqueue({1,header.dump(),s.folder},true);
     }
 }

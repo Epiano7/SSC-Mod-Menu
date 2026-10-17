@@ -6,7 +6,7 @@ WNDPROC previous_proc;
 HWND game_window;
 bool opened=false,clock_enabled=false,dirty=true,save_failed=false,suppress_escape_up=false;
 bool animations=true,sound_requested=false,cosmetic_requested=false,match_sound_level=true;
-bool shared_receive=false,shared_publish=false;
+bool shared_receive=true,shared_publish=true;bool shared_defaults_applied=false;
 std::wstring shared_notice;
 bool rpc_requested=false,rpc_timer=true,rpc_rating=true,rpc_editing=false,rpc_select_all=false,rpc_error=false;
 std::string private_code;bool private_editing=false;
@@ -34,7 +34,7 @@ bool chat_editing=false,chat_select_all=false,chat_new=false;std::string chat_bu
 ssc_edit::Cursor edit_cursor;
 struct EditVisual {std::wstring value;int id=0,x=0,y=0,w=0,size=15;size_t first=0;};
 std::vector<EditVisual> edit_visuals;
-int lab_drag=-1;bool speed_dragging=false,slow_binding=false,photo_binding=false;
+int lab_drag=-1;bool speed_dragging=false,slow_binding=false,photo_binding=false,capture_binding=false;
 bool scale_dragging=false;int scale_preview=100;float scale_drag_left=0,scale_drag_width=1;
 bool bot_color_error=false;
 bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buffer;
@@ -42,7 +42,7 @@ bool statistics_graph_visible(){return manager&&settings_page==21&&!ssc_hud::edi
 bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hud::editing;}
 
 // Advance this ID when publishing a new set of release notes.
-constexpr int release_notes_id=20261012;
+constexpr int release_notes_id=20261017;
 bool update_popup=false;
 bool show_update_notes=true;int seen_release_notes=0;
 bool update_notes_due(int phase){return presence_supported&&phase==1&&welcome_seen&&show_update_notes&&seen_release_notes!=release_notes_id&&!opened;}
@@ -69,11 +69,24 @@ std::vector<Control> controls;
 float unit(float value){return std::clamp(value,0.f,1.f);}
 void log(const char* message) {
     if(state_dir.empty())return;
-    std::ofstream out(state_dir/L"runtime.log",std::ios::app);SYSTEMTIME now;GetSystemTime(&now);char stamp[48];std::snprintf(stamp,sizeof(stamp),"[%04u-%02u-%02u %02u:%02u:%02u UTC] ",now.wYear,now.wMonth,now.wDay,now.wHour,now.wMinute,now.wSecond);out<<stamp<<message<<"\n";
+    SYSTEMTIME now;GetSystemTime(&now);char stamp[64];std::snprintf(stamp,sizeof(stamp),"[%04u-%02u-%02u %02u:%02u:%02u UTC] ",now.wYear,now.wMonth,now.wDay,now.wHour,now.wMinute,now.wSecond);
+    const std::string line=std::string(stamp)+message+"\r\n";
+    auto append=[](const std::filesystem::path& path,const std::string& text){
+        HANDLE file=CreateFileW(path.c_str(),FILE_APPEND_DATA,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(file==INVALID_HANDLE_VALUE)return GetLastError();
+        DWORD written=0;BOOL ok=WriteFile(file,text.data(),DWORD(text.size()),&written,nullptr);DWORD error=ok?(written==text.size()?ERROR_SUCCESS:ERROR_WRITE_FAULT):GetLastError();CloseHandle(file);return error;
+    };
+    DWORD error=append(state_dir/L"runtime.log",line);
+    if(error){
+        // Keep startup evidence when a viewer or another process locks the main log.
+        auto fallback=state_dir/(L"runtime-"+std::to_wstring(GetCurrentProcessId())+L".log");
+        append(fallback,std::string(stamp)+"runtime.log append failed (Windows error "+std::to_string(error)+"); "+message+"\r\n");
+        OutputDebugStringA(line.c_str());
+    }
 }
 void activate(int id);
 void commit_text(){if(color_editing&&settings_page==4&&color_buffer.size()==6)activate(189);if(chat_editing)activate(321);if(color_editing&&settings_page==18&&ssc_names::private_visible()){unsigned rgb,alpha;if(ssc_names::parse_bot_color(color_buffer,rgb,alpha))activate(537);}}
-void cancel_edit(){photo_binding=false;slow_binding=false;speed_dragging=false;close_color_picker();private_editing=false;private_label_editing=false;credits_popup=false;commit_text();dropdown=-1;chat_editing=false;sound_search_editing=false;color_editing=false;rpc_editing=false;rpc_error=false;dirty=true;}
+void cancel_edit(){capture_binding=false;photo_binding=false;slow_binding=false;speed_dragging=false;close_color_picker();private_editing=false;private_label_editing=false;credits_popup=false;commit_text();dropdown=-1;chat_editing=false;sound_search_editing=false;color_editing=false;rpc_editing=false;rpc_error=false;dirty=true;}
 void save() {
     ssc_names::cosmetics=cosmetic_requested&&ssc_compat::supports(1);
     ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);
@@ -90,24 +103,32 @@ void save() {
     out<<"camera_relative_driving="<<ssc_vehicle::enabled.load()<<"\n";
     out<<"freecam_hide_shadows="<<ssc_freecam::hide_shadows<<"\n";
     out<<"freecam_hide_diagnostics="<<ssc_freecam::hide_diagnostics<<"\n";
+    out<<"freecam_hide_all_gui="<<ssc_freecam::hide_all_gui<<"\n";
     out<<"freecam_hide_hud="<<ssc_freecam::hide_hud<<"\n";
+    out<<"freecam_fps="<<ssc_freecam::fps<<"\n";out<<"freecam_eye_height="<<int(ssc_freecam::eye_height)<<"\n";
     out<<"freecam_fly="<<ssc_freecam::fly<<"\n";
+    out<<"freecam_capture_key="<<ssc_freecam::capture_key<<"\n";
     out<<"freecam_photo_enabled="<<ssc_freecam::photo_enabled<<"\n";out<<"freecam_photo_key="<<ssc_freecam::photo_key<<"\n";
     out<<"freecam_slow_key="<<ssc_freecam::slow_key<<"\n";out<<"freecam_slow_toggle="<<ssc_freecam::slow_toggle<<"\n";
     out<<"freecam_fly_speed="<<int(ssc_freecam::fly_speed)<<"\n";
     out<<"freecam_speed="<<int(ssc_freecam::state.speed)<<"\n";
     out<<"freecam_draw_distance="<<ssc_freecam::draw_distance<<"\n";
     out<<"hide_crosshair="<<ssc_creator::hide_crosshair.load()<<"\n";
+    out<<"draft_advisor="<<ssc_advisor::enabled<<"\n";
+    out<<"draft_advisor_api="<<ssc_advisor::use_api<<"\n";
     out<<"geri_mode="<<ssc_geri::enabled.load()<<"\n";
     out<<"cooldown_pulse="<<ssc_cooldown::settings.enabled<<"\ncooldown_duration_ms="<<ssc_cooldown::settings.duration_ms<<"\n";
     out<<"hud_hover_fade="<<ssc_hud::hover_fade<<"\n";out<<"hud_enabled="<<ssc_hud::enabled<<"\n";for(const auto& item:ssc_hud::items){out<<"hud_box_"<<item.key<<"="<<item.home_x<<","<<item.home_y<<","<<item.w<<","<<item.h<<"\n";out<<"hud_"<<item.key<<"="<<item.x<<","<<item.y<<","<<item.scale<<"\n";}
+    out<<"shared_defaults_applied=1\n";
     out<<"shared_receive="<<shared_receive<<"\nshared_publish="<<shared_publish<<"\n";
     out<<"cosmetic_gradient="<<ssc_names::gradient<<"\ncosmetic_gradient_count="<<ssc_names::gradient_count<<"\n";for(int i=0;i<3;++i)out<<"cosmetic_gradient_"<<i<<"="<<ssc_names::gradient_colors[i]<<"\n";
     out<<"cosmetic_rainbow="<<ssc_names::rainbow<<"\ncosmetic_rgb="<<ssc_names::solid_rgb<<"\n";out<<"welcome_seen="<<welcome_seen<<"\n";out<<"schema=2\nclock="<<clock_enabled
        <<"\nsound_requested="<<sound_requested<<"\ncosmetic_requested="<<cosmetic_requested<<"\nmatch_sound_level="<<match_sound_level
        <<"\nrpc_requested="<<rpc_requested<<"\nrpc_id="<<rpc_id<<"\nrpc_timer="<<rpc_timer<<"\nrpc_rating="<<rpc_rating
        <<"\nrecording_enabled="<<recording_requested<<"\nanimations="<<animations<<"\nui_scale="<<ui_scale<<"\n";out.close();
-    save_failed=!auto_saved||!chat_saved||!out||!MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);dirty=true;
+    // Attempt every independent save, even if another settings file failed.
+    bool menu_saved=out&&MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);
+    save_failed=!auto_saved||!chat_saved||!menu_saved;dirty=true;
 }
 constexpr float hud_view_x=266,hud_view_y=188,hud_view_w=820,hud_view_h=461;
 int hud_drag=-1;bool hud_resize=false;float hud_start_x=0,hud_start_y=0,hud_item_x=0,hud_item_y=0,hud_item_scale=1;
@@ -148,8 +169,12 @@ void load_settings() {
         else if(key=="camera_relative_driving")ssc_vehicle::enabled=number!=0;
         else if(key=="freecam_hide_shadows")ssc_freecam::hide_shadows=number!=0;
         else if(key=="freecam_hide_diagnostics")ssc_freecam::hide_diagnostics=number!=0;
+        else if(key=="freecam_hide_all_gui")ssc_freecam::hide_all_gui=number!=0;
         else if(key=="freecam_hide_hud")ssc_freecam::hide_hud=number!=0;
+        else if(key=="freecam_fps")ssc_freecam::fps=number!=0;
+        else if(key=="freecam_eye_height")ssc_freecam::eye_height=float(std::clamp(number,8,64));
         else if(key=="freecam_fly")ssc_freecam::fly=number!=0;
+        else if(key=="freecam_capture_key")ssc_freecam::capture_key=ssc_freecam::valid_slow_key(number)?number:VK_F9;
         else if(key=="freecam_photo_enabled")ssc_freecam::photo_enabled=number!=0;
         else if(key=="freecam_photo_key")ssc_freecam::photo_key=ssc_freecam::valid_slow_key(number)?number:VK_F8;
         else if(key=="freecam_slow_key")ssc_freecam::slow_key=ssc_freecam::valid_slow_key(number)?number:VK_F6;
@@ -158,10 +183,13 @@ void load_settings() {
         else if(key=="freecam_speed")ssc_freecam::state.speed=float(std::clamp(number,30,600));
         else if(key=="freecam_draw_distance")ssc_freecam::draw_distance=(number==1000||number==2000||number==4000||number==8000)?number:0;
         else if(key=="hide_crosshair")ssc_creator::hide_crosshair=number!=0;
+        else if(key=="draft_advisor")ssc_advisor::enabled=number!=0;
+        else if(key=="draft_advisor_api")ssc_advisor::use_api=number!=0;
         else if(key=="geri_mode")ssc_geri::enabled=number!=0;
         else if(key=="cooldown_pulse")ssc_cooldown::settings.enabled=number!=0;
         else if(key=="cooldown_duration_ms"&&(number==1000||number==1500||number==2500))ssc_cooldown::settings.duration_ms=unsigned(number);
         else if(key=="cosmetic_gradient")ssc_names::gradient=number==1;
+        else if(key=="shared_defaults_applied")shared_defaults_applied=number==1;
         else if(key=="shared_receive")shared_receive=number==1;
         else if(key=="shared_publish")shared_publish=number==1;
         else if(key=="cosmetic_gradient_count"&&number>=2&&number<=3)ssc_names::gradient_count=number;
@@ -181,9 +209,14 @@ void load_settings() {
         else if(key=="animations")animations=number!=0;
         else if(key=="ui_scale"&&number>=50&&number<=200)ui_scale=number;
     }
+    // Windows readers do not grant delete sharing: close before atomic replacement.
+    in.close();
+    bool migrate_sharing=!shared_defaults_applied;
+    if(migrate_sharing){shared_receive=shared_publish=true;shared_defaults_applied=true;}
     if(!quick_freecam_known)quick_mask|=64;
     if(ssc_freecam::photo_key==ssc_freecam::slow_key)ssc_freecam::photo_key=ssc_freecam::slow_key==VK_F8?VK_F9:VK_F8;
     if(!version2||!developer_tools)clock_enabled=false;
+    if(migrate_sharing)save();
     if(recording_requested)ssc_record::start(state_dir/L"recordings");
 }
 void finish_lab_slider(){if(lab_drag>=0){lab_drag=-1;ssc_lab::recompute();dirty=true;}}
@@ -250,6 +283,7 @@ void poll_live_hud_drag(HWND window){
 }
 void live_hud_wheel(int delta,int hovered_item){if(hud_drag>=0){finish_hud_drag();ReleaseCapture();}if(hovered_item>=0)ssc_hud::selected=hovered_item;auto& a=ssc_hud::items[ssc_hud::selected];a.scale*=std::pow(1.1f,float(delta)/WHEEL_DELTA);ssc_hud::constrain(a);save();}
 bool module_ready(int id){
+    if(id==998||id==1001)return ssc_advisor::private_access();
     if(id==510||id==511||(id>=530&&id<=537))return ssc_names::private_visible();
     if(!ssc_compat::initialized)return true;
     return id==981?ssc_vehicle::attached:id==586?ssc_creator::attached:id==570?ssc_geri::attached:id==330?ssc_auto::supported():id==80?ssc_sound::attached:id==81?ssc_names::attached:id==83?presence_supported:(id==86||id==193)?ssc_hud::attached:true;
@@ -284,12 +318,17 @@ void activate(int id) {
     else if(id==586){if(ssc_creator::attached){ssc_creator::hide_crosshair=!ssc_creator::hide_crosshair.load();save();}}
     else if(id==587){show_manager(9);}
     else if(id==588){if(ssc_freecam::state.active||ssc_freecam::pending_since){ssc_freecam::stop();dirty=true;}else {if(ssc_freecam::request_start(GetTickCount64()))finish_freecam_entry();dirty=true;}}
-    else if(id==592||id==593){if(!ssc_freecam::state.active){ssc_freecam::fly=id==593;save();}}
+    else if(id==592||id==593||id==993){ssc_freecam::select_mode(id==592?0:id==593?1:2);save();}
+    else if(id==994||id==995){float old=ssc_freecam::eye_height;ssc_freecam::eye_height=std::clamp(old+(id==994?-1.f:1.f),8.f,64.f);if(ssc_freecam::fps&&ssc_freecam::camera.seeded)ssc_freecam::limit_floor();save();}
     else if(id==962){show_manager(25);}
+    else if(id==990){show_manager(27);}
+    else if(id==991){capture_binding=true;photo_binding=false;slow_binding=true;dirty=true;}
+    else if(id==992){std::error_code error;std::filesystem::create_directories(state_dir/L"captures",error);ShellExecuteW(nullptr,L"open",(state_dir/L"captures").c_str(),nullptr,nullptr,SW_SHOWNORMAL);}
     else if(id==963){ssc_freecam::photo_enabled=!ssc_freecam::photo_enabled;ssc_freecam::photo_frozen=false;save();}
-    else if(id==964){photo_binding=true;slow_binding=true;dirty=true;}
-    else if(id==960){photo_binding=false;slow_binding=true;dirty=true;}
+    else if(id==964){capture_binding=false;photo_binding=true;slow_binding=true;dirty=true;}
+    else if(id==960){capture_binding=false;photo_binding=false;slow_binding=true;dirty=true;}
     else if(id==961){ssc_freecam::slow_toggle=!ssc_freecam::slow_toggle;ssc_freecam::slow_latched=false;save();}
+    else if(id==999){ssc_freecam::hide_all_gui=!ssc_freecam::hide_all_gui;save();}
     else if(id==589){ssc_freecam::hide_hud=!ssc_freecam::hide_hud;save();}
     else if(id==590){ssc_freecam::state.speed=std::clamp(ssc_freecam::state.speed-30,30.f,600.f);save();}
     else if(id==591){ssc_freecam::state.speed=std::clamp(ssc_freecam::state.speed+30,30.f,600.f);save();}
@@ -304,6 +343,9 @@ void activate(int id) {
     else if(id==566&&ssc_names::private_visible()){private_label_buffer=private_label;private_label_editing=true;edit_cursor.begin(private_label_buffer.size());dirty=true;}
     else if(id==567&&ssc_names::private_visible()){if(valid_private_label(private_label_buffer))private_label=private_label_buffer;private_label_editing=false;save();}
     else if(id==568&&ssc_names::private_visible()){private_label="Bot highlight";private_label_editing=false;save();}
+    else if(id==997){settings_page=28;}
+    else if(id==1001){ssc_advisor::use_api=!ssc_advisor::use_api;save();}
+    else if(id==998){if(ssc_advisor::attached){ssc_advisor::enabled=!ssc_advisor::enabled;save();}}
     else if(id==570){credits_popup=true;credits_page=0;dirty=true;}
     else if(id==571){credits_popup=false;dirty=true;}
     else if(id==572){credits_page=std::max(0,credits_page-1);dirty=true;}
@@ -417,6 +459,8 @@ void activate(int id) {
     else if(id==143){show_manager(10);}
     else if(id==190){ssc_hud::reset();save();show_manager(6);}
     else if(id==191){show_manager(6);}
+    else if(id==997){settings_page=28;}
+    else if(id==998){if(ssc_advisor::attached){ssc_advisor::enabled=!ssc_advisor::enabled;save();}}
     else if(id==570){if(ssc_geri::attached){ssc_geri::enabled=!ssc_geri::enabled.load();save();}}
     else if(id==193){ssc_cooldown::settings.enabled=!ssc_cooldown::settings.enabled;ssc_cooldown::tracker.clear();save();}
     else if(id>=197&&id<=199){ssc_cooldown::settings.duration_ms=id==197?1000:id==198?1500:2500;save();}
@@ -517,16 +561,16 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         }return 0;
     }
     if(message==WM_KEYUP&&menu_key)return 0;
-    if(opened&&manager&&(settings_page==24||settings_page==25)&&slow_binding&&(message==WM_KEYDOWN||message==WM_SYSKEYDOWN)){
-        if(wp==VK_ESCAPE){photo_binding=false;slow_binding=false;suppress_escape_up=true;dirty=true;}
-        else if(ssc_freecam::valid_slow_key(int(wp))&&int(wp)!=(photo_binding?ssc_freecam::slow_key:ssc_freecam::photo_key)){if(photo_binding)ssc_freecam::photo_key=int(wp);else ssc_freecam::slow_key=int(wp);photo_binding=false;ssc_freecam::slow_latched=false;slow_binding=false;save();}
+    if(opened&&manager&&(settings_page==24||settings_page==25||settings_page==27)&&slow_binding&&(message==WM_KEYDOWN||message==WM_SYSKEYDOWN)){
+        if(wp==VK_ESCAPE){capture_binding=false;photo_binding=false;slow_binding=false;suppress_escape_up=true;dirty=true;}
+        else if(ssc_freecam::valid_slow_key(int(wp))&&(capture_binding||int(wp)!=ssc_freecam::capture_key)&&(photo_binding||int(wp)!=ssc_freecam::photo_key)&&((!capture_binding&&!photo_binding)||int(wp)!=ssc_freecam::slow_key)){if(capture_binding)ssc_freecam::capture_key=int(wp);else if(photo_binding)ssc_freecam::photo_key=int(wp);else ssc_freecam::slow_key=int(wp);capture_binding=false;photo_binding=false;ssc_freecam::slow_latched=false;slow_binding=false;save();}
         return 0;
     }
     if(message==WM_CAPTURECHANGED||message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wp)){if(speed_dragging){speed_dragging=false;save();}slow_binding=false;}
     if(message==WM_KEYDOWN&&wp==VK_ESCAPE&&ssc_freecam::state.active){ssc_freecam::stop();suppress_escape_up=true;dirty=true;return 0;}
     if(message==WM_SYSKEYDOWN&&wp==VK_F4&&ssc_freecam::state.active){ssc_freecam::stop();return CallWindowProcW(previous_proc,window,message,wp,lp);}
     if(ssc_freecam::key(message,wp,opened))return 0;
-    if(ssc_freecam::state.active&&!opened){if(message==WM_MOUSEWHEEL){ssc_freecam::camera.wheel(float(GET_WHEEL_DELTA_WPARAM(wp))/WHEEL_DELTA,(GET_KEYSTATE_WPARAM(wp)&MK_SHIFT)!=0,ssc_freecam::fly);return 0;}if(message==WM_SETCURSOR&&ssc_freecam::mouse_window){SetCursor(nullptr);return TRUE;}if(message==WM_INPUT){ssc_freecam::raw_motion(lp);return DefWindowProcW(window,message,wp,lp);}if(message==WM_CHAR||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;}
+    if(ssc_freecam::state.active&&!opened){if(message==WM_MOUSEWHEEL){ssc_freecam::wheel(float(GET_WHEEL_DELTA_WPARAM(wp))/WHEEL_DELTA,(GET_KEYSTATE_WPARAM(wp)&MK_SHIFT)!=0);return 0;}if(message==WM_SETCURSOR&&ssc_freecam::mouse_window){SetCursor(nullptr);return TRUE;}if(message==WM_INPUT){ssc_freecam::raw_motion(lp);return DefWindowProcW(window,message,wp,lp);}if(message==WM_CHAR||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;}
 
     if(message==WM_KEYUP&&wp==VK_ESCAPE&&suppress_escape_up){suppress_escape_up=false;return 0;}
     if(message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wp)){
@@ -953,11 +997,12 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"0.1.15 COMPATIBILITY UPDATE",cyan);
-        bullet(201,L"Freecam with 2D pan, 3D flight and creator settings" );
-        bullet(233,L"Optional camera-relative driving in singleplayer" );
-        bullet(265,L"Auto-message timing controls and updated credits" );
-        bullet(297,L"Existing settings and custom sounds are preserved" );
+        text(50,153,L"v0.1.16",cyan);
+        bullet(201,L"Updated compatibility, quick chat and settings fixes" );
+        bullet(233,L"Name-color fixes; sharing is now on by default" );
+        bullet(265,L"Compressed recordings and performance logging" );
+        bullet(297,L"Freecam: 3D + Floor and hide GUI options" );
+        bullet(329,L"Known issue: some world GUI may remain visible" );
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
@@ -1157,7 +1202,7 @@ void paint_panel() {
             button(161,266,308,340,48,ssc_update::action_label(),true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
             button(1,630,308,180,48,L"LATER");
         } else if(settings_page==9){
-            text(266,111,L"MISC",ink,true);
+            text(266,111,L"MISC",ink,true);button(997,760,106,326,38,L"DRAFT ADVISOR");
             text(282,198,L"HUD HOVER FADE");toggle(192,978,189,ssc_hud::hover_fade);
             text(282,246,L"Fade HUD elements near your cursor.",muted);
             text(282,310,L"READY SKILL PULSE");toggle(193,978,301,ssc_cooldown::settings.enabled);
@@ -1168,6 +1213,21 @@ void paint_panel() {
             text(282,518,L"PULSE DURATION");
             button(197,282,554,210,38,L"1 SECOND",ssc_cooldown::settings.duration_ms==1000);button(198,508,554,210,38,L"1.5 SECONDS",ssc_cooldown::settings.duration_ms==1500);button(199,734,554,210,38,L"2.5 SECONDS",ssc_cooldown::settings.duration_ms==2500);
             button(585,282,606,350,38,L"FREECAM");text(670,619,L"HIDE CROSSHAIR",muted,false,12);toggle(586,978,606,ssc_creator::hide_crosshair.load());
+        } else if(settings_page==28){
+            text(266,111,L"DRAFT ADVISOR",ink,true);
+            if(!ssc_advisor::private_access()){
+                text(282,204,L"PRIVATE ACCESS REQUIRED",ink,true);
+                text(282,266,L"Activate your private key to use draft and syringe advice.",muted,false,15);
+                button(520,282,322,300,44,L"PRIVATE ACCESS");
+            }else{
+            text(282,204,L"HIGHLIGHT RECOMMENDED SKILL");toggle(998,978,195,ssc_advisor::enabled);
+            text(282,276,L"Uses your class, skills and current mutations.",muted,false,15);
+            text(282,322,L"API STATISTICS",muted,false,16);toggle(1001,978,312,ssc_advisor::use_api);
+            text(282,368,L"Sends visible offers and build IDs to skillshotcity.gg.",muted,false,14);
+            text(282,414,L"Mutation advice uses local research; recommendations are estimates.",muted,false,13);
+            text(282,460,L"Only visible choices are highlighted. Nothing is auto-picked.",muted,false,14);
+            text(282,520,ssc_advisor::attached?ssc_advisor::advice_status:L"Unavailable for this game build.",muted,false,14);
+            }
         } else if(settings_page==26){
             text(266,111,L"DRIVING",ink,true);
             text(282,204,L"CAMERA-RELATIVE CONTROLS");toggle(981,978,195,ssc_vehicle::enabled.load());
@@ -1184,15 +1244,26 @@ void paint_panel() {
             text(282,286,L"Only available while Freecam is active in offline single-player.",muted,false,13);
             text(282,350,L"FREEZE KEY");{std::wstring key=ssc_freecam::photo_key>=VK_F1&&ssc_freecam::photo_key<=VK_F12?L"F"+std::to_wstring(ssc_freecam::photo_key-VK_F1+1):std::wstring(1,wchar_t(ssc_freecam::photo_key));button(964,600,337,430,40,photo_binding?L"PRESS KEY (ESC CANCEL)":key.c_str());}
             text(282,420,L"Press again to resume. Leaving Freecam always resumes.",muted,false,13);
-            text(282,464,L"Use your usual screenshot key after composing the shot.",muted,false,13);
+            button(990,282,450,748,40,L"LOCATION CAPTURE");
             text(282,520,L"HIDE SHADOWS IN FREECAM",muted,false,16);toggle(967,978,510,ssc_freecam::hide_shadows);
-            text(282,560,L"Normal shadows return when you exit Freecam.",muted,false,13);
+            text(282,590,L"HIDE ALL GUI",muted,false,16);toggle(999,978,580,ssc_freecam::hide_all_gui);
+        } else if(settings_page==27){
+            text(266,111,L"LOCATION CAPTURE",ink,true);button(962,850,106,236,38,L"< PHOTO");
+            text(282,195,L"SAVE STILL + LOOK-AROUND",ink,false,18);
+            text(282,240,L"Single-player 3D Freecam only. Simulation pauses briefly.",muted,false,13);
+            text(282,275,L"Captures save privately; they are never uploaded automatically.",muted,false,13);
+            {int binding=ssc_freecam::capture_key;std::wstring key=binding>=VK_F1&&binding<=VK_F12?L"F"+std::to_wstring(binding-VK_F1+1):std::wstring(1,wchar_t(binding));button(991,282,320,748,40,capture_binding?L"PRESS KEY (ESC CANCEL)":(L"CAPTURE KEY: "+key).c_str());}
+            button(992,282,390,748,40,L"OPEN CAPTURE FOLDER");
+            text(282,465,L"Includes a PNG still, six cube faces and private position data.",muted,false,13);
+            text(282,505,L"Map calibration and capture review are required before use.",muted,false,13);
+            text(282,545,L"Render effects may animate between faces; inspect for seams.",muted,false,13);
+            text(282,595,(L"FLOOR CLEARANCE (NATIVE UNITS): "+std::to_wstring(int(ssc_freecam::eye_height))).c_str(),muted,false,13);button(994,850,582,80,36,L"-");button(995,950,582,80,36,L"+");
         } else if(settings_page==24){
             text(266,111,L"FREECAM",ink,true);button(962,610,106,220,38,L"PHOTO SETTINGS");button(587,850,106,236,38,L"< MISC");
-            button(592,282,190,240,38,L"PAN",!ssc_freecam::fly,!ssc_freecam::state.active);button(593,538,190,300,38,L"3D FREECAM",ssc_freecam::fly,!ssc_freecam::state.active);
+            button(592,282,190,230,38,L"PAN",!ssc_freecam::fly,!ssc_freecam::capture::session.active());button(593,528,190,250,38,L"3D FREECAM",ssc_freecam::fly&&!ssc_freecam::fps,!ssc_freecam::capture::session.active());button(993,794,190,236,38,L"3D + FLOOR",ssc_freecam::fps,!ssc_freecam::capture::session.active()&&ssc_freecam::ground_supported);
             button(588,282,244,400,40,ssc_freecam::pending_since?L"CANCEL REQUEST":ssc_freecam::state.active?L"EXIT FREECAM":L"ENTER FREECAM",ssc_freecam::state.active,true);
             text(282,298,ssc_freecam::fly?L"Mouse: look. W / S: forward / back. A / D: strafe.":L"WASD / arrows: pan. Scroll: zoom. Shift + scroll: fine zoom.",muted,false,12);
-            text(282,325,ssc_freecam::fly?L"Space / Shift: up / down. Scroll: move. Shift + scroll: fine.":L"Multiplayer: dead or spectating. Single-player: unrestricted.",muted,false,12);
+            text(282,325,ssc_freecam::fps?L"Space / Shift: up / down. Terrain floor limit. Scroll: lens zoom.":ssc_freecam::fly?L"Space / Shift: up / down. Scroll: move. Shift + scroll: fine.":L"Multiplayer: dead or spectating. Single-player: unrestricted.",muted,false,12);
             text(282,352,L"Escape: exit camera. Right Shift: menu. Alt-tab retains your view.",muted,false,12);
             text(282,405,L"HIDE HUD",muted,false,14);toggle(589,460,395,ssc_freecam::hide_hud);text(600,405,L"HIDE VERSION / FPS / PING",muted,false,12);toggle(966,978,395,ssc_freecam::hide_diagnostics);
             text(282,453,L"SPEED (UNITS / SEC)",muted,false,12);text(490,453,std::to_wstring(int(ssc_freecam::selected_speed())).c_str(),cyan,false,14);
@@ -1342,7 +1413,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.15",cyan);
+            text(266,157,L"0.1.16",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");

@@ -48,7 +48,7 @@ void test_xp_source(const unsigned char* reviewed=nullptr){
  if(reviewed){
   // Use a distinct allocation: guards cache their decision per module base.
   auto* native=static_cast<unsigned char*>(VirtualAlloc(nullptr,0x1000000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));assert(native);
-  for(auto span:std::vector<std::pair<size_t,size_t>>{{0x241130,247},{0x22fa60,36},{0x3ba3b9,91},{0x3bcd67,70},{0xc78250,4},{0xc780d4,4},{0xc77648,8},{0xc78b9c,4}})std::memcpy(native+span.first,reviewed+span.first,span.second);
+  for(auto span:std::vector<std::pair<size_t,size_t>>{{0x241480,276},{0x22fdd0,36},{0x3ba839,91},{0x3bd1e7,70},{0xc78058,4},{0xc77edc,4},{0xc77450,8},{0xc789ac,4}})std::memcpy(native+span.first,reviewed+span.first,span.second);
   // Reset the guard's last checked base before testing a potentially reused allocation.
   assert(ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(reviewed)));
   fixture_put(native,0xfae634,2);fixture_put(native,0xde65d0,w);fixture_put(native,0xe1e0b8,a);fixture_put(native,0xe1a638,0);
@@ -103,14 +103,14 @@ int main(int argc,char**argv){
  o.round=2;o.active=true;o.ending=false;o.values.erase("shotsFired");ssc_auto::tracking_observation=o;ssc_auto::tracking_at=1200;track_observation(1200);assert(state().active&&state().tracking["metrics"]["shotsFired"].is_null());assert(state().match_id==match&&state().segment==2);
  track_observation(1800);assert(!state().active&&state().tracking["round_end_observed"]==false);stop();
  for(int i=0;i<500&&state().status!=0;++i){Sleep(10);}assert(state().status==0);
- int files=0;bool final=false;for(auto& entry:std::filesystem::directory_iterator(dir)){++files;std::ifstream f(entry.path());std::string line;while(std::getline(f,line)){auto e=Json::parse(line);if(e["event"]=="round_ended"&&e["tracking"]["round"]==1){assert(e["tracking"]["metrics"]["shotsFired"]==7);final=true;}}}assert(files==1&&final);
+ int files=0;bool final=false;ssc_record_archive::visit(dir,[&](const auto&,const auto& raw){++files;std::istringstream f(raw);std::string line;while(std::getline(f,line)){auto e=Json::parse(line);if(e["event"]=="round_ended"&&e["tracking"]["round"]==1){assert(e["tracking"]["metrics"]["shotsFired"]==7);final=true;}}});assert(files==1&&final);
  // Actor replacement and a new countdown must not merge two players/matches.
  start(dir);o.actor=8;o.round=3;o.active=true;o.ending=false;o.connected=true;
  ssc_auto::tracking_observation=o;ssc_auto::tracking_at=2000;track_observation(2000);auto id1=state().match_id;
  o.actor=9;ssc_auto::tracking_observation=o;ssc_auto::tracking_at=2100;track_observation(2100);assert(state().match_id!=id1&&state().segment==1);auto id2=state().match_id;
  o.round=0;o.active=false;o.preparing=true;ssc_auto::tracking_observation=o;ssc_auto::tracking_at=2200;track_observation(2200);assert(state().match_id!=id2&&!state().active);stop();
  for(int i=0;i<500&&(state().written<4||state().status!=0);++i){Sleep(10);}assert(state().written>=4&&state().status==0);
- assert(std::distance(std::filesystem::directory_iterator(dir),std::filesystem::directory_iterator())==3);
+ unsigned saved=0;ssc_record_archive::visit(dir,[&](const auto&,const auto&){++saved;});assert(saved==3);
  // One, two and three played rounds each produce exactly one physical file.
  for(int played=1;played<=3;++played){
   auto match_dir=dir/("match-"+std::to_string(played));start(match_dir);o.actor=90+played;o.session=42+played;o.connected=true;o.last_round=3;
@@ -123,7 +123,7 @@ int main(int argc,char**argv){
   }
   o.valid=false;o.connected=false;ssc_auto::tracking_observation=o;ssc_auto::tracking_at=++tick;track_observation(tick);assert(!state().match_open&&state().enabled);stop();
   for(int i=0;i<500&&state().status!=0;++i){Sleep(10);}assert(state().status==0);
-  int count=0,boundaries=0,headers=0,closes=0;for(auto& file:std::filesystem::directory_iterator(match_dir)){++count;std::ifstream f(file.path());std::string line;double previous=0;while(std::getline(f,line)){auto row=Json::parse(line);if(row["event"]=="round_ended")++boundaries;if(row["event"]=="recording_started")++headers;if(row["event"]=="recording_stopped")++closes;if(row.contains("elapsed_ms")){double time=row["elapsed_ms"];assert(time>=previous);previous=time;}}}
+  int count=0,boundaries=0,headers=0,closes=0;ssc_record_archive::visit(match_dir,[&](const auto&,const auto& raw){++count;std::istringstream f(raw);std::string line;double previous=0;while(std::getline(f,line)){auto row=Json::parse(line);if(row["event"]=="round_ended")++boundaries;if(row["event"]=="recording_started")++headers;if(row["event"]=="recording_stopped")++closes;if(row.contains("elapsed_ms")){double time=row["elapsed_ms"];assert(time>=previous);previous=time;}}});
   assert(count==1&&headers==1&&closes==1&&boundaries==played);o.valid=true;
  }
  std::cout<<"PASS: numeric validation, missing vs zero, partial-hit suppression, actor isolation, interrupted rounds, recorder-only tracking, final snapshot, stale observations and round isolation\n";

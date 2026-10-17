@@ -34,7 +34,7 @@ int main(int argc,char** argv){
  ssc_record::state().enabled=false;ssc_record::state().status=2;save();recording_requested=false;load_settings();assert(recording_requested&&ssc_record::state().enabled);
  activate(270);assert(!recording_requested&&!ssc_record::state().enabled);load_settings();assert(!recording_requested&&!ssc_record::state().enabled);
  // Shared cosmetics remains discoverable independently of private/beta access.
- assert(!shared_receive&&!shared_publish);activate(560);assert(settings_page==22);paint_panel();picture(folder/"shared-cosmetics.bmp");
+ assert(shared_receive&&shared_publish);activate(560);assert(settings_page==22);paint_panel();picture(folder/"shared-cosmetics.bmp");
  activate(561);activate(562);assert(shared_receive&&shared_publish);shared_receive=shared_publish=false;load_settings();assert(shared_receive&&shared_publish);
  activate(561);activate(562);activate(565);assert(settings_page==4&&!shared_receive&&!shared_publish);
  private_label="Stream colors";save();private_label="Bot highlight";load_settings();assert(private_label=="Stream colors");

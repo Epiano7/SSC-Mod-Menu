@@ -3,17 +3,17 @@
 #include <set>
 #include <array>
 namespace ssc_record {
-// Reviewed acquired-skill vector and updater for executable 8af24e05...1de6.
+// Reviewed acquired-skill vector and updater for executable 4061ca99...238a.
 // Do not use draft candidates or equipped account presets as acquired skills.
 struct BuildSpan {uint32_t rva,length;uint64_t hash;};
 inline constexpr BuildSpan build_spans[]={
- {0x2dde00,449,0xa29812ac74144cd6ULL},
- {0x8f8510,8108,0x1a30cf3e60baf8abULL},
- {0x3de470,4174,0x315f88510155d1d4ULL},
+ {0x2de1a0,449,0xe9b91e0757417077ULL},
+ {0x8f8980,8108,0x2ee633760bdf3aebULL},
+ {0x3de8f0,4174,0x123a6a25add8d89ULL},
 
- {0x9387f0,1666,0xf53977d329d7c501ULL},
- {0x951ef0,24972,0xedd6018ee43491f0ULL},
- {0x958080,35024,0xeaf8f28ced647351ULL},
+ {0x938c60,1666,0x1908e9698f712860ULL},
+ {0x952360,24972,0x19719eb78affef8cULL},
+ {0x9584f0,35024,0x2014d1d9116bfdd4ULL},
 };
 template<class Read> bool validate_build_code(uintptr_t base,Read read){
  for(const auto& span:build_spans){uint64_t hash=14695981039346656037ULL;

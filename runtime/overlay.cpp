@@ -25,6 +25,7 @@
 #include "geri_mode.h"
 #include "creator_controls.h"
 #include "freecam.h"
+#include "draft_advisor.h"
 #include "vehicle_adapter.h"
 #include "quick_chat.h"
 #include "auto_messages_source.h"
@@ -80,6 +81,7 @@ void upload_canvas_texture() {
     }else glTexSubImage2D(GL_TEXTURE_2D,0,0,0,raster_w,raster_h,0x80E1,GL_UNSIGNED_BYTE,pixels);
 }
 void render(HDC dc) {
+    ssc_perf::Scope timing(ssc_perf::overlay);
     HWND window=WindowFromDC(dc); HGLRC context=wglGetCurrentContext();
     if(!window||!context) return;
     if(!game_window) {
@@ -89,6 +91,17 @@ void render(HDC dc) {
         previous_proc=reinterpret_cast<WNDPROC>(old);game_window=window;log("Render and input attached; Right Shift opens menu");
     }
     ULONGLONG now=GetTickCount64();float seconds=last_frame?float(now-last_frame)/1000.f:0.f;last_frame=now;
+    static double precise_frame_at=0;const double precise_now=ssc_perf::clock_ms();const double frame_seconds=precise_frame_at?(precise_now-precise_frame_at)/1000.0:0;precise_frame_at=precise_now;
+    static ULONGLONG performance_at=0;static unsigned performance_frames=0,slow_frames=0;static double frame_sum=0,frame_max=0;
+    if(!ssc_record::state().enabled||!ssc_record::state().match_open){performance_at=now;performance_frames=slow_frames=0;frame_sum=frame_max=0;ssc_perf::milliseconds.fill(0);ssc_perf::calls.fill(0);}
+    else if(frame_seconds>0){
+      ++performance_frames;frame_sum+=frame_seconds;frame_max=std::max(frame_max,frame_seconds);if(frame_seconds>.033333)++slow_frames;
+      if(now-performance_at>=10000){
+        ssc_record::diagnostic({{"event","performance_sample"},{"mod_overlay_ms",ssc_perf::milliseconds[ssc_perf::overlay]},{"advisor_prepare_ms",ssc_perf::milliseconds[ssc_perf::advisor]},{"shared_lookup_ms",ssc_perf::milliseconds[ssc_perf::sharing]},{"timed_calls",ssc_perf::calls},{"frames",performance_frames},{"window_ms",now-performance_at},{"average_fps",performance_frames/frame_sum},{"mean_frame_ms",1000*frame_sum/performance_frames},{"max_frame_ms",1000*frame_max},{"frames_over_33ms",slow_frames},{"focused",GetForegroundWindow()==game_window},{"menu_open",opened},{"advisor_attached",ssc_advisor::attached},{"advisor_enabled",ssc_advisor::enabled},{"shared_receive",shared_receive},{"shared_publish",shared_publish}});
+        performance_at=now;performance_frames=slow_frames=0;frame_sum=frame_max=0;ssc_perf::milliseconds.fill(0);ssc_perf::calls.fill(0);
+      }
+    }
+    ssc_names::begin_render_frame();
     static ULONGLONG auth_start_at=0;
     if(now-auth_start_at>=1000){auth_start_at=now;ssc_auth::service().start();}
     static ULONGLONG shared_at=0;
@@ -100,6 +113,7 @@ void render(HDC dc) {
       ssc_shared::service().update(own,shared_receive?ssc_names::shared_accounts():std::vector<std::string>{},appearance,shared_receive&&ssc_names::attached,shared_publish&&ssc_names::cosmetics.load());
       if(settings_page==22)dirty=true;
     }
+    ssc_names::refresh_shared_labels(now,shared_receive||ssc_names::render_private_active());
     static uint64_t private_cleared=0;auto cleared=ssc_auth::service().cleared();if(cleared!=private_cleared){private_cleared=cleared;ssc_auth::license::wipe(private_code);private_editing=false;dirty=true;}
     static auto private_last=ssc_auth::license::State::idle;auto private_state=ssc_auth::service().state();if(private_state!=private_last){private_last=private_state;if(settings_page==19)dirty=true;}
     static bool private_was_visible=false;
@@ -108,6 +122,7 @@ void render(HDC dc) {
     static ULONGLONG diagnostics_at=0;
     if(developer_tools&&now-diagnostics_at>15000){diagnostics_at=now;char report[160];snprintf(report,sizeof(report),"Draw diagnostics: rainbow=%u audio=%u",ssc_names::cosmetic_draws.load(),ssc_sound::substituted.load());log(report);}
     ssc_auto::tick(now,ssc_record::state().enabled);
+    ssc_advisor::tick();
     if(rpc_preview.phase==1)ssc_freecam::stop();
     bool was_freecam=ssc_freecam::state.active;auto pending_freecam=ssc_freecam::pending_since;
     ssc_freecam::tick(now,opened,game_window,ssc_freecam::frame_seconds());
@@ -131,8 +146,10 @@ void render(HDC dc) {
     poll_live_hud_drag(window);
     advance_animation(seconds);
     bool freecam_notice=now<ssc_freecam::notice_until;
-    if(!freecam_notice&&!opened&&visibility==0.f&&ssc_freecam::state.active&&ssc_freecam::hide_hud)return;
-    if(window!=game_window||(!opened&&visibility==0.f&&modal_visibility==0.f&&!clock_enabled&&!freecam_notice))return;
+    bool advisor_border=ssc_advisor::border_ready()||ssc_advisor::stim_ready();
+    if(!advisor_border||opened){ssc_advisor::border.pending=false;ssc_advisor::stim_border.pending=false;}
+    if(!freecam_notice&&!opened&&visibility==0.f&&ssc_freecam::state.active&&(ssc_freecam::hide_hud||ssc_freecam::hide_all_gui))return;
+    if(window!=game_window||(!opened&&visibility==0.f&&modal_visibility==0.f&&!clock_enabled&&!freecam_notice&&!advisor_border))return;
     RECT client;GetClientRect(window,&client);int width=client.right,height=client.bottom;
     if(width<=0||height<=0)return;
     layout_panel(width,height);
@@ -171,6 +188,7 @@ void render(HDC dc) {
     glViewport(0,0,width,height);glMatrixMode(GL_PROJECTION);glPushMatrix();glLoadIdentity();glOrtho(0,width,height,0,-1,1);
     glMatrixMode(GL_MODELVIEW);glPushMatrix();glLoadIdentity();glMatrixMode(GL_TEXTURE);glPushMatrix();glLoadIdentity();
     glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    ssc_advisor::render_border();ssc_advisor::render_stim(width,height);
     const float opacity=ease(visibility);
     if(modal_visibility>0.f&&!ssc_hud::editing) {
         glDisable(GL_TEXTURE_2D);glColor4f(.01f,.03f,.07f,.45f*ease(modal_visibility));
@@ -218,7 +236,16 @@ void render(HDC dc) {
     if(use_program) use_program(program);
     if(active_texture) active_texture(active);
 }
-BOOL WINAPI swap_hook(HDC dc) {render(dc);return original_swap(dc);}
+BOOL WINAPI swap_hook(HDC dc) {
+    if(ssc_freecam::capture::session.active()&&WindowFromDC(dc)==game_window){
+        bool valid=!opened&&ssc_freecam::state.active&&ssc_freecam::singleplayer()&&!ssc_freecam::focus_suspended&&ssc_freecam::state.world==ssc_freecam::capture::session.world&&ssc_freecam::state.actor==ssc_freecam::capture::session.actor;
+        if(!valid)ssc_freecam::capture::session.cancel();
+        else try {if(!ssc_freecam::capture::session.read_frame(state_dir/L"captures")&&!ssc_freecam::capture::session.active())ssc_freecam::reject(GetTickCount64(),L"Capture interrupted. Try again with the menu closed.");}catch(...){ssc_freecam::capture::session.cancel();ssc_freecam::reject(GetTickCount64(),L"Capture failed. Try a smaller window.");}
+    }
+    int capture_result=ssc_freecam::capture::writer().result.exchange(0);
+    if(capture_result)ssc_freecam::reject(GetTickCount64(),capture_result>0?L"Location capture saved in captures.":L"Capture could not be saved. Check disk space.");
+    render(dc);return original_swap(dc);
+}
 void log_game_build() {
     wchar_t path[32768];if(!GetModuleFileNameW(nullptr,path,32768))return;
     std::ifstream in(std::filesystem::path(path),std::ios::binary);if(!in)return;
@@ -274,7 +301,7 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
     ssc_diagnostics::initialize(state_dir);ssc_auth::service().configure(state_dir);ssc_shared::service().configure(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
-    log("SSC Mod Menu 0.1.15 startup");log_game_build();
+    log("SSC Mod Menu 0.1.16 startup");log_game_build();
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
     presence_supported=(supported&4)!=0;native_supported=true;
     log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");
@@ -284,11 +311,12 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     load_settings();ssc_chat::attached=ssc_chat::attach();log(ssc_chat::attached?"Custom quick chat adapter attached":"Custom quick chat unavailable");
     ssc_names::cosmetics=cosmetic_requested&&ssc_compat::supports(1);
     ssc_combat::attached=ssc_combat::attach();log(ssc_combat::attached?"Combat event counters attached":"Combat event counters unavailable");
-    ssc_names::attached=ssc_names::attach();ssc_names::validate_bot_layout();log(ssc_names::attached?"Tab and overhead name adapters attached":"Name adapters unavailable");
+    ssc_names::attached=ssc_names::attach();ssc_names::validate_bot_layout();log(ssc_names::bot_layout?"Private module compatibility supported":"Private module unavailable: native compatibility check failed");log(ssc_names::attached?"Tab and overhead name adapters attached":"Name adapters unavailable");
     try {
         wchar_t executable[32768];DWORD length=GetModuleFileNameW(nullptr,executable,32768);
         if(length&&length<32768){ssc_sound::initialize(std::filesystem::path(executable).parent_path(),state_dir,sound_requested);ssc_sound::attached=attach_sound();log(ssc_music::attach()?"Music file adapter attached":"Music file adapter unavailable");log(ssc_sound::attached?"Audio buffer adapter attached (WAV effects / OGG music; restart applies changes)":"Audio adapter unavailable");}
     }catch(const std::exception&){log("Sound catalog unavailable; originals preserved");}
+    ssc_advisor::attached=ssc_advisor::attach();log(ssc_advisor::attached?"Draft advisor attached":"Draft advisor unavailable");
     ssc_geri::attached=ssc_geri::attach();log(ssc_geri::attached?"Geri panel adapter attached":"Geri panel adapter unavailable");
     ssc_creator::attached=ssc_creator::attach();log(ssc_creator::attached?"Creator crosshair adapter attached":"Creator crosshair adapter unavailable");
     ssc_hud::diagnostics_draw=ssc_freecam::attached?reinterpret_cast<uintptr_t>(ssc_freecam::debug_draw):0;

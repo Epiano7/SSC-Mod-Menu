@@ -103,3 +103,73 @@ ssc_actor_name_bridge:
     addq $0x88, %rsp
     ret
 .seh_endproc
+
+// Modifier chooser name: verified actor owner in RBX.
+.text
+.globl ssc_modifier_name_bridge
+.def ssc_modifier_name_bridge; .scl 2; .type 32; .endef
+.seh_proc ssc_modifier_name_bridge
+ssc_modifier_name_bridge:
+    subq $0x88, %rsp
+    .seh_stackalloc 0x88
+    .seh_endprologue
+    movq 0xb0(%rsp), %rax
+    movq %rax, 0x20(%rsp)
+    movq 0xb8(%rsp), %rax
+    movq %rax, 0x28(%rsp)
+    movq 0xc0(%rsp), %rax
+    movq %rax, 0x30(%rsp)
+    movq 0xc8(%rsp), %rax
+    movq %rax, 0x38(%rsp)
+    movq 0xd0(%rsp), %rax
+    movq %rax, 0x40(%rsp)
+    movq 0xd8(%rsp), %rax
+    movq %rax, 0x48(%rsp)
+    movq 0xe0(%rsp), %rax
+    movq %rax, 0x50(%rsp)
+    movq 0xe8(%rsp), %rax
+    movq %rax, 0x58(%rsp)
+    movq 0xf0(%rsp), %rax
+    movq %rax, 0x60(%rsp)
+    movq 0xf8(%rsp), %rax
+    movq %rax, 0x68(%rsp)
+    movq %rbx, 0x70(%rsp)
+    call ssc_actor_name_draw
+    addq $0x88, %rsp
+    ret
+.seh_endproc
+
+// Showdown participant owner is RDI, preserved by the native formatter.
+.text
+.globl ssc_showdown_name_bridge
+.def ssc_showdown_name_bridge; .scl 2; .type 32; .endef
+.seh_proc ssc_showdown_name_bridge
+ssc_showdown_name_bridge:
+    subq $0x88, %rsp
+    .seh_stackalloc 0x88
+    .seh_endprologue
+    movq 0xb0(%rsp), %rax
+    movq %rax, 0x20(%rsp)
+    movq 0xb8(%rsp), %rax
+    movq %rax, 0x28(%rsp)
+    movq 0xc0(%rsp), %rax
+    movq %rax, 0x30(%rsp)
+    movq 0xc8(%rsp), %rax
+    movq %rax, 0x38(%rsp)
+    movq 0xd0(%rsp), %rax
+    movq %rax, 0x40(%rsp)
+    movq 0xd8(%rsp), %rax
+    movq %rax, 0x48(%rsp)
+    movq 0xe0(%rsp), %rax
+    movq %rax, 0x50(%rsp)
+    movq 0xe8(%rsp), %rax
+    movq %rax, 0x58(%rsp)
+    movq 0xf0(%rsp), %rax
+    movq %rax, 0x60(%rsp)
+    movq 0xf8(%rsp), %rax
+    movq %rax, 0x68(%rsp)
+    movq %rdi, 0x70(%rsp)
+    call ssc_showdown_name_draw
+    addq $0x88, %rsp
+    ret
+.seh_endproc

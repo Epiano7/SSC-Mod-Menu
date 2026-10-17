@@ -4,8 +4,8 @@
 
 Open **All Modules > Cosmetics > Shared Cosmetics**. Turn on **Share my colors**
 to publish the existing solid color, rainbow or two/three-color gradient. Turn on
-**See other players' colors** to receive them. Both controls default off and save
-across restarts. Cosmetics must be enabled to publish. No code, enrollment,
+**See other players' colors** to receive them. Both controls default on for fresh settings and save
+across restarts. Existing saved choices are preserved. Cosmetics must be enabled to publish. No code, enrollment,
 sharing ID, administrator approval or device key is required.
 
 Other users need a compatible mod and receiving enabled. Unmodified clients keep

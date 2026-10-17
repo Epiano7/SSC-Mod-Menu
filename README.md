@@ -1,5 +1,5 @@
 <a href="https://epiano7.dev" target="_blank" rel="noopener noreferrer"><img src="https://epiano7.dev/assets/buttons/epiano7.png" width="88" height="31" alt="epiano7.dev"></a>
-[![Github All Releases](https://img.shields.io/github/downloads/Epiano7/SSC-Mod-Menu/total.svg)]()
+[![Downloads](https://raw.githubusercontent.com/Epiano7/SSC-Mod-Menu/traffic-data/downloads.svg)](https://github.com/Epiano7/SSC-Mod-Menu/releases)
 ![Traffic](https://raw.githubusercontent.com/Epiano7/SSC-Mod-Menu/traffic-data/badge.svg)
 # SSC Mod Menu
 
@@ -29,7 +29,7 @@ The installer runs natively; the game and mod use Proton. The native Linux game 
 ## Modules
 
 - **Sound Replacer:** import WAV or MP3 replacements for sound effects and music, preview clips, adjust individual volume, and replace related variants together. **All Music Tracks** uses one custom song across the music playlist. Track lengths are shown, and replacements apply after restarting the game
-- **Cosmetics:** customize your name with a solid color, animated rainbow, or a custom gradient with up to three colors. Choose colors with the in-game picker or hex fields. Overrides apply across name displays, including chat and leaderboards, and are local by default. Optional **Shared Cosmetics** lets you share your colors, receive other mod users' colors, or both. [Details and supported displays](docs/shared-cosmetics.md)
+- **Cosmetics:** customize your name with a solid color, animated rainbow, or a custom gradient with up to three colors. Choose colors with the in-game picker or hex fields. Overrides apply across name displays, including chat and leaderboards, and support **Shared Cosmetics** to share your colors, receive other mod users' colors, or both. Both sharing controls start enabled with fresh settings; existing saved choices are preserved. [Details and supported displays](docs/shared-cosmetics.md)
 - **Discord Presence:** shows game status, available round and level details, elapsed time, and SSC rating. Confirmed to work on the Windows Discord app, Linux is still experimental but should work for both flatpak and other installs
 - **HUD Editor:** move and resize most HUD elements, save layouts, and reset individual elements
 - **Custom Quick Chat:** customize the quick-react wheel with up to 12 messages per slot. The first message labels the wheel, and each use sends a randomly chosen message from that slot's list. Importing images is supported as well
