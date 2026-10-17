@@ -8,7 +8,7 @@
 namespace ssc_advisor {
 inline bool enabled=true,attached=false,use_api=true;
 // Entitlement is independent of the Bot Highlight module's enabled preference.
-inline bool (*private_access)()=+[](){return ssc_auth::available();};
+inline bool (*private_access)()=+[](){return ssc_auth::draft_available();};
 inline bool allowed(){return enabled&&private_access();}
 inline uintptr_t cached_actor=0,cached_world=0;
 inline const wchar_t* advice_status=L"Waiting for your build";

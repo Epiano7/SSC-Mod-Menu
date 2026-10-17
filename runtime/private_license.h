@@ -102,7 +102,8 @@ public:
  void configure(const std::filesystem::path& path){std::lock_guard<std::mutex> l(mutex_);if(!started_)store_.directory=path;}
  void start(){std::lock_guard<std::mutex> l(mutex_);if(started_||stopping_||store_.directory.empty())return;if(sodium_init()<0||!steam_.attach())return;started_=true;try{std::thread([this]{work();}).detach();}catch(...){started_=false;state_=State::unavailable;}}
  bool request(std::string code){trim(code);std::lock_guard<std::mutex> l(mutex_);observe();if(GetTickCount64()<retry_after_){wipe(code);state_=State::limited;return false;}if(stopping_||busy_||queued_){wipe(code);return false;}if(!code_valid(code)){wipe(code);state_=State::code_denied;return false;}if(!started_||!steam_.account().valid()){wipe(code);state_=State::account;return false;}ssc_auth_privacy::secrets_used=true;code_.swap(code);wipe(code);queued_account_=steam_.account().id;queued_=true;state_=State::checking;wake_.notify_all();return true;}
- bool available(){std::lock_guard<std::mutex> l(mutex_);return started_&&!stopping_&&access_.visible(steam_.account(),clock_now());}
+ bool available(){std::lock_guard<std::mutex> l(mutex_);return started_&&!stopping_&&access_.bot_visible(steam_.account(),clock_now());}
+ bool draft_available(){std::lock_guard<std::mutex> l(mutex_);return started_&&!stopping_&&access_.visible(steam_.account(),clock_now());}
  bool active(){std::lock_guard<std::mutex> l(mutex_);return started_&&!stopping_&&access_.active(steam_.account(),clock_now());}
  void enable(bool on){std::lock_guard<std::mutex> l(mutex_);access_.enable(started_&&!stopping_&&on,steam_.account(),clock_now());}
  State state(){std::lock_guard<std::mutex> l(mutex_);observe();if(state_==State::accepted&&!access_.visible(steam_.account(),clock_now()))state_=State::expired;return state_;}
@@ -115,4 +116,5 @@ public:
 using Service=license::Service<>;
 inline Service& service(){static auto* s=new Service;return *s;}
 inline bool available(){return service().available();}inline bool active(){return service().active();}
+inline bool draft_available(){return service().draft_available();}
 }

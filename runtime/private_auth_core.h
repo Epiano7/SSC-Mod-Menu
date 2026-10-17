@@ -74,7 +74,7 @@ inline Keys read_keys(const std::string& body){auto j=parse(body);const auto& li
   auto kid=string(k,"kid",128);require(!kid.empty()&&!result.count(kid));auto key=un64(string(k,"x",43),32);require(key.size()==32);std::array<unsigned char,32> a{};std::copy(key.begin(),key.end(),a.begin());result.emplace(kid,a);
  }return result;
 }
-struct Grant {Account account;int64_t issued=0,expires=0;uint64_t deadline=0;std::string id;};
+struct Grant {Account account;int64_t issued=0,expires=0;uint64_t deadline=0;std::string id;bool draft_only=false;};
 inline Grant verify(const std::string& body,const Keys& keys,Session& s,Account current,Clock now,uint64_t generation,bool license=false){
  require(s.pending&&s.generation==generation&&s.account==current&&current.valid()&&s.fresh(now));
  auto response=parse(body);auto jwt=string(response,"authorization",8192);auto p=jwt.find('.'),q=jwt.find('.',p==std::string::npos?0:p+1);
@@ -85,7 +85,8 @@ inline Grant verify(const std::string& body,const Keys& keys,Session& s,Account 
  require(crypto_sign_verify_detached(sig.data(),reinterpret_cast<const unsigned char*>(jwt.data()),q,key->second.data())==0);
  auto payload=un64(jwt.substr(p+1,q-p-1),6144);auto claims=parse(std::string(payload.begin(),payload.end()));
  require(string(claims,"iss")==issuer&&string(claims,"aud")==(license?"ssc-bot-license:":"ssc-mod:")+std::to_string(current.app)&&integer(claims,"appid")==current.app);
- require(string(claims,"sub")==std::to_string(current.id)&&string(claims,"permission")=="bot-highlighting");
+ auto permission=string(claims,"permission");
+ require(string(claims,"sub")==std::to_string(current.id)&&(permission=="bot-highlighting"||(license&&permission=="draft-advisor")));
  if(license){require(string(claims,"auth_method")=="activation_code_device_key"&&claims.at("steam_identity_verified").is_boolean()&&!claims.at("steam_identity_verified").get<bool>());}
  require(string(claims,"challenge")==s.challenge&&string(claims.at("cnf"),"jkt")==s.thumb);
  auto iat=integer(claims,"iat"),nbf=integer(claims,"nbf"),exp=integer(claims,"exp");
@@ -95,7 +96,7 @@ inline Grant verify(const std::string& body,const Keys& keys,Session& s,Account 
  require(exp>s.start.wall&&exp-s.start.wall<=180);
  uint64_t deadline=s.start.mono+uint64_t(exp-s.start.wall)*1000-999; // Epoch seconds were floored: expire conservatively
  require(now.mono<deadline);s.pending=false;sodium_memzero(s.secret.data(),s.secret.size());
- return {current,iat,exp,deadline,id};
+ return {current,iat,exp,deadline,id,permission=="draft-advisor"};
 }
 // All visibility and behavior consult this same state. Caller serializes access.
 class Access {
@@ -117,7 +118,8 @@ public:
   accepted_[g.id]=g.expires;grant_=g;lease_=true;return true;
  }
  bool visible(Account a,Clock t){observe(a,t);return lease_;}
- bool active(Account a,Clock t){return visible(a,t)&&enabled_;}
+ bool bot_visible(Account a,Clock t){return visible(a,t)&&!grant_.draft_only;}
+ bool active(Account a,Clock t){return bot_visible(a,t)&&enabled_;}
  void enable(bool value,Account a,Clock t){enabled_=visible(a,t)&&value;}
 };
 }
