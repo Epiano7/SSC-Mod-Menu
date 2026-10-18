@@ -17,6 +17,7 @@
 #include "sound_module.h"
 #include "cosmetic_adapter.h"
 #include "beta_auth.h"
+#include "cosmetics_access.h"
 #include "presence_source.h"
 #include "weapon_lab.h"
 #include "local_recorder.h"
@@ -88,7 +89,7 @@ void render(HDC dc) {
         if(GetWindowThreadProcessId(window,nullptr)!=GetCurrentThreadId()) {log("Window/render threads differ; input hook refused");return;}
         SetLastError(0);auto old=SetWindowLongPtrW(window,GWLP_WNDPROC,reinterpret_cast<LONG_PTR>(window_proc));
         if(!old) {log("Window input hook failed");return;}
-        previous_proc=reinterpret_cast<WNDPROC>(old);game_window=window;log("Render and input attached; Right Shift opens menu");
+        previous_proc=reinterpret_cast<WNDPROC>(old);game_window=window;log("Render and input attached; menu key configurable in Interface");
     }
     ULONGLONG now=GetTickCount64();float seconds=last_frame?float(now-last_frame)/1000.f:0.f;last_frame=now;
     static double precise_frame_at=0;const double precise_now=ssc_perf::clock_ms();const double frame_seconds=precise_frame_at?(precise_now-precise_frame_at)/1000.0:0;precise_frame_at=precise_now;
@@ -110,8 +111,11 @@ void render(HDC dc) {
       ssc_shared::Style appearance;appearance.mode=ssc_names::gradient?ssc_shared::Mode::gradient:ssc_names::rainbow?ssc_shared::Mode::rainbow:ssc_shared::Mode::solid;
       appearance.count=ssc_names::gradient?unsigned(std::clamp(ssc_names::gradient_count,2,3)):ssc_names::rainbow?0:1;
       appearance.colors=ssc_names::gradient?ssc_names::gradient_colors:std::array<unsigned,3>{ssc_names::solid_rgb,0,0};
-      ssc_shared::service().update(own,shared_receive?ssc_names::shared_accounts():std::vector<std::string>{},appearance,shared_receive&&ssc_names::attached,shared_publish&&ssc_names::cosmetics.load());
-      if(settings_page==22)dirty=true;
+      ssc_cosmetic_access::refresh(own,now);
+      ssc_shared::Style permitted;const bool can_share=ssc_cosmetic_access::publication(ssc_cosmetic_access::current,appearance,ssc_names::solid_rgb,permitted);
+      if(can_share)appearance=permitted;
+      ssc_shared::service().update(own,shared_receive?ssc_names::shared_accounts():std::vector<std::string>{},appearance,shared_receive&&ssc_names::attached,shared_publish&&ssc_names::cosmetics.load()&&can_share);
+      if(settings_page==22||cosmetics_popup)dirty=true;
     }
     ssc_names::refresh_shared_labels(now,shared_receive||ssc_names::render_private_active());
     static uint64_t private_cleared=0;auto cleared=ssc_auth::service().cleared();if(cleared!=private_cleared){private_cleared=cleared;ssc_auth::license::wipe(private_code);private_editing=false;dirty=true;}
@@ -135,10 +139,11 @@ void render(HDC dc) {
     static ULONGLONG update_at=0;
     if(now-update_at>=1000){update_at=now;
         if(presence_supported&&rpc_preview.phase==1&&!welcome_seen&&!opened){opened=true;show_manager(8);}
+        if(presence_supported&&rpc_preview.phase==1&&!opened&&!cosmetics_notice_shown&&ssc_cosmetic_access::account_id&&cosmetics_notice_account!=ssc_cosmetic_access::account_key){cosmetics_notice_shown=true;show_cosmetics_notice();}
         if(update_notes_due(rpc_preview.phase)){opened=true;show_manager(14);}
         if(presence_supported&&rpc_preview.phase==1&&!ssc_update::checked)ssc_update::check(state_dir);
         if(ssc_update::poll(window,rpc_preview.phase==1||!presence_supported))dirty=true;
-        if(rpc_preview.phase!=1&&opened&&(update_popup||(manager&&settings_page==7)))close_menu(true);
+        if(rpc_preview.phase!=1&&opened&&(update_popup||cosmetics_popup||(manager&&settings_page==7)))close_menu(true);
         if(ssc_update::notification_due(presence_supported&&rpc_preview.phase==1)&&!opened){ssc_update::notified=true;manager=false;update_popup=true;opened=true;dirty=true;}
     }
     RECT hud_client{};GetClientRect(window,&hud_client);if(ssc_hud::finish_frame(hud_client.right,hud_client.bottom,now)&&ssc_hud::editing)dirty=true;

@@ -23,11 +23,18 @@ carry no trusted gameplay statistics, and cannot change names, commands or modul
 Only supported color modes and bounded integer colors are accepted.
 
 HTTPS/TLS validation, redirect refusal, body limits, per-source/global rate limits
-and client stale-response checks remain enabled. Public styles live in bounded
-server memory for at most 120 seconds. Clients renew after approximately 60 seconds
-and cache received styles for at most 30 seconds, bounded by the server lease.
-Wall-clock and monotonic expiry reject rollback/suspend extensions. Opt-out sends
-remove; offline leases expire naturally. Restart never resurrects old profiles.
+and client stale-response checks remain enabled. As of October 17, 2026, the server
+saves the last published appearance to its runtime directory and retains it across
+player disconnects and service restarts. Explicit sharing opt-out removes the saved
+appearance. Updating a color replaces the saved appearance atomically before the
+server acknowledges success. Unchanged client renewals do not rewrite storage.
+
+Clients still cache lookup results for at most 30 seconds and refresh asynchronously;
+only clients with receiving enabled apply them. The v1 `lease_seconds:120` response
+is retained for compatibility with existing clients, not as a server retention limit.
+Previously expired appearances cannot be recovered; those players must publish once
+again. The store is limited to 10,000 accounts and rejects new entries when full
+rather than silently evicting saved colors. Invalid storage fails visibly at startup.
 Networking remains asynchronous and each request has a 10-second watchdog.
 
 ## Protocol

@@ -10,8 +10,8 @@ namespace SSCMods.Setup {
         public static Package Package() {
 #if MENU_ALPHA
             var assembly=Assembly.GetExecutingAssembly();
-            var package=new Package {RuntimeValidated=true,GameSize=15326208,
-                GameHash="9359247B2D000954FF0D2FBE8230B8F65146883E7B27EE4748481F47823B020E"};
+            var package=new Package {RuntimeValidated=true,GameSize=15325696,
+                GameHash="8E7423439C5270BCB28B4615034798E8AEE18B7240E0C26B86E4E74347F2CF3C"};
             foreach(var name in new[]{"opengl32.dll","runtime.dll","AUDIO-NOTICES.txt"}) {
                 using(var stream=assembly.GetManifestResourceStream(name))
                 using(var bytes=new MemoryStream()) {

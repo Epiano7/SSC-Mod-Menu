@@ -48,7 +48,7 @@ void test_xp_source(const unsigned char* reviewed=nullptr){
  if(reviewed){
   // Use a distinct allocation: guards cache their decision per module base.
   auto* native=static_cast<unsigned char*>(VirtualAlloc(nullptr,0x1000000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));assert(native);
-  for(auto span:std::vector<std::pair<size_t,size_t>>{{0x241820,276},{0x2300a0,36},{0x3bb119,91},{0x3bdad1,70},{0xc7a1a0,4},{0xc7a024,4},{0xc79598,8},{0xc7aafc,4}})std::memcpy(native+span.first,reviewed+span.first,span.second);
+  for(auto span:std::vector<std::pair<size_t,size_t>>{{0x2417c0,314},{0x230040,36},{0x3bb0e9,91},{0x3bdaa1,70},{0xc7a160,4},{0xc79fe4,4},{0xc79558,8},{0xc7aabc,4}})std::memcpy(native+span.first,reviewed+span.first,span.second);
   // Reset the guard's last checked base before testing a potentially reused allocation.
   assert(ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(reviewed)));
   fixture_put(native,0xfb0664,2);fixture_put(native,0xde85d0,w);fixture_put(native,0xe200d8,a);fixture_put(native,0xe1c648,0);

@@ -75,7 +75,13 @@ public:
     // Start at request dispatch, not receipt: latency cannot extend server leases.
     require(next.emplace(account,Entry{style(profile.at("style")),p.start,uint64_t(ttl)*1000}).second);
    }
-   entries_.swap(next);return true;
+   // A batch replaces only its own accounts; other batches keep their leases.
+     for(auto it=entries_.begin();it!=entries_.end();){
+      if(p.accounts.count(it->first)||!fresh(it->second.start,now,it->second.ttl))it=entries_.erase(it);else ++it;
+     }
+     for(auto& item:next)entries_[item.first]=item.second;
+     while(entries_.size()>256)entries_.erase(entries_.begin());
+     return true;
   }catch(...){return false;}
  }
  bool get(const std::string& native_account,Time now,Style& result){

@@ -50,8 +50,10 @@ inline bool snapshot(uintptr_t context,Build& b,std::array<int,54>& offers,unsig
  float animation=0;if(!read(context+0x3148,animation)||!std::isfinite(animation)||animation>0)return false;
  if(!read(game+0xe03350,first)||!read(game+0xe03358,last)||!first||last<first||(last-first)%12||(last-first)/12>3)return false;
  const unsigned native_count=unsigned((last-first)/12);if(native_count<2)return false;count=0;
- uintptr_t own=0,own_end=0;if(!read(actor+0x558,own)||!read(actor+0x560,own_end)||own_end<own||own_end-own!=last-first)return false;
- for(unsigned i=0;i<native_count;++i){int id=-1,own_id=-2;if(!read(first+i*12,id)||!read(own+i*12,own_id)||id!=own_id)return false;
+ // The native panel copies this displayed list at 0x3e0961. The actor's
+ // separate offer copy can lag a queued pick until Ctrl is reopened.
+ // build_snapshot already proves this is the local player's panel.
+ for(unsigned i=0;i<native_count;++i){int id=-1;if(!read(first+i*12,id))return false;
   // Native drafts retain an empty (-1) slot when only two choices are offered.
   if(id==-1)continue;
   if(id<0||id>=54)return false;
@@ -114,7 +116,9 @@ inline void panel(uintptr_t context,uintptr_t output,float a,uint64_t b,char c,c
  if(use_api){auto key=api_key(build,offers,count);if(!key.empty()){auto answer=api().request(key,GetTickCount64());api_valid=answer.valid;if(answer.valid){for(unsigned i=0;i<count;++i){auto id=size_t(offers[i]);if(answer.samples[id]>=5){scores[id].value+=2.f*std::tanh(answer.edge[id]/10.f);api_used=true;}}advice_status=L"Local research + API";}}}
  recommended=choose(scores,offers,count);if(recommended<0)return;
  for(unsigned i=0;i<count;++i)if(offers[i]==recommended){uintptr_t button=context+0x310+slots[i]*0x170;int x=0,y=0,w=0,h=0,ax=0,ay=0,width=0,height=0;
-  unsigned char interactive=0;if(!read(button+0x44,interactive)||!interactive)return;
+  // +0x44 gates native input after a click; it is not panel visibility.
+  // Held Ctrl, pending points, current displayed offers and the transition
+  // guard above determine whether this recommendation is visible.
   if(!read(button+0x14,x)||!read(button+0x18,y)||!read(button+0x1c,w)||!read(button+0x20,h)||!read(button+0x70,ax)||!read(button+0x74,ay)||!read(game+0xfafa40,width)||!read(game+0xfafa44,height)||w<=0||h<=0||width<=0||height<=0)return;
   x+=ax==1?width/2:ax==2?width:0;y+=ay==1?height/2:ay==2?height:0;
   border={x,y,w,h,width,height,true};
@@ -136,8 +140,8 @@ inline void icon(uintptr_t renderer,uintptr_t sheet,float x,float y,float w,floa
 }
 inline bool attach(){
  game=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));auto bytes=reinterpret_cast<unsigned char*>(game);
- if(ssc_creator::hash(bytes+0x3e02d0,14780)!=0x813076afd467a2fdULL||!ssc_compat::supports(128)||!ssc_record::validate_build_code(game,[](uintptr_t p,auto& v){return read(p,v);})||ssc_creator::hash(bytes+0x951420,1212)!=0x81cc28d5b7af6e4eULL||ssc_creator::hash(bytes+0x3db910,14692)!=0xd2c61ba0847b5400ULL)return false;
- struct Site{uint32_t call,target;uintptr_t hook;};const Site sites[]={{0x3d9544,0x3e02d0,reinterpret_cast<uintptr_t>(panel)},{0x3e06d3,0x3db910,reinterpret_cast<uintptr_t>(draw)},{0x3deaa0,0x488300,reinterpret_cast<uintptr_t>(icon)}};
+ if(ssc_creator::hash(bytes+0x3e02a0,14780)!=0xbe7d129b40fdff34ULL||!ssc_compat::supports(128)||!ssc_record::validate_build_code(game,[](uintptr_t p,auto& v){return read(p,v);})||ssc_creator::hash(bytes+0x9511e0,1212)!=0xaa1a84c7851e37d7ULL||ssc_creator::hash(bytes+0x3db8e0,14692)!=0x4fb8bca8d436de06ULL)return false;
+ struct Site{uint32_t call,target;uintptr_t hook;};const Site sites[]={{0x3d9514,0x3e02a0,reinterpret_cast<uintptr_t>(panel)},{0x3e06a3,0x3db8e0,reinterpret_cast<uintptr_t>(draw)},{0x3dea70,0x488050,reinterpret_cast<uintptr_t>(icon)}};
  for(auto s:sites){int32_t rel=0;std::memcpy(&rel,bytes+s.call+1,4);if(bytes[s.call]!=0xe8||int64_t(s.call)+5+rel!=s.target)return false;}
  unsigned char* bridge=nullptr;for(uintptr_t n=0x10000;n<0x60000000&&!bridge;n+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((game+n)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
  const unsigned char jump[]={0xff,0x25,0,0,0,0};for(unsigned i=0;i<3;++i){std::memcpy(bridge+i*16,jump,6);std::memcpy(bridge+i*16+6,&sites[i].hook,8);}DWORD old=0;if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}DWORD protections[3]{};

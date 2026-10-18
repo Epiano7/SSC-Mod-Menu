@@ -22,6 +22,7 @@ inline const wchar_t* label(Status s){switch(s){
 template<class Identity=ssc_beta::Identity,class Net=Network> class BasicService {
  mutable std::mutex mutex_;std::condition_variable wake_;std::thread worker_;Identity steam_;Net net_;
  std::filesystem::path directory_;Cache cache_;bool stopping_=false,started_=false,receive_=false,share_=false,remove_=false;
+ size_t lookup_cursor_=0;uint64_t last_lookup_=0;
  uint64_t account_=0,generation_=0,next_lookup_=0,next_publish_=0,last_publish_=0;std::string own_,appearance_;Style style_;
  std::vector<std::string> peers_;std::map<std::string,uint64_t> observed_;Status status_=Status::off;
  void work(){
@@ -31,7 +32,7 @@ template<class Identity=ssc_beta::Identity,class Net=Network> class BasicService
     auto time=now();id=account_;generation=generation_;own=own_;style=style_;
     remove=remove_&&time.mono_ms>=next_publish_;send=(share_||remove)&&time.mono_ms>=next_publish_;
     lookup=receive_&&!peers_.empty()&&time.mono_ms>=next_lookup_;
-    if(lookup)next_lookup_=time.mono_ms+15000;
+    if(lookup){last_lookup_=time.mono_ms;next_lookup_=time.mono_ms+3000;}
     if(send){last_publish_=time.mono_ms;next_publish_=time.mono_ms+15000;}
    }
    auto current=[&]{std::lock_guard<std::mutex> l(mutex_);require(!stopping_&&generation==generation_&&id==account_&&steam_.read()==id);};
@@ -46,7 +47,10 @@ template<class Identity=ssc_beta::Identity,class Net=Network> class BasicService
     }}
    }
    if(lookup){try{
-     {std::lock_guard<std::mutex> l(mutex_);require(!stopping_&&generation==generation_&&id==account_&&receive_);pending=cache_.begin(peers_,now());}
+     {std::lock_guard<std::mutex> l(mutex_);require(!stopping_&&generation==generation_&&id==account_&&receive_);std::vector<std::string> batch;
+      for(size_t i=0;i<std::min(size_t(32),peers_.size());++i)batch.push_back(peers_[(lookup_cursor_+i)%peers_.size()]);
+      lookup_cursor_=peers_.empty()?0:(lookup_cursor_+batch.size())%peers_.size();
+      pending=cache_.begin(batch,now());}
      current();auto response=net_.request(L"/api/cosmetics/v1/lookup",Json{{"accounts",pending.accounts}}.dump());current();
      std::lock_guard<std::mutex> l(mutex_);if(generation!=generation_||id!=account_)continue;
      if(response.status==200&&cache_.accept(pending,response.body,now())){if(!share_&&!remove_)status_=Status::ready;}
@@ -64,7 +68,7 @@ public:
   const bool account_change=id!=account_||own!=own_;
   if(account_change||!receive)observed_.clear();
   const bool changed=account_change||receive!=receive_||share!=share_||encoded_style!=appearance_;
-  if(changed){++generation_;if(account_change){remove_=false;next_lookup_=next_publish_=0;cache_.context(0,false);}
+  if(changed){++generation_;if(account_change){lookup_cursor_=0;last_lookup_=0;remove_=!share&&id&&account_valid(own);next_lookup_=next_publish_=0;cache_.context(0,false);}
    else if(share_&&!share){remove_=true;next_publish_=0;}
    else if(!share_&&share){remove_=false;next_publish_=0;}
    // Coalesce edits to at most one exchange per five seconds; failures retry at 15s.
@@ -72,11 +76,11 @@ public:
    if(receive!=receive_)next_lookup_=0;
   }
   account_=id;own_=own;style_=style;appearance_=encoded_style;receive_=receive;share_=share;
-  std::set<std::string> unique;for(auto& peer:peers)if(account_valid(peer)&&unique.size()<32)unique.insert(peer);
+  std::set<std::string> unique;for(auto& peer:peers)if(account_valid(peer)&&unique.size()<128)unique.insert(peer);
   const auto seen_at=now().mono_ms;
   for(auto i=observed_.begin();i!=observed_.end();){
    if(seen_at<i->second||seen_at-i->second>30000)i=observed_.erase(i);
-   else {if(unique.size()<32)unique.insert(i->first);++i;}
+   else {unique.insert(i->first);++i;}
   }
   peers_={unique.begin(),unique.end()};cache_.context(id,receive);
   if(!id||!account_valid(own))status_=Status::account;else if(!receive&&!share&&!remove_)status_=Status::off;
@@ -85,7 +89,10 @@ public:
  bool get(const std::string& account,Style& style){std::lock_guard<std::mutex> l(mutex_);if(steam_.read()!=account_){cache_.context(0,false);observed_.clear();return false;}
   // Attributed chat senders may not be in a match roster (main-menu chat).
   // Queue only bounded public account keys; the worker performs all network I/O.
-  if(!stopping_&&receive_&&account!=own_&&account_valid(account)&&(observed_.count(account)||observed_.size()<32))observed_[account]=now().mono_ms;
+  if(!stopping_&&receive_&&account!=own_&&account_valid(account)&&(observed_.count(account)||observed_.size()<128)){
+   const auto time=now().mono_ms;const bool added=!observed_.count(account);observed_[account]=time;
+   if(added){next_lookup_=std::min(next_lookup_,std::max(time,last_lookup_+1000));wake_.notify_all();}
+  }
   return cache_.get(account,now(),style);
  }
  Status status()const{std::lock_guard<std::mutex> l(mutex_);return status_;}
