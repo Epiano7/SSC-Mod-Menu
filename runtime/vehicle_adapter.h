@@ -47,7 +47,7 @@ inline void control(uintptr_t car){
 }
 inline uint64_t hash(const unsigned char* p,size_t n){uint64_t h=14695981039346656037ULL;for(size_t i=0;i<n;++i)h=(h^p[i])*1099511628211ULL;return h;}
 inline bool matches(const unsigned char* p,size_t n){
- if(n<0xfafc44||hash(p+0x9df170,0x230)!=0x331fc76d40db16c8ULL||hash(p+0x9d6cc0,0x980)!=0x85004542e1434359ULL)return false;
+ if(n<0xfafc44||hash(p+0x9df170,0x230)!=0x549e3fce2b0f79fULL||hash(p+0x9d6cc0,0x980)!=0x1df338458faf7934ULL)return false;
  int32_t rel=0;std::memcpy(&rel,p+0x9df391,4);return p[0x9df390]==0xe8&&int64_t(0x9df395)+rel==0x9d6cc0;
 }
 inline bool attach(){
