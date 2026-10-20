@@ -14,7 +14,7 @@ inline Predicate native_predicate=nullptr;
 inline Overhead native_overhead=nullptr;
 inline Draw native_draw=nullptr;
 inline std::atomic<bool> cosmetics{false};
-inline bool rainbow=true;inline unsigned solid_rgb=0x55dcaf;
+inline bool rainbow=true;inline unsigned solid_rgb=0x55e4af;
 inline bool gradient=false;inline int gradient_count=3;
 inline std::array<unsigned,3> gradient_colors{5623039,16737996,16759620};
 inline std::array<float,3> gradient_rgb(float phase){
@@ -101,8 +101,8 @@ inline bool bot_range(int slot,int kind,int start,int offset,int count,size_t to
 // generated-player range from the world start, offset and count fields.
 inline void validate_bot_layout(){
  bot_layout=false;std::array<unsigned char,0x32d4> code{};std::array<unsigned char,32> hash{},expected{};
- const char* hex="ea2f410d5277202749a50e72b4040041deaccfe37a7f478aa34d228aca56f798";
- if(!ssc_compat::supports(1)||!read_bytes(image_base+0x278d60,code.data(),code.size()))return;
+ const char* hex="12251e56267b67ee5d201a7650b8cd34877936440840a2d1264ce2c709c736a0";
+ if(!ssc_compat::supports(1)||!read_bytes(image_base+0x279240,code.data(),code.size()))return;
  if(sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr)!=0)return;
  crypto_hash_sha256(hash.data(),code.data(),code.size());bot_layout=sodium_memcmp(hash.data(),expected.data(),32)==0;
 }
@@ -128,25 +128,25 @@ inline bool account_string(uintptr_t object,std::string& value){
 }
 inline bool local_account(uintptr_t account){
     std::string own,candidate;
-    return account_string(image_base+ssc_compat::resolve(0xe021e8),own)&&account_string(account,candidate)&&own==candidate;
+    return account_string(image_base+ssc_compat::resolve(0xe031e8),own)&&account_string(account,candidate)&&own==candidate;
 }
 inline bool native_phase(float& phase){
     float speed=0,time=0;
-    if(!read(image_base+ssc_compat::resolve(0xfaf0e4),speed)||!read(image_base+ssc_compat::resolve(0xfafb50),time)||!std::isfinite(time)||!std::isfinite(speed))return false;
+    if(!read(image_base+ssc_compat::resolve(0xfb0164),speed)||!read(image_base+ssc_compat::resolve(0xfb0bd0),time)||!std::isfinite(time)||!std::isfinite(speed))return false;
     float candidate=std::fmod(time*speed,1.f);if(!std::isfinite(candidate))return false;if(candidate<0)candidate+=1.f;phase=candidate;return true;
 }
 inline Identity identify(uintptr_t actor,bool allow_inactive=false){
     Identity answer;uintptr_t world=0,first=0,last=0,registry=0;int slot=-1,kind=-1,local_slot=-1;unsigned char active=0;
-    if(!read(image_base+ssc_compat::resolve(0xde85d0),world)||!world||!read(world+0xa628,first)||!read(world+0xa630,last)||!first||last<first||(last-first)%0x3488||(last-first)/0x3488>2048)return answer;
-    if(actor<first||actor>=last||(actor-first)%0x3488||!read(actor+0x78,slot)||slot<0||uintptr_t(slot)!=(actor-first)/0x3488||!read(actor+0x7dc,kind)||!read(actor+0x81,active)||(!active&&!allow_inactive))return answer;
+    if(!read(image_base+ssc_compat::resolve(0xde95d0),world)||!world||!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048)return answer;
+    if(actor<first||actor>=last||(actor-first)%0x34b8||!read(actor+0x78,slot)||slot<0||uintptr_t(slot)!=(actor-first)/0x34b8||!read(actor+0x7dc,kind)||!read(actor+0x81,active)||(!active&&!allow_inactive))return answer;
     if(kind==0){std::string key;if(account_string(actor+0x6f0,key)&&ssc_shared::account_valid(key))answer.account=key;}
     if(kind==1&&render_private_active()){
         int start=0,offset=0,count=0;
-        if(read(image_base+0xfb281c,start)&&read(world+0x190,offset)&&read(world+0x28c,count))answer.bot=bot_range(slot,kind,start,offset,count,(last-first)/0x3488);
+        if(read(image_base+0xfb389c,start)&&read(world+0x190,offset)&&read(world+0x28c,count))answer.bot=bot_range(slot,kind,start,offset,count,(last-first)/0x34b8);
     }
     // e03370 is used by the native own-player formatter; bf48 may be spectated.
-    answer.local=kind==0&&read(image_base+ssc_compat::resolve(0xe1c648),local_slot)&&slot==local_slot&&
-        read(image_base+ssc_compat::resolve(0xe200d8),registry)&&registry==first&&local_account(actor+0x6f0);
+    answer.local=kind==0&&read(image_base+ssc_compat::resolve(0xe1d678),local_slot)&&slot==local_slot&&
+        read(image_base+ssc_compat::resolve(0xe21138),registry)&&registry==first&&local_account(actor+0x6f0);
     return answer;
 }
 inline bool (*lookup_shared)(const std::string&,ssc_shared::Style&)=+[](const std::string& key,ssc_shared::Style& value){return ssc_shared::service().get(key,value);};
@@ -187,7 +187,7 @@ inline uintptr_t list_name_formatter(uintptr_t actor,uintptr_t output,unsigned c
  auto result=native_name_formatter(actor,output,flags);
  std::string label,account,display;uintptr_t world=0;
  account_string(actor+0x6f0,account); // Bots need not have a human account key.
- if(read(image_base+ssc_compat::resolve(0xde85d0),world)&&world&&account_string(result,label)&&account_string(actor+0x798,display)){
+ if(read(image_base+ssc_compat::resolve(0xde95d0),world)&&world&&account_string(result,label)&&account_string(actor+0x798,display)){
   if(formatted_labels.size()<2048){auto [it,added]=formatted_labels.emplace(label,FormattedLabel{actor,world,account,display});if(!added&&it->second.actor!=actor)it->second.actor=0;}
  }
  return result;
@@ -197,7 +197,7 @@ inline uintptr_t label_actor(const std::string& label){
  auto found=formatted_labels.find(label);if(found==formatted_labels.end()||!found->second.actor)return 0;
  const auto& entry=found->second;uintptr_t world=0;std::string account,display;
  account_string(entry.actor+0x6f0,account);
- if(!read(image_base+ssc_compat::resolve(0xde85d0),world)||world!=entry.world||account!=entry.account||!account_string(entry.actor+0x798,display)||display!=entry.display)return 0;
+ if(!read(image_base+ssc_compat::resolve(0xde95d0),world)||world!=entry.world||account!=entry.account||!account_string(entry.actor+0x798,display)||display!=entry.display)return 0;
  return entry.actor;
 }
 inline uintptr_t shared_label_world=0;
@@ -205,13 +205,13 @@ inline uint64_t shared_label_refresh=0,shared_label_scans=0;
 inline void refresh_shared_labels(uint64_t now,bool receive){
  if(!attached||!receive){shared_label_index.clear();formatted_labels.clear();shared_label_world=0;shared_label_refresh=0;return;}
  uintptr_t world=0,first=0,last=0;
- if(!read(image_base+ssc_compat::resolve(0xde85d0),world)||!world){shared_label_index.clear();shared_label_world=0;return;}
+ if(!read(image_base+ssc_compat::resolve(0xde95d0),world)||!world){shared_label_index.clear();shared_label_world=0;return;}
  if(world==shared_label_world&&shared_label_refresh&&now>=shared_label_refresh&&now-shared_label_refresh<250)return;
  if(world!=shared_label_world)formatted_labels.clear();
  shared_label_index.clear();shared_label_world=world;shared_label_refresh=now;++shared_label_scans;
- if(!read(world+0xa628,first)||!read(world+0xa630,last)||!first||last<first||(last-first)%0x3488||(last-first)/0x3488>2048)return;
+ if(!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048)return;
  auto add=[](const std::string& label,uintptr_t actor){if(label.empty())return;auto result=shared_label_index.emplace(label,actor);if(!result.second&&result.first->second!=actor)result.first->second=0;};
- for(auto actor=first;actor<last;actor+=0x3488){int kind=-1;if(!read(actor+0x7dc,kind)){shared_label_index.clear();return;}if(kind!=0&&kind!=1)continue;
+ for(auto actor=first;actor<last;actor+=0x34b8){int kind=-1;if(!read(actor+0x7dc,kind)){shared_label_index.clear();return;}if(kind!=0&&kind!=1)continue;
   std::string key,display;if(account_string(actor+0x6f0,key))add(key,actor);if(account_string(actor+0x798,display))add(display,actor);
  }
 }
@@ -219,7 +219,7 @@ inline bool shared_text(const std::string& label,ssc_shared::Style& value){
  // Generic HUD text must only perform an index lookup, never a roster walk.
  if(!attached||label.empty())return false;
  auto actor=label_actor(label);if(!actor)return false;
- uintptr_t world=0;if(!read(image_base+ssc_compat::resolve(0xde85d0),world)||world!=shared_label_world)return false;
+ uintptr_t world=0;if(!read(image_base+ssc_compat::resolve(0xde95d0),world)||world!=shared_label_world)return false;
  auto identity=identify(actor,true);if(identity.local||identity.bot||identity.account.empty())return false;
  // A reused actor slot or renamed player must not inherit a stale label.
  std::string display;if(identity.account!=label&&(!account_string(actor+0x798,display)||display!=label)&&formatted_labels.find(label)==formatted_labels.end())return false;
@@ -228,7 +228,7 @@ inline bool shared_text(const std::string& label,ssc_shared::Style& value){
 inline bool bot_text(const std::string& label){
  if(!attached)return false;
  auto actor=label_actor(label);if(!actor)return false;
- uintptr_t world=0;if(!read(image_base+ssc_compat::resolve(0xde85d0),world)||world!=shared_label_world)return false;
+ uintptr_t world=0;if(!read(image_base+ssc_compat::resolve(0xde95d0),world)||world!=shared_label_world)return false;
  if(!identify(actor,true).bot||!render_private_active())return false;
  std::string current;return (account_string(actor+0x798,current)&&current==label)||(account_string(actor+0x6f0,current)&&current==label)||formatted_labels.find(label)!=formatted_labels.end();
 }
@@ -250,8 +250,8 @@ inline bool shared_wide_text(uintptr_t object,ssc_shared::Style& value){std::str
 inline bool bot_wide_text(uintptr_t object){std::string label;return wide_label(object,label)&&bot_text(label);}
 inline std::vector<std::string> shared_accounts(){
  std::set<std::string> keys;uintptr_t world=0,first=0,last=0;
- if(!attached||!read(image_base+ssc_compat::resolve(0xde85d0),world)||!world||!read(world+0xa628,first)||!read(world+0xa630,last)||!first||last<first||(last-first)%0x3488||(last-first)/0x3488>2048)return {};
- for(auto actor=first;actor<last&&keys.size()<128;actor+=0x3488){auto identity=identify(actor);if(!identity.account.empty()&&!identity.local)keys.insert(identity.account);}
+ if(!attached||!read(image_base+ssc_compat::resolve(0xde95d0),world)||!world||!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048)return {};
+ for(auto actor=first;actor<last&&keys.size()<128;actor+=0x34b8){auto identity=identify(actor);if(!identity.account.empty()&&!identity.local)keys.insert(identity.account);}
  return {keys.begin(),keys.end()};
 }
 // Observe the original game result, never the cosmetic override returned below.
@@ -260,7 +260,7 @@ inline bool native_pass_value=false;
 inline uint64_t native_pass_observed=0;
 inline void observe_native_pass(bool own,unsigned char result){
  if(!own)return;
- std::string account;if(!account_string(image_base+ssc_compat::resolve(0xe021e8),account))return;
+ std::string account;if(!account_string(image_base+ssc_compat::resolve(0xe031e8),account))return;
  native_pass_account=account;native_pass_value=result!=0;native_pass_observed=GetTickCount64();
 }
 inline unsigned char native_pass_probe(void* context,int id,void* owned_string){
@@ -280,14 +280,14 @@ inline unsigned char __cdecl predicate(void* context,int id,void* owned_string){
 // belongs to the local actor and no other actor is displaying that same key.
 inline bool unambiguous_event_account(uintptr_t text){
     std::string own_key,candidate;
-    if(!account_string(image_base+ssc_compat::resolve(0xe021e8),own_key)||!account_string(text,candidate)||own_key!=candidate)return false;
+    if(!account_string(image_base+ssc_compat::resolve(0xe031e8),own_key)||!account_string(text,candidate)||own_key!=candidate)return false;
     uintptr_t world=0,first=0,last=0;int slot=-1;
-    if(!read(image_base+ssc_compat::resolve(0xde85d0),world)||!read(world+0xa628,first)||!read(world+0xa630,last)||
-       !first||last<first||(last-first)%0x3488||(last-first)/0x3488>2048||
-       !read(image_base+ssc_compat::resolve(0xe1c648),slot)||slot<0||size_t(slot)>=(last-first)/0x3488)return false;
-    const auto own=first+size_t(slot)*0x3488;
+    if(!read(image_base+ssc_compat::resolve(0xde95d0),world)||!read(world+0xa658,first)||!read(world+0xa660,last)||
+       !first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048||
+       !read(image_base+ssc_compat::resolve(0xe1d678),slot)||slot<0||size_t(slot)>=(last-first)/0x34b8)return false;
+    const auto own=first+size_t(slot)*0x34b8;
     if(!identify(own).local)return false;
-    for(auto p=first;p<last;p+=0x3488){unsigned char active=0;
+    for(auto p=first;p<last;p+=0x34b8){unsigned char active=0;
         if(!read(p+0x81,active))return false;
         if(p!=own&&active&&((account_string(p+0x798,candidate)&&candidate==own_key)||(account_string(p+0x6f0,candidate)&&candidate==own_key)))return false;
     }
@@ -335,7 +335,7 @@ inline float __cdecl draw(void* renderer,float x,float y,void* name,float size,f
 extern "C" float __cdecl ssc_score_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase,uintptr_t row){
     int slot=-1;uintptr_t world=0,first=0,last=0;
     Identity identity;
-    if(read(row+0x2c,slot)&&slot>=0&&read(image_base+ssc_compat::resolve(0xde85d0),world)&&read(world+0xa628,first)&&read(world+0xa630,last)&&last>=first&&size_t(slot)<(last-first)/0x3488)identity=identify(first+size_t(slot)*0x3488);
+    if(read(row+0x2c,slot)&&slot>=0&&read(image_base+ssc_compat::resolve(0xde95d0),world)&&read(world+0xa658,first)&&read(world+0xa660,last)&&last>=first&&size_t(slot)<(last-first)/0x34b8)identity=identify(first+size_t(slot)*0x34b8);
     ColorScope scope(identity.local);
     shared_actor_tint(scope,identity,r,g,b,phase);
     if(identity.bot&&render_private_active())bot_tint(r,g,b,alpha,phase);
@@ -414,7 +414,7 @@ inline bool local_wide_label(uintptr_t object){
  if(!read_bytes(object,header.data(),header.size()))return false;
  std::memcpy(&length,header.data()+16,8);std::memcpy(&capacity,header.data()+24,8);
  if(!length||length>256||capacity<length)return false;
- std::string account;if(!account_string(image_base+ssc_compat::resolve(0xe021e8),account))return false;
+ std::string account;if(!account_string(image_base+ssc_compat::resolve(0xe031e8),account))return false;
  std::array<wchar_t,256> expected{},candidate{};
  const int count=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,account.data(),int(account.size()),expected.data(),int(expected.size()));
  if(count<=0||size_t(count)!=length)return false;
@@ -453,8 +453,8 @@ inline int wide_wrapped(uintptr_t renderer,float x,float y,float width,float hei
 }
 inline bool modifier_layout_supported(){
  std::array<unsigned char,17021> code{};std::array<unsigned char,32> actual{},expected{};
- if(!read_bytes(image_base+0x3bdef0,code.data(),code.size()))return false;
- const char* hex="7ab09b7ce5d02a6c6f125fa5880b0528898c6cab1192025a403232dd892674c4";
+ if(!read_bytes(image_base+0x3be640,code.data(),code.size()))return false;
+ const char* hex="07b13aeb6c46a338bd63df9aa4eebc2bb07b4471125ec90ad1b919929f11aa1c";
  if(sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr))return false;
  crypto_hash_sha256(actual.data(),code.data(),code.size());return sodium_memcmp(actual.data(),expected.data(),32)==0;
 }
@@ -465,14 +465,14 @@ extern "C" void ssc_showdown_name_bridge();
 inline bool account_surfaces_supported(){
  struct Guard{uint32_t rva,size;const char* hash;};
  const Guard guards[]={
-  {0x3ab9c0,0x3c4,"75cc630a420006615981309117ae713850922f67e2d0b098a4fc9e029c3a7531"},
-  {0x607cd0,0x17ac,"49531977edafe61d82f88bed310737ac7d740d7d03260da2273ddf7143e1cc24"},
-  {0x609ab0,0x20fb,"4758d5c3079192a2b4dd8f8968787c2cbd7482b60cb7bfe5451d439708336259"},
-  {0x627210,0x3a3a,"beb1e270f28b1de3a6200e3dc1eb073cf7b38a035a1ea438605998922d56399a"},
-  {0x419e00,0x1285,"3248379b391b2b76fde4f8466a6e769f782df86c0169a288126aea40d150fcaf"},
-  {0x622050,0x51c0,"60484eb7cd633190569ccc57ba84f82398c898d006a3eb787a0b2b58653e371d"},
-  {0x63a980,0x9468,"ea70bfbdb1f281d5b55313702aa90539fdc9bf95a14633217c0692cbdbe19b71"},
-  {0x9e2fa6,0x72f,"eb0fe475d513f071ed9cf7cd202785baea1bcfe38a316d40f6757ba7ccb0dd3d"},
+  {0x3ac110,0x3c4,"d6c69cbe865d60acf0f0760f8c9fb9951c08442de2ee62e9bc627109502b83eb"},
+  {0x6084d0,0x17ac,"032e1609973a0b441dc1891260b840ad82eb7486efbeaf96d4e7766c195f59b0"},
+  {0x60a2b0,0x20fb,"ef11d1baa2e5220ff99a1a5234975fc50be9a3a510fb10e126f5ebfa50e46fd2"},
+  {0x627a10,0x3a3a,"7c33f6b51fcaeb5fa618c59d8147a7881d6eb20840cf6e24614570fc3572f4d1"},
+  {0x41a550,0x1285,"adbbd99665395f2f30cfba41a678d87a1e726322407674eca27bd79317b1ab56"},
+  {0x622850,0x51c0,"263b5aa97d727510d4e768012aeb9bf201cf9701c980218bb2458ce8dc920794"},
+  {0x63b180,0x9468,"2e590bf02af31e91bbb0df323e8c55e83c2956463a1fd496dd41e9dc21d05332"},
+  {0x9e3c86,0x72f,"6705dce24bd4497f4f80e78b57453ea31e6506703a580332abb20a06233e909f"},
  };
  for(const auto& guard:guards){
   std::vector<unsigned char> bytes(guard.size);std::array<unsigned char,32> actual{},expected{};
@@ -486,139 +486,139 @@ inline bool attach(){
     image_base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
     if(!modifier_layout_supported()||!account_surfaces_supported())return false;
     {std::array<unsigned char,0x30f7> code{};std::array<unsigned char,32> actual{},expected{};
-     const char* hex="7c0361d1d178a7c6957b7b4c8f4adf5b242b591cd24b731433bd356d08b2b432";
-     if(!read_bytes(image_base+0x3badf0,code.data(),code.size())||sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr))return false;
+     const char* hex="0225c8296e6cdcde82ad4d15a9905a69e2398cac1b8fa9a0981926511f246ecd";
+     if(!read_bytes(image_base+0x3bb540,code.data(),code.size())||sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr))return false;
      crypto_hash_sha256(actual.data(),code.data(),code.size());if(sodium_memcmp(actual.data(),expected.data(),32))return false;}
-    native_predicate=reinterpret_cast<Predicate>(image_base+ssc_compat::resolve(0x3ab9c0));native_overhead=reinterpret_cast<Overhead>(image_base+ssc_compat::resolve(0x849770));native_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x4817b0));
-    native_wrapped=reinterpret_cast<Wrapped>(image_base+ssc_compat::resolve(0x481940));
-    native_wide_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x4823f0));
-    native_wide_wrapped=reinterpret_cast<Wrapped>(image_base+ssc_compat::resolve(0x481ad0));
-    native_palette=reinterpret_cast<Palette>(image_base+ssc_compat::resolve(0x154ca0));
-    native_name_formatter=reinterpret_cast<NameFormatter>(image_base+0x7db4b0);
-    native_widget=reinterpret_cast<Widget>(image_base+ssc_compat::resolve(0x99bbe0));
+    native_predicate=reinterpret_cast<Predicate>(image_base+ssc_compat::resolve(0x3ac110));native_overhead=reinterpret_cast<Overhead>(image_base+ssc_compat::resolve(0x84a3c0));native_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x481f90));
+    native_wrapped=reinterpret_cast<Wrapped>(image_base+ssc_compat::resolve(0x482120));
+    native_wide_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x482bd0));
+    native_wide_wrapped=reinterpret_cast<Wrapped>(image_base+ssc_compat::resolve(0x4822b0));
+    native_palette=reinterpret_cast<Palette>(image_base+ssc_compat::resolve(0x154dc0));
+    native_name_formatter=reinterpret_cast<NameFormatter>(image_base+0x7dbed0);
+    native_widget=reinterpret_cast<Widget>(image_base+ssc_compat::resolve(0x99c8c0));
     struct Site{uint32_t call,target;uintptr_t hook;bool exact=false;};
     // Whitelist presentation calls only. Do not hook the predicate globally:
     // 5fb3b0/5fd316/6834a3/6b6db7 also service pass-related UI/cache logic.
     Site sites[]={
-        {0x60892f,0x3ab9c0,reinterpret_cast<uintptr_t>(native_pass_probe),true},
-        {0x60a896,0x3ab9c0,reinterpret_cast<uintptr_t>(native_pass_probe),true},
+        {0x60912f,0x3ac110,reinterpret_cast<uintptr_t>(native_pass_probe),true},
+        {0x60b096,0x3ac110,reinterpret_cast<uintptr_t>(native_pass_probe),true},
         // Native formatter constructs the cached participant label from RBX actor.
-        {0x3bb34a,0x7db4b0,reinterpret_cast<uintptr_t>(list_name_formatter),true},
+        {0x3bba9a,0x7dbed0,reinterpret_cast<uintptr_t>(list_name_formatter),true},
         // Showdown participant name, including native eliminated/score suffixes; RDI is its actor.
-        {0x3bbcd0,0x4817b0,reinterpret_cast<uintptr_t>(ssc_showdown_name_bridge),true},
-        // Modifier owner is formatted by 0x7db4b0; RBX retains its actor.
-        {0x3c1663,0x4817b0,reinterpret_cast<uintptr_t>(ssc_modifier_name_bridge),true},
-        {0x3c1758,0x4817b0,reinterpret_cast<uintptr_t>(ssc_modifier_name_bridge),true},
-        {0x3c1a8c,0x4817b0,reinterpret_cast<uintptr_t>(ssc_modifier_name_bridge),true},
+        {0x3bc420,0x481f90,reinterpret_cast<uintptr_t>(ssc_showdown_name_bridge),true},
+        // Modifier owner is formatted by 0x7dbed0; RBX retains its actor.
+        {0x3c1db3,0x481f90,reinterpret_cast<uintptr_t>(ssc_modifier_name_bridge),true},
+        {0x3c1ea8,0x481f90,reinterpret_cast<uintptr_t>(ssc_modifier_name_bridge),true},
+        {0x3c21dc,0x481f90,reinterpret_cast<uintptr_t>(ssc_modifier_name_bridge),true},
         // Shared narrow-to-wide conversion and direct UTF-16 text paths.
-        {0x42f812,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x42fe7c,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x4301a3,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x43b04d,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x4818d6,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x481a6b,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x485650,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x52f94f,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x530fb0,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x5314aa,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x534172,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x535e18,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x5362b5,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x536a7c,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x536ed1,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x5371a8,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x537448,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x5376e8,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x537be8,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x5387ed,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x538cd1,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x543f54,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x54420a,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x5454a3,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x545a26,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x546006,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x547380,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x54778e,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x547c5c,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x634b74,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x650d2c,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x650e99,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x650ff0,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x651139,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x6511e6,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65137f,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65152b,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65176f,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x659093,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65922f,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x6593c2,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x6597ba,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65996b,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x659b13,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x659cb1,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65f4f8,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x66084e,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x663938,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x6639ea,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x666c28,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x6bf978,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6bfb30,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c0105,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c01e8,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c068d,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c09bb,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c0cdd,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c0fff,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c3699,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c39b4,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c3ccf,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c4042,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c43ff,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6d601a,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x71826e,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x9a343a,0x4823f0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x9a3510,0x481ad0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x42ff62,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x4305cc,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x4308f3,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x43b79d,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x4820b6,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x48224b,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x485e30,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x53014f,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5317b0,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x531caa,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x534972,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x536618,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x536ab5,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x53727c,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5376d1,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5379a8,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x537c48,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x537ee8,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5383e8,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x538fed,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5394d1,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x544754,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x544a0a,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x545ca3,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x546226,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x546806,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x547b80,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x547f8e,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x54845c,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x635374,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x65152c,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x651699,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6517f0,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x651939,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6519e6,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x651b7f,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x651d2b,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x651f6f,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x659893,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x659a2f,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x659bc2,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x659fba,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65a16b,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65a313,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65a4b1,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65fcf8,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x66104e,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x664138,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6641ea,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x667428,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6c0178,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c0330,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c0905,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c09e8,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c0e8d,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c11bb,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c14dd,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c17ff,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c3e99,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c41b4,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c44cf,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c4842,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c4bff,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6d681a,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x718a6e,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x9a411a,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x9a41f0,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
         // Both glyph palette paths (regular and alternate text rendering).
-        {0x48ae11,0x154ca0,reinterpret_cast<uintptr_t>(palette)},
-        {0x48ae72,0x154ca0,reinterpret_cast<uintptr_t>(palette)},
-        {0x3f6815,0x4817b0,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
-        {0x3f68ce,0x4817b0,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
-        {0x3f6961,0x4817b0,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
-        {0x3f6a35,0x4817b0,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
-        {0x3f6ad1,0x4817b0,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
-        {0x3f6b8c,0x4817b0,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x48b5f1,0x154dc0,reinterpret_cast<uintptr_t>(palette)},
+        {0x48b652,0x154dc0,reinterpret_cast<uintptr_t>(palette)},
+        {0x3f6f65,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f701e,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f70b1,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f7185,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f7221,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f72dc,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
 
-        {0x99df3f,0x481940,reinterpret_cast<uintptr_t>(widget_wrapped)},
-        {0x48a759,0x154ca0,reinterpret_cast<uintptr_t>(palette)},
-        {0x48a7b6,0x154ca0,reinterpret_cast<uintptr_t>(palette)},
-        {0x41ad1a,0x4817b0,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x41ad9e,0x4817b0,reinterpret_cast<uintptr_t>(ssc_modifier_name_bridge),true},
-        {0x626eda,0x4817b0,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
-        {0x629618,0x4817b0,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
-        {0x640aeb,0x4817b0,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
-        {0x6acb9c,0x4817b0,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6ace24,0x4817b0,reinterpret_cast<uintptr_t>(ssc_chat_name_bridge)},
-        {0x6ad042,0x4817b0,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9e3393,0x4817b0,reinterpret_cast<uintptr_t>(ssc_vehicle_name_bridge),true},
-        {0x9ae93b,0x4817b0,reinterpret_cast<uintptr_t>(event_draw)},
-        {0x9aeadf,0x4817b0,reinterpret_cast<uintptr_t>(event_draw)},
+        {0x99ec1f,0x482120,reinterpret_cast<uintptr_t>(widget_wrapped)},
+        {0x48af39,0x154dc0,reinterpret_cast<uintptr_t>(palette)},
+        {0x48af96,0x154dc0,reinterpret_cast<uintptr_t>(palette)},
+        {0x41b46a,0x481f90,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x41b4ee,0x481f90,reinterpret_cast<uintptr_t>(ssc_modifier_name_bridge),true},
+        {0x6276da,0x481f90,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
+        {0x629e18,0x481f90,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
+        {0x6412eb,0x481f90,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
+        {0x6ad39c,0x481f90,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6ad624,0x481f90,reinterpret_cast<uintptr_t>(ssc_chat_name_bridge)},
+        {0x6ad842,0x481f90,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9e4073,0x481f90,reinterpret_cast<uintptr_t>(ssc_vehicle_name_bridge),true},
+        {0x9af61b,0x481f90,reinterpret_cast<uintptr_t>(event_draw)},
+        {0x9af7bf,0x481f90,reinterpret_cast<uintptr_t>(event_draw)},
 
-        {0x33d7fc,0x849770,reinterpret_cast<uintptr_t>(overhead)},
-        {0x849c26,0x3ab9c0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x41ab32,0x3ab9c0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x43a9d8,0x3ab9c0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x6243ac,0x3ab9c0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x63dcae,0x3ab9c0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x6ab059,0x3ab9c0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9e32f5,0x3ab9c0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9ae86d,0x3ab9c0,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x9aea17,0x3ab9c0,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x60abc1,0x99bbe0,reinterpret_cast<uintptr_t>(local_widget)},
-        {0x99e079,0x4817b0,reinterpret_cast<uintptr_t>(widget_draw)},
-        {0x84a4a8,0x4817b0,reinterpret_cast<uintptr_t>(draw)},
-        {0x84a534,0x4817b0,reinterpret_cast<uintptr_t>(draw)},
-        {0x43747d,0x4817b0,reinterpret_cast<uintptr_t>(ssc_score_bridge)},
-        {0x437502,0x4817b0,reinterpret_cast<uintptr_t>(ssc_score_bridge)}};
+        {0x33df1c,0x84a3c0,reinterpret_cast<uintptr_t>(overhead)},
+        {0x84a876,0x3ac110,reinterpret_cast<uintptr_t>(predicate)},
+        {0x41b282,0x3ac110,reinterpret_cast<uintptr_t>(predicate)},
+        {0x43b128,0x3ac110,reinterpret_cast<uintptr_t>(predicate)},
+        {0x624bac,0x3ac110,reinterpret_cast<uintptr_t>(predicate)},
+        {0x63e4ae,0x3ac110,reinterpret_cast<uintptr_t>(predicate)},
+        {0x6ab859,0x3ac110,reinterpret_cast<uintptr_t>(predicate)},
+        {0x9e3fd5,0x3ac110,reinterpret_cast<uintptr_t>(predicate)},
+        {0x9af54d,0x3ac110,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x9af6f7,0x3ac110,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x60b3c1,0x99c8c0,reinterpret_cast<uintptr_t>(local_widget)},
+        {0x99ed59,0x481f90,reinterpret_cast<uintptr_t>(widget_draw)},
+        {0x84b0f8,0x481f90,reinterpret_cast<uintptr_t>(draw)},
+        {0x84b184,0x481f90,reinterpret_cast<uintptr_t>(draw)},
+        {0x437bcd,0x481f90,reinterpret_cast<uintptr_t>(ssc_score_bridge)},
+        {0x437c52,0x481f90,reinterpret_cast<uintptr_t>(ssc_score_bridge)}};
     for(auto& site:sites){if(site.exact)continue;site.call=ssc_compat::resolve(uint32_t(site.call));site.target=ssc_compat::resolve(uint32_t(site.target));}
     for(auto site:sites){auto p=reinterpret_cast<unsigned char*>(image_base+site.call);int32_t relative;std::memcpy(&relative,p+1,4);if(p[0]!=0xe8||image_base+site.call+5+relative!=image_base+site.target)return false;}
     unsigned char* bridge=nullptr;

@@ -108,7 +108,7 @@ void render(HDC dc) {
     if(now-auth_start_at>=1000){auth_start_at=now;ssc_auth::service().start();}
     static ULONGLONG shared_at=0;
     if(now-shared_at>=1000){shared_at=now;
-      std::string own;if(ssc_names::attached)ssc_names::account_string(ssc_names::image_base+ssc_compat::resolve(0xe021e8),own);
+      std::string own;if(ssc_names::attached)ssc_names::account_string(ssc_names::image_base+ssc_compat::resolve(0xe031e8),own);
       ssc_shared::Style appearance;appearance.mode=ssc_names::gradient?ssc_shared::Mode::gradient:ssc_names::rainbow?ssc_shared::Mode::rainbow:ssc_shared::Mode::solid;
       appearance.count=ssc_names::gradient?unsigned(std::clamp(ssc_names::gradient_count,2,3)):ssc_names::rainbow?0:1;
       appearance.colors=ssc_names::gradient?ssc_names::gradient_colors:std::array<unsigned,3>{ssc_names::solid_rgb,0,0};
@@ -308,7 +308,7 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
     ssc_diagnostics::initialize(state_dir);ssc_auth::service().configure(state_dir);ssc_shared::service().configure(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
-    log("SSC Mod Menu 0.1.21 startup");log_game_build();
+    log("SSC Mod Menu 0.1.22 startup");log_game_build();
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
     if(!supported){native_supported=false;log("Unsupported executable; runtime inactive");return;}
     presence_supported=(supported&4)!=0;native_supported=true;

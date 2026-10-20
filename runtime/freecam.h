@@ -45,7 +45,7 @@ using Hud=void(*)(uintptr_t);
 inline Center original_center=nullptr;
 inline Hud original_hud=nullptr;
 template<class T> bool read(uintptr_t p,T& value){MEMORY_BASIC_INFORMATION m{};if(!p||!VirtualQuery(reinterpret_cast<void*>(p),&m,sizeof m)||m.State!=MEM_COMMIT||(m.Protect&(PAGE_NOACCESS|PAGE_GUARD))||p<reinterpret_cast<uintptr_t>(m.BaseAddress)||sizeof(T)>m.RegionSize-(p-reinterpret_cast<uintptr_t>(m.BaseAddress)))return false;std::memcpy(&value,reinterpret_cast<void*>(p),sizeof(T));return true;}
-inline std::optional<capture::Surface> floor_at(float x,float y){uintptr_t map=0;if(!ground_supported||!read(base+0xde85d8,map))return std::nullopt;return capture::terrain(map,x,y,[](uintptr_t address,auto& value){return read(address,value);});}
+inline std::optional<capture::Surface> floor_at(float x,float y){uintptr_t map=0;if(!ground_supported||!read(base+0xde95d8,map))return std::nullopt;return capture::terrain(map,x,y,[](uintptr_t address,auto& value){return read(address,value);});}
 inline void limit_floor(){auto surface=floor_at(camera.eye.x,camera.eye.y);if(surface)camera.eye.z=std::max(camera.eye.z,surface->z+eye_height);}
 inline void wheel(float steps,bool fine){if(capture::session.active())return;if(fps){capture_fov=std::clamp(capture_fov-steps*(fine?1.f:5.f),20.f,100.f);}else camera.wheel(steps,fine,fly);}
 inline void mouse_look(float dx,float dy){if(!capture::session.active())camera.look(dx,dy);}
@@ -69,14 +69,14 @@ inline bool toggle_photo(uint64_t now){
 }
 inline float time_scale(uintptr_t world,unsigned char update){
  float native=native_time_scale(world,update);uintptr_t current=0;
- return state.active&&((photo_enabled&&photo_frozen)||capture::session.active())&&world==state.world&&read(base+0xde85d0,current)&&current==world&&singleplayer()?0.f:native;
+ return state.active&&((photo_enabled&&photo_frozen)||capture::session.active())&&world==state.world&&read(base+0xde95d0,current)&&current==world&&singleplayer()?0.f:native;
 }
 inline bool request_start(uint64_t now){
  if(fps&&!ground_supported)return reject(now,L"FPS terrain camera unavailable for this build.");
  if(fps)fly=true;
  if(!attached||!state.ready||now<state.seen||now-state.seen>500)return reject(now,L"Freecam unavailable: no active session.");
  uintptr_t actor=0,world=0;int local=-1,slot=-2,kind=-1;unsigned char active=0;
- if(!read(observed_context,actor)||actor!=state.actor||!read(base+0xde85d0,world)||world!=state.world||!read(world+0x6b98,local)||!read(actor+0x78,slot)||slot!=local||slot<0||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active)return reject(now,L"Freecam unavailable: local player not ready.");
+ if(!read(observed_context,actor)||actor!=state.actor||!read(base+0xde95d0,world)||world!=state.world||!read(world+0x6b98,local)||!read(actor+0x78,slot)||slot!=local||slot<0||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active)return reject(now,L"Freecam unavailable: local player not ready.");
  if(!permitted())return reject(now,L"Freecam requires death or spectator mode in multiplayer.");
  camera.reset();slow_latched=false;focus_suspended=false;entry_status=L"";notice_until=0;return state.start(now);
 }
@@ -88,7 +88,7 @@ inline bool register_mouse(HWND window){
 }
 inline bool restore_mouse_registration(){if(!raw_mouse)return true;RAWINPUTDEVICE d=had_raw_mouse?saved_raw_mouse:RAWINPUTDEVICE{1,2,RIDEV_REMOVE,nullptr};if(!RegisterRawInputDevices(&d,1,sizeof d))return false;raw_mouse=false;return true;}
 inline void release_mouse(){if(mouse_window){restore_mouse_registration();ClipCursor(&saved_clip);if(GetForegroundWindow()==mouse_window){SetCursorPos(saved_cursor.x,saved_cursor.y);SetCursor(saved_shape);}mouse_window=nullptr;}}
-inline void restore_bounds(){if(bounds_saved&&base){std::memcpy(reinterpret_cast<void*>(base+0xfafc00),saved_bounds,sizeof saved_bounds);bounds_saved=false;}}
+inline void restore_bounds(){if(bounds_saved&&base){std::memcpy(reinterpret_cast<void*>(base+0xfb0c80),saved_bounds,sizeof saved_bounds);bounds_saved=false;}}
 inline void stop(){capture::session.cancel();photo_frozen=false;focus_suspended=false;slow_latched=false;state.stop();pending_since=0;pending_actor=pending_world=0;entry_status=L"";camera.reset();release_mouse();restore_bounds();ssc_creator::freecam_hide=false;}
 inline bool start(uint64_t now){camera.reset();return state.start(now);}
 inline bool select_mode(int mode){
@@ -142,16 +142,16 @@ inline void APIENTRY view(float x,float y,float z){
   if(fly&&draw_distance>0)wanted=std::max(near_plane+1.f,float(draw_distance));
   if(std::isfinite(wanted)&&near_plane>0&&wanted>near_plane&&wanted!=far_plane){projection[10]=-(wanted+near_plane)/(wanted-near_plane);projection[14]=-2*wanted*near_plane/(wanted-near_plane);glMatrixMode(GL_PROJECTION);glLoadMatrixf(projection);glMatrixMode(GL_MODELVIEW);}
  }
- if(base&&(fly||camera.zoom>1.f)){if(!bounds_saved){std::memcpy(saved_bounds,reinterpret_cast<void*>(base+0xfafc00),sizeof saved_bounds);bounds_saved=true;}
+ if(base&&(fly||camera.zoom>1.f)){if(!bounds_saved){std::memcpy(saved_bounds,reinterpret_cast<void*>(base+0xfb0c80),sizeof saved_bounds);bounds_saved=true;}
   float bounds[4];if(fly){bounds[0]=-256;bounds[1]=-256;bounds[2]=state.max_x+512;bounds[3]=state.max_y+512;rendered_camera.visible_bounds(projection,state.max_x,state.max_y,bounds);}
   else {bounds[0]=state.x+(saved_bounds[0]-state.x)*camera.zoom;bounds[1]=state.y+(saved_bounds[1]-state.y)*camera.zoom;bounds[2]=saved_bounds[2]*camera.zoom;bounds[3]=saved_bounds[3]*camera.zoom;}
-  std::memcpy(reinterpret_cast<void*>(base+0xfafc00),bounds,sizeof bounds);
+  std::memcpy(reinterpret_cast<void*>(base+0xfb0c80),bounds,sizeof bounds);
  }
 }
 inline float* center(uintptr_t context,float* output){
  observed_context=context;
  restore_bounds();auto result=original_center(context,output);uintptr_t actor=0,world=0,map=0;int width=0,height=0;
- bool valid=read(context,actor)&&read(base+0xde85d0,world)&&read(base+0xde85d8,map)&&read(map+0x98,width)&&read(map+0x9c,height)&&width>0&&height>0&&width<=10000&&height<=10000;
+ bool valid=read(context,actor)&&read(base+0xde95d0,world)&&read(base+0xde95d8,map)&&read(map+0x98,width)&&read(map+0x9c,height)&&width>0&&height>0&&width<=10000&&height<=10000;
  if(focus_suspended&&actor==state.actor&&world==state.world)state.seen=GetTickCount64();
  state.observe(valid?actor:0,valid?world:0,output[0],output[1],float(width)*32,float(height)*32,GetTickCount64());
  if(state.active&&!permitted())stop();
@@ -217,7 +217,7 @@ inline Vec3 listening_position(float x,float y,float z){
 inline void listener(int property,float x,float y,float z){
  if(property==0x1004){auto point=listening_position(x,y,z);x=point.x;y=point.y;z=point.z;
   // The sound distance checks share these listener coordinates with OpenAL.
-  float position[]={x,y,z};std::memcpy(reinterpret_cast<void*>(base+0xe05508),position,sizeof position);
+  float position[]={x,y,z};std::memcpy(reinterpret_cast<void*>(base+0xe06508),position,sizeof position);
  }
  native_listener(property,x,y,z);
 }
@@ -225,7 +225,7 @@ using Scene=void(*)();inline Scene native_scene=nullptr;
 inline void scene(){
  // This is the native render-only Shadows switch, scoped to one world draw.
  // Restore it even when Freecam stops during that draw; never save game config.
- auto flag=reinterpret_cast<unsigned char*>(base+0xfaf95d);
+ auto flag=reinterpret_cast<unsigned char*>(base+0xfb09dd);
  const unsigned char previous=*flag;
  const bool hidden=state.active&&hide_shadows;
  if(hidden)*flag=0;
@@ -235,38 +235,38 @@ inline void scene(){
 using DebugDraw=void(*)(uintptr_t,uintptr_t,uintptr_t,int);inline DebugDraw native_debug=nullptr;
 inline void debug_draw(uintptr_t a,uintptr_t b,uintptr_t c,int d){if(clean_view()||(state.active&&hide_diagnostics)){ssc_creator::WriteMask mask;native_debug(a,b,c,d);}else native_debug(a,b,c,d);}
 inline bool matches(const unsigned char* b,size_t size){
- if(size<0x8669ac)return false;
- const unsigned char caller[]={0x00,0x0f,0x28,0xc2,0xf2,0x0f,0x59,0xd8,0xf2,0x0f,0x11,0x1d,0xec,0xef,0x74,0x00,0xe8,0x3f,0x83,0x98,0xff,0x40,0x32,0xff,0xf2,0x0f,0x11,0x35,0xdc,0xef,0x74,0x00};
- if(std::memcmp(b+0x86698c,caller,sizeof caller)!=0)return false;
- if(ssc_creator::hash(b+0x8562d0,0x1b36)!=0x52815345f0b0bc7cULL)return false;
- if(ssc_creator::hash(b+0x1aa350,0x7e7)!=0xec749593664add85ULL)return false;
- {int32_t d=0;std::memcpy(&d,b+0x1eee7e,4);if(b[0x1eee7c]!=0xff||b[0x1eee7d]!=0x15||int64_t(0x1eee82)+d!=0xb86b30)return false;}
- if(ssc_creator::hash(b+0x2b6960,0x355)!=0x7575a1969d595827ULL||ssc_creator::hash(b+0x214799,0x30)!=0x5b78a28c4e622539ULL)return false;
- if(ssc_creator::hash(b+0x851470,0x49fe)!=0x149708ffc098a295ULL||ssc_creator::hash(b+0x84db30,0x393b)!=0xff0c93440c35b2ceULL||ssc_creator::hash(b+0x84aac0,0xdb4)!=0x503437922025de90ULL)return false;
- for(auto function:{std::pair<uint32_t,uint64_t>{0x589800,0x15878155ff1f814eULL},{0x58ee20,0xc6f9ce3316a3e5a7ULL},{0x849770,0xa54b0b348186782bULL}}){size_t length=function.first==0x589800?0x1e09:function.first==0x58ee20?0xa3e:0x1344;if(ssc_creator::hash(b+function.first,length)!=function.second)return false;}
- for(uint32_t site:{0x58994au,0x589964u,0x58ef6fu,0x58ef88u,0x84a28cu,0x84a2a6u,0x851b61u,0x851b7bu,0x851025u,0x85103eu,0x84abe8u,0x84ac02u,0x856746u,0x856760u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdee870)return false;}
- if(ssc_creator::hash(b+0x432020,0x2e5)!=0x570ed3337ead1dbdULL)return false;
- if(ssc_creator::hash(b+0x1f0de0,0x1d1)!=0xd5cabe9bb72add42ULL)return false;
- for(uint32_t site:{0x1f004bu,0x1f02efu,0x1f0f11u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdee868)return false;}
- if(ssc_creator::hash(b+0x451350,0x490)!=0x313af75a90d76edaULL||ssc_creator::hash(b+0x1eece0,6566)!=0x88fcb9cbde401666ULL||ssc_creator::hash(b+0x3b8cf0,0x1f8c)!=0xe1460861b377faULL)return false;
- for(auto pair:{std::pair<uint32_t,uint32_t>{0x1ef481,0x451350},{0x1f05c3,0x3b8cf0},{0x2147a0,0x2b6960},{0x1aa293,0x1aa350}}){int32_t d=0;std::memcpy(&d,b+pair.first+1,4);if(b[pair.first]!=0xe8||int64_t(pair.first)+5+d!=pair.second)return false;}return true;
+ if(size<0x86760c)return false;
+ const unsigned char caller[]={0x0,0xf,0x28,0xc2,0xf2,0xf,0x59,0xd8,0xf2,0xf,0x11,0x1d,0xc,0xf4,0x74,0x0,0xe8,0x1f,0x78,0x98,0xff,0x40,0x32,0xff,0xf2,0xf,0x11,0x35,0xfc,0xf3,0x74,0x0};
+ if(std::memcmp(b+0x8675ec,caller,sizeof caller)!=0)return false;
+ if(ssc_creator::hash(b+0x856f20,0x1b36)!=0x7fc2216c075ad9e2ULL)return false;
+ if(ssc_creator::hash(b+0x1aa470,0x7e7)!=0xfe60ecdaac08d3faULL)return false;
+ {int32_t d=0;std::memcpy(&d,b+0x1eefbe,4);if(b[0x1eefbc]!=0xff||b[0x1eefbd]!=0x15||int64_t(0x1eefc2)+d!=0xb87b30)return false;}
+ if(ssc_creator::hash(b+0x2b6e40,0x355)!=0x55ead16cea95084cULL||ssc_creator::hash(b+0x2149a9,0x30)!=0x20236b264630ee95ULL)return false;
+ if(ssc_creator::hash(b+0x8520c0,0x49fe)!=0x7542e97e474120eULL||ssc_creator::hash(b+0x84e780,0x393b)!=0x22161414629e4234ULL||ssc_creator::hash(b+0x84b710,0xdb4)!=0xc8cea856b23f0da8ULL)return false;
+ for(auto function:{std::pair<uint32_t,uint64_t>{0x58a000,0xd8c986f94a040716ULL},{0x58f620,0xceaa15597eeb5105ULL},{0x84a3c0,0x8077b35827c63d84ULL}}){size_t length=function.first==0x58a000?0x1e09:function.first==0x58f620?0xa3e:0x1344;if(ssc_creator::hash(b+function.first,length)!=function.second)return false;}
+ for(uint32_t site:{0x58a14au,0x58a164u,0x58f76fu,0x58f788u,0x84aedcu,0x84aef6u,0x8527b1u,0x8527cbu,0x851c75u,0x851c8eu,0x84b838u,0x84b852u,0x857396u,0x8573b0u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdef870)return false;}
+ if(ssc_creator::hash(b+0x432770,0x2e5)!=0xf5bb1e74dfeb570eULL)return false;
+ if(ssc_creator::hash(b+0x1f0f20,0x1d1)!=0xc66c0b3d66241a5bULL)return false;
+ for(uint32_t site:{0x1f018bu,0x1f042fu,0x1f1051u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdef868)return false;}
+ if(ssc_creator::hash(b+0x451aa0,0x490)!=0xc53c9ca71d50382cULL||ssc_creator::hash(b+0x1eee20,6566)!=0x83da1a01876234a2ULL||ssc_creator::hash(b+0x3b9440,0x1f8c)!=0xafac4074918fad1dULL)return false;
+ for(auto pair:{std::pair<uint32_t,uint32_t>{0x1ef5c1,0x451aa0},{0x1f0703,0x3b9440},{0x2149b0,0x2b6e40},{0x1aa3b3,0x1aa470}}){int32_t d=0;std::memcpy(&d,b+pair.first+1,4);if(b[pair.first]!=0xe8||int64_t(pair.first)+5+d!=pair.second)return false;}return true;
 }
 inline bool attach(){
  auto b=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));if(!b)return false;auto dos=reinterpret_cast<IMAGE_DOS_HEADER*>(b);if(dos->e_magic!=IMAGE_DOS_SIGNATURE)return false;auto nt=reinterpret_cast<IMAGE_NT_HEADERS*>(b+dos->e_lfanew);if(nt->Signature!=IMAGE_NT_SIGNATURE||!matches(b,nt->OptionalHeader.SizeOfImage))return false;
- base=reinterpret_cast<uintptr_t>(b);ground_supported=ssc_creator::hash(b+0x582480,0x229)==0xccf1fd542e47e47eULL;unsigned char* bridge=nullptr;
- native_time_scale=reinterpret_cast<TimeScale>(b+0x2b6960);
- native_scene=reinterpret_cast<Scene>(b+0x1eece0);
- native_debug=reinterpret_cast<DebugDraw>(b+0x1aa350);
- native_listener=*reinterpret_cast<Listener3f*>(b+0xb86b30);
- native_spectator_request=reinterpret_cast<SpectatorRequest>(b+0x432020);
+ base=reinterpret_cast<uintptr_t>(b);ground_supported=ssc_creator::hash(b+0x582c80,0x229)==0x3c30dc3166cbd79dULL;unsigned char* bridge=nullptr;
+ native_time_scale=reinterpret_cast<TimeScale>(b+0x2b6e40);
+ native_scene=reinterpret_cast<Scene>(b+0x1eee20);
+ native_debug=reinterpret_cast<DebugDraw>(b+0x1aa470);
+ native_listener=*reinterpret_cast<Listener3f*>(b+0xb87b30);
+ native_spectator_request=reinterpret_cast<SpectatorRequest>(b+0x432770);
  for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((base+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));
  if(!bridge)return false;
  uintptr_t hooks[]={reinterpret_cast<uintptr_t>(center),reinterpret_cast<uintptr_t>(hud),reinterpret_cast<uintptr_t>(view),reinterpret_cast<uintptr_t>(view),reinterpret_cast<uintptr_t>(view),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(time_scale),reinterpret_cast<uintptr_t>(listener),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(scene)};const unsigned char jump[]={0xff,0x25,0,0,0,0};
  for(int i=0;i<22;++i){std::memcpy(bridge+16*i,jump,6);std::memcpy(bridge+16*i+6,&hooks[i],8);}DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,352);
- unsigned char* sites[]={b+0x1ef481,b+0x1f05c3,b+0x1f004b,b+0x1f02ef,b+0x1f0f11,b+0x58994a,b+0x589964,b+0x58ef6f,b+0x58ef88,b+0x84a28c,b+0x84a2a6,b+0x851b61,b+0x851b7b,b+0x851025,b+0x85103e,b+0x84abe8,b+0x84ac02,b+0x2147a0,b+0x1eee7c,b+0x856746,b+0x856760,b+0x86699c};DWORD protection[22]{};const size_t lengths[]={5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,6,6,6,5};
+ unsigned char* sites[]={b+0x1ef5c1,b+0x1f0703,b+0x1f018b,b+0x1f042f,b+0x1f1051,b+0x58a14a,b+0x58a164,b+0x58f76f,b+0x58f788,b+0x84aedc,b+0x84aef6,b+0x8527b1,b+0x8527cb,b+0x851c75,b+0x851c8e,b+0x84b838,b+0x84b852,b+0x2149b0,b+0x1eefbc,b+0x857396,b+0x8573b0,b+0x8675fc};DWORD protection[22]{};const size_t lengths[]={5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,6,6,6,5};
  for(int i=0;i<22;++i)if(!VirtualProtect(sites[i],lengths[i],PAGE_EXECUTE_READWRITE,&protection[i])){for(int j=0;j<i;++j){DWORD ignored;VirtualProtect(sites[j],lengths[j],protection[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
- original_center=reinterpret_cast<Center>(b+0x451350);original_hud=reinterpret_cast<Hud>(b+0x3b8cf0);
+ original_center=reinterpret_cast<Center>(b+0x451aa0);original_hud=reinterpret_cast<Hud>(b+0x3b9440);
  for(int i=0;i<22;++i){int32_t d=int32_t(reinterpret_cast<uintptr_t>(bridge+16*i)-reinterpret_cast<uintptr_t>(sites[i]+5));sites[i][0]=0xe8;std::memcpy(sites[i]+1,&d,4);if(lengths[i]==6)sites[i][5]=0x90;FlushInstructionCache(GetCurrentProcess(),sites[i],lengths[i]);}
  for(int i=21;i>=0;--i){DWORD ignored;VirtualProtect(sites[i],lengths[i],protection[i],&ignored);}return true;
 }
