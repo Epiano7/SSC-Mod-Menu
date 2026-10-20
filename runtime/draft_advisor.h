@@ -5,6 +5,7 @@
 #include "private_license.h"
 #include "freecam.h"
 #include "local_recorder.h"
+#include "draft_training.h"
 namespace ssc_advisor {
 inline bool enabled=true,attached=false,use_api=true;
 // Entitlement is independent of the Bot Highlight module's enabled preference.
@@ -14,11 +15,14 @@ inline uintptr_t cached_actor=0,cached_world=0;
 inline const wchar_t* advice_status=L"Waiting for your build";
 inline int recommended=-1,recommended_icon=-1;
 inline uintptr_t game=0;
-inline bool (*selection_held)()=+[](){return (GetAsyncKeyState(VK_CONTROL)&0x8000)!=0;};
+// Follow the native expanded-panel state, not a physical key. In build 26047692,
+// the guarded panel routine at 3e2277 permits skill input at expansion >= 32.
+inline bool selection_open(){float expansion=0;return ssc_freecam::read(game+0xfb051c,expansion)&&std::isfinite(expansion)&&expansion>=32.f&&expansion<=64.f;}
 inline Build last_build;inline bool cached=false;inline std::array<Score,54> cached_scores{},cached_mutation_scores{};
 struct AuditState {Build build;std::array<int,54> offers{};std::array<Score,54> scores{};unsigned count=0,segment=0;int best=-1;bool valid=false,api_valid=false,api_used=false;std::string match;};
 inline AuditState skill_audit,stim_audit;
 inline void audit(bool mutation,const Build& build,const std::array<int,54>& offers,unsigned count,int best,const std::array<Score,54>& scores,bool api_valid=false,bool api_used=false){
+ if(allowed()&&ssc_training::enabled)ssc_training::round.advice(mutation,build,offers,count,best,scores,api_valid,api_used,GetTickCount64());
  auto& record=ssc_record::state();if(!allowed()||!record.enabled||!record.match_open||count>54)return;
  auto& old=mutation?stim_audit:skill_audit;
  bool changed=!old.valid||old.match!=record.match_id||old.segment!=record.segment||!same_build(old.build,build)||old.count!=count||old.best!=best||old.api_valid!=api_valid||old.api_used!=api_used;
@@ -98,7 +102,7 @@ using Panel=void(*)(uintptr_t,uintptr_t,float,uint64_t,char,char);
 inline Panel original_panel=nullptr;
 struct DraftBorder {int x=0,y=0,w=0,h=0,width=0,height=0;bool pending=false;};
 inline DraftBorder border;
-inline bool border_ready(){return border.pending&&allowed()&&selection_held()&&!ssc_geri::enabled.load()&&!ssc_freecam::clean_view();}
+inline bool border_ready(){return border.pending&&allowed()&&selection_open()&&!ssc_geri::enabled.load()&&!ssc_freecam::clean_view();}
 inline void render_border(){
  const bool show=border_ready();auto box=border;border.pending=false;if(!show)return;
  const auto [x,y,w,h,width,height,pending]=box;(void)pending;
@@ -108,16 +112,16 @@ inline void render_border(){
 inline void panel(uintptr_t context,uintptr_t output,float a,uint64_t b,char c,char d){
  original_panel(context,output,a,b,c,d);
  recommended=-1;border.pending=false;
- if(!allowed()||!selection_held()||ssc_geri::enabled.load()||ssc_freecam::clean_view())return;
+ if(!allowed()||!selection_open()||ssc_geri::enabled.load()||ssc_freecam::clean_view())return;
  ssc_perf::Scope timing(ssc_perf::advisor);Build build;std::array<int,54> offers{};std::array<unsigned,54> slots{};unsigned count=0;if(!snapshot(context,build,offers,count,&slots))return;
  uintptr_t actor=0,world=0;if(!read(context,actor)||!read(game+0xde85d0,world))return;prepare(build,actor,world);
  auto scores=cached_scores;bool api_valid=false,api_used=false;
- // Highlight only the interactive Ctrl draft, never the collapsed preview.
+ // Highlight only the interactive native draft, never the collapsed preview.
  if(use_api){auto key=api_key(build,offers,count);if(!key.empty()){auto answer=api().request(key,GetTickCount64());api_valid=answer.valid;if(answer.valid){for(unsigned i=0;i<count;++i){auto id=size_t(offers[i]);if(answer.samples[id]>=5){scores[id].value+=2.f*std::tanh(answer.edge[id]/10.f);api_used=true;}}advice_status=L"Local research + API";}}}
  recommended=choose(scores,offers,count);if(recommended<0)return;
  for(unsigned i=0;i<count;++i)if(offers[i]==recommended){uintptr_t button=context+0x310+slots[i]*0x170;int x=0,y=0,w=0,h=0,ax=0,ay=0,width=0,height=0;
   // +0x44 gates native input after a click; it is not panel visibility.
-  // Held Ctrl, pending points, current displayed offers and the transition
+  // Expanded panel, pending points, current displayed offers and the transition
   // guard above determine whether this recommendation is visible.
   if(!read(button+0x14,x)||!read(button+0x18,y)||!read(button+0x1c,w)||!read(button+0x20,h)||!read(button+0x70,ax)||!read(button+0x74,ay)||!read(game+0xfafa40,width)||!read(game+0xfafa44,height)||w<=0||h<=0||width<=0||height<=0)return;
   x+=ax==1?width/2:ax==2?width:0;y+=ay==1?height/2:ay==2?height:0;
@@ -140,7 +144,7 @@ inline void icon(uintptr_t renderer,uintptr_t sheet,float x,float y,float w,floa
 }
 inline bool attach(){
  game=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));auto bytes=reinterpret_cast<unsigned char*>(game);
- if(ssc_creator::hash(bytes+0x3e0290,14780)!=0x5da8b1450cda7607ULL||!ssc_compat::supports(128)||!ssc_record::validate_build_code(game,[](uintptr_t p,auto& v){return read(p,v);})||ssc_creator::hash(bytes+0x9511d0,1212)!=0x1dd1b583ce4ca2b8ULL||ssc_creator::hash(bytes+0x3db8d0,14692)!=0x4a4f120bf159e587ULL)return false;
+ if(!ssc_compat::supports(128)||ssc_creator::hash(bytes+0x3e0290,14780)!=0x5da8b1450cda7607ULL||!ssc_record::validate_build_code(game,[](uintptr_t p,auto& v){return read(p,v);})||ssc_creator::hash(bytes+0x9511d0,1212)!=0x1dd1b583ce4ca2b8ULL||ssc_creator::hash(bytes+0x3db8d0,14692)!=0x4a4f120bf159e587ULL)return false;
  struct Site{uint32_t call,target;uintptr_t hook;};const Site sites[]={{0x3d9504,0x3e0290,reinterpret_cast<uintptr_t>(panel)},{0x3e0693,0x3db8d0,reinterpret_cast<uintptr_t>(draw)},{0x3dea60,0x488040,reinterpret_cast<uintptr_t>(icon)}};
  for(auto s:sites){int32_t rel=0;std::memcpy(&rel,bytes+s.call+1,4);if(bytes[s.call]!=0xe8||int64_t(s.call)+5+rel!=s.target)return false;}
  unsigned char* bridge=nullptr;for(uintptr_t n=0x10000;n<0x60000000&&!bridge;n+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((game+n)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
@@ -150,4 +154,3 @@ inline bool attach(){
  for(unsigned i=0;i<3;++i){int32_t rel=int32_t(reinterpret_cast<uintptr_t>(bridge+i*16)-(game+sites[i].call+5));std::memcpy(bytes+sites[i].call+1,&rel,4);FlushInstructionCache(GetCurrentProcess(),bytes+sites[i].call,5);DWORD ignored;VirtualProtect(bytes+sites[i].call,5,protections[i],&ignored);}FlushInstructionCache(GetCurrentProcess(),bridge,48);return true;
 }
 }
-

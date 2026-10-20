@@ -7,6 +7,10 @@ std::string response(Json appearance={{"mode","solid"},{"colors",Json::array({0x
  return Json{{"ok",true},{"profiles",Json::array({{{"account_key","player_one"},{"style",appearance},{"ttl_seconds",30}}})}}.dump();
 }
 int main(){
+ assert(fresh({100000,100000},{99000,101000},30000));
+ assert(fresh({100000,100000},{200000,101000},30000));
+ assert(!fresh({100000,100000},{99000,130000},30000));
+ assert(!fresh({100000,100000},{100001,99999},30000));
  {Cache batches;Style value;batches.context(321,true);
   auto first=batches.begin({"player_one"},start);assert(batches.accept(first,response(),start));
   auto second=batches.begin({"other"},start);assert(batches.accept(second,"{\"ok\":true,\"profiles\":[]}",start));
@@ -19,12 +23,13 @@ int main(){
  assert(c.accept(p,response(),{100200,100200}));assert(c.get("player_one",{100300,100300},s)&&s.colors[0]==0x55dcaf);
  assert(!c.get("player",{100300,100300},s));assert(!c.get("Player_one",{100300,100300},s));
  assert(!c.accept(p,response(),{100400,100400})); // replay
- for(auto now:{Time{130000,130000},Time{99999,100100},Time{100100,99999},Time{130000,100100},Time{100100,130000}}){
+ for(auto now:{Time{130000,130000},Time{100100,99999},Time{100100,130000}}){
   Cache isolated;isolated.context(123,true);auto request=isolated.begin({"player_one"},start);assert(isolated.accept(request,response(),start));
   assert(!isolated.get("player_one",now,s));assert(!isolated.get("player_one",start,s));
  }
  c.context(124,true);assert(!c.get("player_one",start,s));assert(!c.accept(p,response(),start));
  p=c.begin({"player_one"},start);c.context(0,true);assert(!c.accept(p,response(),start));
+ {Cache corrected;corrected.context(123,true);auto request=corrected.begin({"player_one"},start);assert(corrected.accept(request,response(),start));assert(corrected.get("player_one",{90000,101000},s));assert(corrected.get("player_one",{200000,102000},s));assert(!corrected.get("player_one",{200000,130000},s));}
  c.context(124,true);p=c.begin({"player_one"},start);c.context(124,false);assert(!c.accept(p,response(),start));
  c.context(124,true);p=c.begin({"player_one"},start);auto newer=c.begin({"player_one"},start);assert(!c.accept(p,response(),start));assert(c.accept(newer,response(),start));
  p=c.begin({"player_one"},start);assert(c.accept(p,"{\"ok\":true,\"profiles\":[]}",start));assert(!c.get("player_one",start,s));

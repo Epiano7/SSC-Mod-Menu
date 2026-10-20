@@ -14,7 +14,8 @@ struct Net {
   if(std::wstring(path).find(L"/status")!=std::wstring::npos)return {200,"{\"ok\":true,\"api_version\":1,\"app_id\":308600,\"service\":\"shared-cosmetics\",\"lease_seconds\":120}"};
   if(std::wstring(path).find(L"/publish")!=std::wstring::npos){auto j=Json::parse(body);return {200,Json{{"ok",true},{"account_key",j["account_key"]},{"lease_seconds",j["operation"]["action"]=="remove"?0:120}}.dump()};}
   {std::lock_guard<std::mutex> lock(seen_mutex);auto j=Json::parse(body);for(auto& a:j["accounts"])seen.insert(a.get<std::string>());}while(blocking&&!stopped)Sleep(10);
-  return {200,"{\"ok\":true,\"profiles\":[{\"account_key\":\"other\",\"style\":{\"colors\":[5623039],\"mode\":\"solid\"},\"ttl_seconds\":30}]}"};}
+  auto request=Json::parse(body);Json profiles=Json::array();for(auto& account:request["accounts"])if(account=="other")profiles.push_back(Json{{"account_key","other"},{"style",{{"colors",Json::array({5623039})},{"mode","solid"}}},{"ttl_seconds",30}});
+  return {200,Json{{"ok",true},{"profiles",profiles}}.dump()};}
  void stop(){stopped=true;}void cancel(){stop();}
 };
 int main(){

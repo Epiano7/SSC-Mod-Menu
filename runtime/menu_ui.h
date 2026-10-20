@@ -1,3 +1,4 @@
+#include "cosmetics_notice.h"
 // Included inside the runtime's private namespace. No game code addresses or bundled assets.
 constexpr bool developer_tools=false;
 int menu_hotkey=VK_RSHIFT;bool menu_binding=false;int menu_binding_release=0;
@@ -22,7 +23,7 @@ bool opened=false,clock_enabled=false,dirty=true,save_failed=false,suppress_esca
 bool animations=true,sound_requested=false,cosmetic_requested=false,match_sound_level=true;
 bool shared_receive=true,shared_publish=true;bool shared_defaults_applied=false;
 std::wstring shared_notice;
-std::string cosmetics_notice_account;bool cosmetics_notice_shown=false;
+std::string cosmetics_notice_account;bool cosmetics_notice_shown=false;ssc_cosmetic_notice::Policy cosmetics_policy;
 bool rpc_requested=false,rpc_timer=true,rpc_rating=true,rpc_editing=false,rpc_select_all=false,rpc_error=false;
 std::string private_code;bool private_editing=false;
 std::string private_label="Bot highlight",private_label_buffer;bool private_label_editing=false;
@@ -115,6 +116,7 @@ void save() {
     out<<"quick_modules="<<quick_mask<<"\nquick_freecam_known=1\n";
     out<<"ignored_update_version="<<ssc_update::ignored_version<<"\n";
     out<<"cosmetics_policy_seen="<<cosmetics_notice_account<<"\n";
+    out<<"cosmetics_notice_migration="<<cosmetics_policy.existing_users<<"\ncosmetics_notice_accounts="<<cosmetics_policy.encode()<<"\n";
     out<<"show_update_notes="<<show_update_notes<<"\nseen_release_notes="<<seen_release_notes<<"\n";
     out<<"camera_relative_driving="<<ssc_vehicle::enabled.load()<<"\n";
     out<<"freecam_hide_shadows="<<ssc_freecam::hide_shadows<<"\n";
@@ -132,6 +134,7 @@ void save() {
     out<<"hide_crosshair="<<ssc_creator::hide_crosshair.load()<<"\n";
     out<<"draft_advisor="<<ssc_advisor::enabled<<"\n";
     out<<"draft_advisor_api="<<ssc_advisor::use_api<<"\n";
+    out<<"draft_training_upload="<<ssc_training::enabled<<"\n";
     out<<"geri_mode="<<ssc_geri::enabled.load()<<"\n";
     out<<"cooldown_pulse="<<ssc_cooldown::settings.enabled<<"\ncooldown_duration_ms="<<ssc_cooldown::settings.duration_ms<<"\n";
     out<<"hud_hover_fade="<<ssc_hud::hover_fade<<"\n";out<<"hud_enabled="<<ssc_hud::enabled<<"\n";for(const auto& item:ssc_hud::items){out<<"hud_box_"<<item.key<<"="<<item.home_x<<","<<item.home_y<<","<<item.w<<","<<item.h<<"\n";out<<"hud_"<<item.key<<"="<<item.x<<","<<item.y<<","<<item.scale<<"\n";}
@@ -164,7 +167,7 @@ void move_hud(float x,float y){
 }
 void load_settings() {
     ssc_chat::load(state_dir);ssc_auto::load(state_dir);
-    std::ifstream in(state_dir/L"menu.ini");std::string line;bool version2=false,quick_freecam_known=false;
+    std::ifstream in(state_dir/L"menu.ini");std::string line;const bool had_settings=in.good();bool notice_known=false;bool version2=false,quick_freecam_known=false;
     // Defaults are inert. Only v2 carries the test clock forward.
     while(std::getline(in,line)) {
         auto at=line.find('=');if(at==std::string::npos)continue;
@@ -177,6 +180,8 @@ void load_settings() {
         if(key.rfind("hud_",0)==0){for(auto& item:ssc_hud::items)if(key==std::string("hud_")+item.key){float x,y,z;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f%c",&x,&y,&z,&extra)==3){item.x=x;item.y=y;item.scale=z;ssc_hud::constrain(item);}}continue;}
         if(key=="ignored_update_version"){if(ssc_update::valid_version(value))ssc_update::ignored_version=value;continue;}
         if(key=="rpc_id"){if(value.empty()||ssc_rpc::valid_id(value))rpc_id=value.empty()?ssc_rpc::bundled_application_id:value;continue;}
+        if(key=="cosmetics_notice_migration"){notice_known=true;cosmetics_policy.existing_users=value=="1";continue;}
+        if(key=="cosmetics_notice_accounts"){cosmetics_policy.parse(value);continue;}
         if(key=="cosmetics_policy_seen"){if(ssc_shared::account_valid(value))cosmetics_notice_account=value;continue;}
         try {size_t used=0;number=std::stoi(value,&used);if(used!=value.size())continue;}catch(...){continue;}
         if(key=="quick_modules"&&number>=0&&number<256)quick_mask=unsigned(number);
@@ -202,6 +207,7 @@ void load_settings() {
         else if(key=="hide_crosshair")ssc_creator::hide_crosshair=number!=0;
         else if(key=="draft_advisor")ssc_advisor::enabled=number!=0;
         else if(key=="draft_advisor_api")ssc_advisor::use_api=number!=0;
+        else if(key=="draft_training_upload")ssc_training::enabled=number!=0;
         else if(key=="geri_mode")ssc_geri::enabled=number!=0;
         else if(key=="cooldown_pulse")ssc_cooldown::settings.enabled=number!=0;
         else if(key=="cooldown_duration_ms"&&(number==1000||number==1500||number==2500))ssc_cooldown::settings.duration_ms=unsigned(number);
@@ -229,6 +235,7 @@ void load_settings() {
     }
     // Windows readers do not grant delete sharing: close before atomic replacement.
     in.close();
+    if(!notice_known)cosmetics_policy.migrate(had_settings,welcome_seen,!cosmetics_notice_account.empty());
     bool migrate_sharing=!shared_defaults_applied;
     if(migrate_sharing){shared_receive=shared_publish=true;shared_defaults_applied=true;}
     if(!quick_freecam_known)quick_mask|=64;
@@ -303,7 +310,7 @@ void poll_live_hud_drag(HWND window){
 }
 void live_hud_wheel(int delta,int hovered_item){if(hud_drag>=0){finish_hud_drag();ReleaseCapture();}if(hovered_item>=0)ssc_hud::selected=hovered_item;auto& a=ssc_hud::items[ssc_hud::selected];a.scale*=std::pow(1.1f,float(delta)/WHEEL_DELTA);ssc_hud::constrain(a);save();}
 bool module_ready(int id){
-    if(id==998||id==1001)return ssc_advisor::private_access();
+    if(id==998||id==1001||id==1002)return ssc_advisor::private_access();
     if(id==510||id==511||(id>=530&&id<=537))return ssc_names::private_visible();
     if(!ssc_compat::initialized)return true;
     return id==981?ssc_vehicle::attached:id==586?ssc_creator::attached:id==570?ssc_geri::attached:id==330?ssc_auto::supported():id==80?ssc_sound::attached:id==81?ssc_names::attached:id==83?presence_supported:(id==86||id==193)?ssc_hud::attached:true;
@@ -368,6 +375,7 @@ void activate(int id) {
     else if(id==568&&ssc_names::private_visible()){private_label="Bot highlight";private_label_editing=false;save();}
     else if(id==997){settings_page=28;}
     else if(id==1001){ssc_advisor::use_api=!ssc_advisor::use_api;save();}
+    else if(id==1002){ssc_training::enabled=!ssc_training::enabled;save();}
     else if(id==998){if(ssc_advisor::attached){ssc_advisor::enabled=!ssc_advisor::enabled;save();}}
     else if(id==1601){credits_popup=true;credits_page=0;dirty=true;}
     else if(id==571){credits_popup=false;dirty=true;}
@@ -1049,12 +1057,8 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"v0.1.20",cyan);
+        text(50,153,L"v0.1.21",cyan);
         bullet(201,L"Updated compatibility for the latest game build" );
-        bullet(233,L"Shared colors now follow your DLC and Acid Pass access" );
-        bullet(265,L"More consistent names in chat, cars and leaderboards" );
-        bullet(297,L"Rebind the mod menu key in Interface settings" );
-        bullet(329,L"Fixed queued draft highlights and menu navigation" );
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
@@ -1277,8 +1281,10 @@ void paint_panel() {
             text(282,276,L"Uses your class, skills and current mutations.",muted,false,15);
             text(282,322,L"API STATISTICS",muted,false,16);toggle(1001,978,312,ssc_advisor::use_api);
             text(282,368,L"Sends visible offers and build IDs to skillshotcity.gg.",muted,false,14);
-            text(282,414,L"Mutation advice uses local research; recommendations are estimates.",muted,false,13);
-            text(282,460,L"Only visible choices are highlighted. Nothing is auto-picked.",muted,false,14);
+            text(282,410,L"SHARE ROUND DATA FOR RESEARCH",muted,false,16);toggle(1002,978,400,ssc_training::enabled);
+            text(282,452,L"Auto-sends builds, advice, choices and round stats to our server.",muted,false,13);
+            text(282,480,L"No names, Steam IDs, chat or PC details. Separate from recordings.",muted,false,13);
+            text(282,555,ssc_training::status(),muted,false,13);
             text(282,520,ssc_advisor::attached?ssc_advisor::advice_status:L"Unavailable for this game build.",muted,false,14);
             }
         } else if(settings_page==26){
@@ -1466,7 +1472,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.20",cyan);
+            text(266,157,L"0.1.21",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
