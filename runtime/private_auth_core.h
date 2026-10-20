@@ -90,7 +90,9 @@ inline Grant verify(const std::string& body,const Keys& keys,Session& s,Account 
  if(license){require(string(claims,"auth_method")=="activation_code_device_key"&&claims.at("steam_identity_verified").is_boolean()&&!claims.at("steam_identity_verified").get<bool>());}
  require(string(claims,"challenge")==s.challenge&&string(claims.at("cnf"),"jkt")==s.thumb);
  auto iat=integer(claims,"iat"),nbf=integer(claims,"nbf"),exp=integer(claims,"exp");
- require(iat>=s.start.wall&&nbf==iat&&iat<=now.wall&&now.wall<exp&&exp-iat>0&&exp-iat<=120);
+ // The signed response is bound to this fresh challenge. Permit a client clock
+ // up to five seconds ahead; expiry and monotonic lifetime remain strict.
+ require(iat>=s.start.wall-(license?5:0)&&nbf==iat&&iat<=now.wall&&now.wall<exp&&exp-iat>0&&exp-iat<=120);
  auto id=string(claims,"jti",22);require(encoded(id,16));
  // Captured before network activity; neither slow responses nor clock rollback extend this deadline.
  require(exp>s.start.wall&&exp-s.start.wall<=180);

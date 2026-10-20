@@ -44,7 +44,8 @@ inline Json encode(const Style& s){
 }
 struct Time {int64_t wall_ms=0;uint64_t mono_ms=0;};
 inline bool fresh(Time start,Time now,uint64_t duration){
- return now.wall_ms>=start.wall_ms&&now.mono_ms>=start.mono_ms&&uint64_t(now.wall_ms-start.wall_ms)<duration&&now.mono_ms-start.mono_ms<duration;
+ // Leases are elapsed durations, independent of wall-clock synchronization.
+ return now.mono_ms>=start.mono_ms&&now.mono_ms-start.mono_ms<duration;
 }
 struct Pending {uint64_t generation=0,request=0;Time start{};std::set<std::string> accounts;};
 class Cache {

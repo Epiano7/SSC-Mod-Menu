@@ -31,6 +31,7 @@
 #include "quick_chat.h"
 #include "auto_messages_source.h"
 #include "tracking_recording.h"
+#include "draft_training_source.h"
 #include "statistics_reader.h"
 #include "update_module.h"
 #include "diagnostics.h"
@@ -125,7 +126,8 @@ void render(HDC dc) {
     if(private_visible!=private_was_visible){private_was_visible=private_visible;dirty=true;controls.clear();pressed=hovered=keyboard_focus=0;if(!private_visible&&settings_page==18)show_manager(-1);}
     static ULONGLONG diagnostics_at=0;
     if(developer_tools&&now-diagnostics_at>15000){diagnostics_at=now;char report[160];snprintf(report,sizeof(report),"Draw diagnostics: rainbow=%u audio=%u",ssc_names::cosmetic_draws.load(),ssc_sound::substituted.load());log(report);}
-    ssc_auto::tick(now,ssc_record::state().enabled);
+    ssc_auto::tick(now,ssc_record::state().enabled||(ssc_training::enabled&&ssc_advisor::private_access()));
+    ssc_training::tick(now,state_dir);
     ssc_advisor::tick();
     if(rpc_preview.phase==1)ssc_freecam::stop();
     bool was_freecam=ssc_freecam::state.active;auto pending_freecam=ssc_freecam::pending_since;
@@ -139,7 +141,7 @@ void render(HDC dc) {
     static ULONGLONG update_at=0;
     if(now-update_at>=1000){update_at=now;
         if(presence_supported&&rpc_preview.phase==1&&!welcome_seen&&!opened){opened=true;show_manager(8);}
-        if(presence_supported&&rpc_preview.phase==1&&!opened&&!cosmetics_notice_shown&&ssc_cosmetic_access::account_id&&cosmetics_notice_account!=ssc_cosmetic_access::account_key){cosmetics_notice_shown=true;show_cosmetics_notice();}
+        if(presence_supported&&rpc_preview.phase==1&&!opened&&ssc_cosmetic_access::account_id&&ssc_cosmetic_access::tier(ssc_cosmetic_access::current)!=ssc_cosmetic_access::Tier::checking&&!cosmetics_policy.known(ssc_cosmetic_access::account_id)){bool show=cosmetics_policy.consume(ssc_cosmetic_access::account_id);save();if(show){cosmetics_notice_shown=true;show_cosmetics_notice();}}
         if(update_notes_due(rpc_preview.phase)){opened=true;show_manager(14);}
         if(presence_supported&&rpc_preview.phase==1&&!ssc_update::checked)ssc_update::check(state_dir);
         if(ssc_update::poll(window,rpc_preview.phase==1||!presence_supported))dirty=true;
@@ -306,8 +308,9 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
     ssc_diagnostics::initialize(state_dir);ssc_auth::service().configure(state_dir);ssc_shared::service().configure(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
-    log("SSC Mod Menu 0.1.18 startup");log_game_build();
+    log("SSC Mod Menu 0.1.21 startup");log_game_build();
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
+    if(!supported){native_supported=false;log("Unsupported executable; runtime inactive");return;}
     presence_supported=(supported&4)!=0;native_supported=true;
     log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");
     char result[128];std::snprintf(result,sizeof(result),"Compatibility: cosmetics=%d HUD=%d presence=%d scan=%llums",int((supported&1)!=0),int((supported&2)!=0),int(presence_supported),static_cast<unsigned long long>(GetTickCount64()-started));log(result);

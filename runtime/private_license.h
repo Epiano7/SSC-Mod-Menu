@@ -34,14 +34,14 @@ struct Store {
  }
 };
 // An untrusted timestamp may only delay validation, never grant access. This
-// handles a server clock up to two seconds ahead without relaxing iat <= now.
-inline int64_t pending_issue_time(const std::string& body,int64_t now){try{auto envelope=parse(body);auto jwt=string(envelope,"authorization",8192);auto a=jwt.find('.'),b=jwt.find('.',a==std::string::npos?0:a+1);require(a!=std::string::npos&&b!=std::string::npos);auto bytes=un64(jwt.substr(a+1,b-a-1),6144);auto claims=parse(std::string(bytes.begin(),bytes.end()));auto iat=integer(claims,"iat");return iat>now&&iat-now<=2?iat:now;}catch(...){return now;}}
+// handles a server clock up to five seconds ahead without relaxing iat <= now.
+inline int64_t pending_issue_time(const std::string& body,int64_t now){try{auto envelope=parse(body);auto jwt=string(envelope,"authorization",8192);auto a=jwt.find('.'),b=jwt.find('.',a==std::string::npos?0:a+1);require(a!=std::string::npos&&b!=std::string::npos);auto bytes=un64(jwt.substr(a+1,b-a-1),6144);auto claims=parse(std::string(bytes.begin(),bytes.end()));auto iat=integer(claims,"iat");return iat>now&&iat-now<=5?iat:now;}catch(...){return now;}}
 struct Network {
  ssc_beta::Http http;std::atomic<bool> cancelled{false};
  Network(){http.host=L"sscmmauth.epiano7.dev";}
  ssc_beta::Reply request(const wchar_t* p,const std::string& b){require(b.size()<=8192);cancelled=false;auto reply=http.request(p,b,"");
   if(reply.status==200&&(std::wstring(p)==L"/v2/license/activate"||std::wstring(p)==L"/v2/license/renew")){
-   auto due=pending_issue_time(reply.body,clock_now().wall);auto until=GetTickCount64()+2500;
+   auto due=pending_issue_time(reply.body,clock_now().wall);auto until=GetTickCount64()+5500;
    while(!cancelled&&clock_now().wall<due&&GetTickCount64()<until)Sleep(20);
   }return reply;
  }
@@ -56,7 +56,7 @@ Grant exchange(Net& net,Device& key,const std::string& code,Account a,uint64_t g
  Session session;session.account=a;session.start=now();session.generation=generation;session.pending=true;session.pub=key.pub;session.thumb=key.thumb();
  const std::string purpose=code.empty()?"renew":"activate";
  auto response=net.request(L"/v2/license/challenge",Json{{"steam_id",std::to_string(a.id)},{"device_public_key",b64(key.pub.data(),32)},{"purpose",purpose}}.dump());ok(response);require(current()==a);
- auto j=parse(response.body);metadata(j);require(integer(j,"app_id")==expected_app&&string(j,"purpose")==purpose);session.challenge=string(j,"challenge",32);require(encoded(session.challenge,24));session.challenge_exp=ssc_beta::expiration(j.at("expires_at"));auto t=now();require(session.challenge_exp>t.wall&&session.challenge_exp-t.wall<=62);
+ auto j=parse(response.body);metadata(j);require(integer(j,"app_id")==expected_app&&string(j,"purpose")==purpose);session.challenge=string(j,"challenge",32);require(encoded(session.challenge,24));session.challenge_exp=ssc_beta::expiration(j.at("expires_at"));auto t=now();require(session.challenge_exp>t.wall&&session.challenge_exp-t.wall<=65);
  // Server/local epoch-second boundaries can differ slightly. Never extend
  // the local 60-second wall/monotonic challenge lifetime to match server time.
  session.challenge_exp=std::min(session.challenge_exp,session.start.wall+60);require(session.fresh(t));

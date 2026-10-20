@@ -65,13 +65,15 @@ void lifecycle(){
 }
 int main(int argc,char** argv){assert(argc==2&&sodium_init()>=0);Device d;randombytes_buf(d.seed.data(),32);d.derive();
  auto hinted=[](int64_t when){auto c=Json{{"iat",when}}.dump();return Json{{"authorization","e30."+b64(reinterpret_cast<const unsigned char*>(c.data()),c.size())+".invalid"}}.dump();};
- assert(pending_issue_time(hinted(101),100)==101);assert(pending_issue_time(hinted(103),100)==100);assert(pending_issue_time("not JSON",100)==100);
+ assert(pending_issue_time(hinted(101),100)==101);assert(pending_issue_time(hinted(106),100)==100);assert(pending_issue_time("not JSON",100)==100);
+ for(int skew:{1,3,5}){Server ahead;auto g=license::exchange(ahead,d,ahead.code,ahead.account,0,[&]{auto t=ahead.now;t.wall+=skew;return t;},[&]{return ahead.account;});assert(g.expires==ahead.now.wall+120);}
+ {Server ahead;rejects([&]{license::exchange(ahead,d,ahead.code,ahead.account,0,[&]{auto t=ahead.now;t.wall+=6;return t;},[&]{return ahead.account;});});}
  Server s;auto grant=run(s,d,s.code);assert(s.activation==1&&grant.account==s.account);auto renewed=run(s,d,"");assert(s.renewal==1&&renewed.id!=grant.id);
  Access gate;gate.observe(s.account,s.now);assert(gate.install(grant,gate.generation(),s.now));gate.enable(true,s.account,s.now);assert(gate.active(s.account,s.now));assert(!gate.install(grant,gate.generation(),s.now));assert(!gate.active(s.account,{s.now.wall,s.now.mono+120000}));gate.enable(true,s.account,s.now);assert(!gate.active(s.account,s.now));
  for(auto mutate:std::vector<std::function<void(Json&)>>{
  [](Json& c){c["aud"]="ssc-mod:308600";},[](Json& c){c["iss"]="https://evil";},[](Json& c){c["sub"]="other";},[](Json& c){c["appid"]=480;},[](Json& c){c["permission"]="beta";},[](Json& c){c["auth_method"]="steam_ticket";},[](Json& c){c["steam_identity_verified"]=true;},[](Json& c){c["steam_identity_verified"]=0;},[](Json& c){c["challenge"]="other";},[](Json& c){c["cnf"]["jkt"]="wrong";},[](Json& c){c["exp"]=1800000121;},[](Json& c){c["exp"]=1800000000;},[](Json& c){c["nbf"]=1800000001;},[](Json& c){c["jti"]="bad";}}){Server bad;bad.mutate=mutate;rejects([&]{run(bad,d,bad.code);});}
  {Server skew;skew.challenge_skew=1;auto g=run(skew,d,skew.code);assert(g.expires==skew.now.wall+120);}
- {Server bad;bad.challenge_skew=3;rejects([&]{run(bad,d,bad.code);});}
+ {Server bad;bad.challenge_skew=6;rejects([&]{run(bad,d,bad.code);});}
  {Server bad;bad.bad_sig=true;rejects([&]{run(bad,d,bad.code);});}
  for(unsigned status:{400,401,403,404,413,429,503}){Server bad;bad.error=status;rejects([&]{run(bad,d,bad.code);});}
  rejects([&]{run(s,d,s.code);});s.revoked=true;rejects([&]{run(s,d,"");});

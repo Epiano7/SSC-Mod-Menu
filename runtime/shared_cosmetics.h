@@ -22,9 +22,10 @@ inline const wchar_t* label(Status s){switch(s){
 template<class Identity=ssc_beta::Identity,class Net=Network> class BasicService {
  mutable std::mutex mutex_;std::condition_variable wake_;std::thread worker_;Identity steam_;Net net_;
  std::filesystem::path directory_;Cache cache_;bool stopping_=false,started_=false,receive_=false,share_=false,remove_=false;
- size_t lookup_cursor_=0;uint64_t last_lookup_=0;
+ size_t lookup_cursor_=0;uint64_t last_lookup_=0;unsigned lookup_failures_=0;std::set<std::string> urgent_;
  uint64_t account_=0,generation_=0,next_lookup_=0,next_publish_=0,last_publish_=0;std::string own_,appearance_;Style style_;
  std::vector<std::string> peers_;std::map<std::string,uint64_t> observed_;Status status_=Status::off;
+ void lookup_failed(){lookup_failures_=std::min(lookup_failures_+1,3u);next_lookup_=now().mono_ms+(15000ULL<<(lookup_failures_-1));}
  void work(){
   for(;;){uint64_t id=0,generation=0;std::string own;Style style;bool send=false,remove=false,lookup=false;Pending pending;
    {std::unique_lock<std::mutex> l(mutex_);wake_.wait_for(l,std::chrono::milliseconds(250));if(stopping_)return;
@@ -48,14 +49,15 @@ template<class Identity=ssc_beta::Identity,class Net=Network> class BasicService
    }
    if(lookup){try{
      {std::lock_guard<std::mutex> l(mutex_);require(!stopping_&&generation==generation_&&id==account_&&receive_);std::vector<std::string> batch;
-      for(size_t i=0;i<std::min(size_t(32),peers_.size());++i)batch.push_back(peers_[(lookup_cursor_+i)%peers_.size()]);
+      for(auto i=urgent_.begin();i!=urgent_.end()&&batch.size()<32;){batch.push_back(*i);i=urgent_.erase(i);}
+      for(size_t i=0;i<peers_.size()&&batch.size()<32;++i){auto& peer=peers_[(lookup_cursor_+i)%peers_.size()];if(std::find(batch.begin(),batch.end(),peer)==batch.end())batch.push_back(peer);}
       lookup_cursor_=peers_.empty()?0:(lookup_cursor_+batch.size())%peers_.size();
       pending=cache_.begin(batch,now());}
      current();auto response=net_.request(L"/api/cosmetics/v1/lookup",Json{{"accounts",pending.accounts}}.dump());current();
      std::lock_guard<std::mutex> l(mutex_);if(generation!=generation_||id!=account_)continue;
-     if(response.status==200&&cache_.accept(pending,response.body,now())){if(!share_&&!remove_)status_=Status::ready;}
-     else if(!share_&&!remove_)status_=Status::unavailable;
-    }catch(...){std::lock_guard<std::mutex> l(mutex_);if(generation==generation_&&!share_&&!remove_)status_=Status::unavailable;}}
+     if(response.status==200&&cache_.accept(pending,response.body,now())){lookup_failures_=0;if(!share_&&!remove_)status_=Status::ready;}
+     else {lookup_failed();if(!share_&&!remove_)status_=Status::unavailable;}
+    }catch(...){std::lock_guard<std::mutex> l(mutex_);if(generation==generation_){lookup_failed();if(!share_&&!remove_)status_=Status::unavailable;}}}
   }
  }
 public:
@@ -66,7 +68,7 @@ public:
   if(!started_){if(!steam_.attach())return;try{worker_=std::thread([this]{work();});started_=true;}catch(...){status_=Status::unavailable;return;}}
   auto id=steam_.read();const auto encoded_style=encode(style).dump();
   const bool account_change=id!=account_||own!=own_;
-  if(account_change||!receive)observed_.clear();
+  if(account_change||!receive){observed_.clear();urgent_.clear();lookup_failures_=0;}
   const bool changed=account_change||receive!=receive_||share!=share_||encoded_style!=appearance_;
   if(changed){++generation_;if(account_change){lookup_cursor_=0;last_lookup_=0;remove_=!share&&id&&account_valid(own);next_lookup_=next_publish_=0;cache_.context(0,false);}
    else if(share_&&!share){remove_=true;next_publish_=0;}
@@ -82,6 +84,8 @@ public:
    if(seen_at<i->second||seen_at-i->second>30000)i=observed_.erase(i);
    else {unique.insert(i->first);++i;}
   }
+  for(const auto& peer:unique)if(!std::binary_search(peers_.begin(),peers_.end(),peer))urgent_.insert(peer);
+  if(!urgent_.empty()&&!lookup_failures_)next_lookup_=std::min(next_lookup_,std::max(seen_at,last_lookup_+1000));
   peers_={unique.begin(),unique.end()};cache_.context(id,receive);
   if(!id||!account_valid(own))status_=Status::account;else if(!receive&&!share&&!remove_)status_=Status::off;
   wake_.notify_all();
@@ -91,7 +95,7 @@ public:
   // Queue only bounded public account keys; the worker performs all network I/O.
   if(!stopping_&&receive_&&account!=own_&&account_valid(account)&&(observed_.count(account)||observed_.size()<128)){
    const auto time=now().mono_ms;const bool added=!observed_.count(account);observed_[account]=time;
-   if(added){next_lookup_=std::min(next_lookup_,std::max(time,last_lookup_+1000));wake_.notify_all();}
+   if(added){urgent_.insert(account);if(!lookup_failures_)next_lookup_=std::min(next_lookup_,std::max(time,last_lookup_+1000));wake_.notify_all();}
   }
   return cache_.get(account,now(),style);
  }
