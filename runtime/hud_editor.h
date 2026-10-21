@@ -47,44 +47,44 @@ template<int Index> void __cdecl draw(uintptr_t object){
 // Hook only validated call sites. Renderer hooks forward 14/20 native arguments.
 struct Hook {uintptr_t call,target;int item;unsigned stack_bytes;bool map_root=false;bool fade=false;bool skills_root=false;};
 inline Hook hooks[]={
- {0x3bac7d,0x43b8c0,1,0},
- {0x3ba809,0x425ab0,2,0,true},{0x3bab60,0x425ab0,2,0,true},
- {0x1aa3b3,0x1aa470,3,0},
- {0x42b7f0,0x3bb540,5,0},
- {0x3bb010,0x40cce0,6,0,true},
- {0x3bafd1,0x41c230,7,0},
- {0x3baf9f,0x3ecb00,8,0},{0x3bafb5,0x40fe40,8,0,false,false,true},
+ {0x3baacd,0x43b710,1,0},
+ {0x3ba659,0x425900,2,0,true},{0x3ba9b0,0x425900,2,0,true},
+ {0x1aa343,0x1aa400,3,0},
+ {0x42b640,0x3bb390,5,0},
+ {0x3bae60,0x40cb30,6,0,true},
+ {0x3bae21,0x41c080,7,0},
+ {0x3badef,0x3ec950,8,0},{0x3bae05,0x40fc90,8,0,false,false,true},
  // These draws are called from the map routine but are not part of the map.
- {0x42b79c,0x4186b0,-1,0},{0x42b7b5,0x41a550,-1,0},
- {0x42b7e0,0x3ebf70,-1,0},{0x42b805,0x41b7e0,-1,0},
+ {0x42b5ec,0x418500,-1,0},{0x42b605,0x41a3a0,-1,0},
+ {0x42b630,0x3ebdc0,-1,0},{0x42b655,0x41b630,-1,0},
  // Timer icon and its three text branches inside the round/player renderer.
- {0x3be1dc,0x4870d0,4,128},{0x3be403,0x481f90,4,80},
- {0x3be4ad,0x481f90,4,80},{0x3be542,0x481f90,4,80},
- {0x43b9e7,0x449690,-2,32,false,true},
- {0x3ecc06,0x449690,-2,32,false,true},
- {0x40cdf0,0x449690,-2,32,false,true},
- {0x41043e,0x449690,-2,32,false,true},
- {0x41c328,0x449690,-2,32,false,true},
- {0x425bc8,0x449690,-2,32,false,true},
- {0x3bb76c,0x449690,-2,32,false,true},
- {0x3bcbe6,0x449690,-2,32,false,true},
- {0x3ec088,0x449690,-2,32,false,true},
- {0x41891e,0x449690,-2,32,false,true},
- {0x41a71c,0x449690,-2,32,false,true},
- {0x41b97f,0x449690,-2,32,false,true},
- {0x1c550f,0x1c2b50,-3,112},
- {0x1c560a,0x1c2b50,-3,112},
- {0x1c6b4c,0x1c2b50,-3,112},
- {0x1c6ca5,0x1c2b50,-3,112},
- {0x1c6dcb,0x1c2b50,-3,112},
- {0x1c7e92,0x1c2b50,-3,112},
- {0x1c7f7f,0x1c2b50,-3,112},
- {0x4871ef,0x1c2b50,-3,112},
- {0x48898f,0x1c2b50,-3,112},
+ {0x3be02c,0x486f20,4,128},{0x3be253,0x481de0,4,80},
+ {0x3be2fd,0x481de0,4,80},{0x3be392,0x481de0,4,80},
+ {0x43b837,0x4494e0,-2,32,false,true},
+ {0x3eca56,0x4494e0,-2,32,false,true},
+ {0x40cc40,0x4494e0,-2,32,false,true},
+ {0x41028e,0x4494e0,-2,32,false,true},
+ {0x41c178,0x4494e0,-2,32,false,true},
+ {0x425a18,0x4494e0,-2,32,false,true},
+ {0x3bb5bc,0x4494e0,-2,32,false,true},
+ {0x3bca36,0x4494e0,-2,32,false,true},
+ {0x3ebed8,0x4494e0,-2,32,false,true},
+ {0x41876e,0x4494e0,-2,32,false,true},
+ {0x41a56c,0x4494e0,-2,32,false,true},
+ {0x41b7cf,0x4494e0,-2,32,false,true},
+ {0x1c549f,0x1c2ae0,-3,112},
+ {0x1c559a,0x1c2ae0,-3,112},
+ {0x1c6adc,0x1c2ae0,-3,112},
+ {0x1c6c35,0x1c2ae0,-3,112},
+ {0x1c6d5b,0x1c2ae0,-3,112},
+ {0x1c7e22,0x1c2ae0,-3,112},
+ {0x1c7f0f,0x1c2ae0,-3,112},
+ {0x48703f,0x1c2ae0,-3,112},
+ {0x4887df,0x1c2ae0,-3,112},
  // Screen-wide progress strips share the currency function, but are not counters.
- {0x40d18b,0x4870d0,-1,128},{0x40d2b8,0x4870d0,-1,128},{0x40d3e9,0x487880,-1,120},
+ {0x40cfdb,0x486f20,-1,128},{0x40d108,0x486f20,-1,128},{0x40d239,0x4876d0,-1,120},
  // Local skill readiness and only its icon draw (not health/background).
- {0x4106ee,0x9655c0,-4,0},{0x410e62,0x488820,-5,80}
+ {0x41053e,0x965300,-4,0},{0x410cb2,0x488670,-5,80}
 };
 inline uintptr_t game_base=0;
 // One owner for the version/FPS call; Freecam can wrap its native target.
@@ -137,7 +137,7 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
  }
  if(width<=0||height<=0){width=view_w;height=view_h;}
  if(editing&&active_item>=0)return std::abs(alpha);
- const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+ssc_compat::resolve(0x449690));
+ const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+ssc_compat::resolve(0x4494e0));
  // Move only the proximity test away; preserve native global/status opacity.
  if(!hover_fade)return original(object,alpha,-1000000.f,-1000000.f,0,0,std::max(1.f,feather),global);
  if(enabled&&active_item>=0&&width>0&&height>0){const auto& a=items[active_item];
@@ -156,7 +156,7 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
 using Ready=bool(__cdecl*)(uintptr_t,uintptr_t);
 template<class T> inline T native_field(uintptr_t object,size_t offset){T v;std::memcpy(&v,reinterpret_cast<const void*>(object+offset),sizeof(v));return v;}
 inline bool __cdecl skill_ready_hook(uintptr_t skill,uintptr_t actor){
-    const bool ready=reinterpret_cast<Ready>(game_base+ssc_compat::resolve(0x9655c0))(skill,actor);
+    const bool ready=reinterpret_cast<Ready>(game_base+ssc_compat::resolve(0x965300))(skill,actor);
     skill_pulse=0;skill_icon=-1;
     if(!ssc_cooldown::settings.enabled){ssc_cooldown::tracker.clear();return ready;}
     // Arguments are native-owned records at a fingerprint-validated HUD call site.
