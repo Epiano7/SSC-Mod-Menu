@@ -47,4 +47,4 @@ The Linux Python archive must be the pinned CPython 3.13.15 x86-64 glibc install
 
 Publish `SSC-Mod-Menu-Setup.exe` and `SSC-Mod-Menu-Linux.tar.gz` as separate release assets. Linux remains experimental: successful installation does not establish that every module or the update/restart flow works under Proton. See [Linux instructions](../linux/README.md) for the current validation scope
 
-Private authorization adds a pinned, statically linked libsodium dependency and WinHTTP. See [authorization implementation and validation](private-authorization.md) for build prerequisites and live-test limitations.
+The runtime also requires the pinned, statically linked libsodium dependency and WinHTTP.
