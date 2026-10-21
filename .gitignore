@@ -14,3 +14,20 @@ settings.ini
 
 # Local native-game port diagnostics (not part of the Proton release)
 /runtime/linux/
+
+# Internal planning and investigation documents stay outside the public repository.
+/docs/planned-features.md
+/docs/completed-features.md
+/docs/beta-access-api.md
+/docs/beta-entitlements.md
+/docs/private-authorization.md
+/docs/private-authorization-api.md
+/docs/private-license-api-v2.md
+/docs/draft-private-access.md
+/docs/native-review-25979506.md
+/docs/native-review-26009609.md
+/docs/showdown-colors-review-25979506.md
+/docs/username-color-audit-20261017.md
+/docs/cosmetics-name-coverage.md
+/docs/compatibility-hotfix-service.md
+/docs/combat-tracking.md
