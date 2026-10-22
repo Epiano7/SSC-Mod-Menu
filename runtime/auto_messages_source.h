@@ -16,7 +16,7 @@ inline void sample_weapon(uintptr_t record,Values& values){
 }
 
 // Fingerprint both producers/consumers of world+6aa0 and the native send route.
-inline constexpr uint32_t native_dependencies[][3]={{0x88f260,0x2ad1e0,0},{0x2e90a0,0x222920,0},{0x830ac0,0x802a83,0},{0x22b0b0,0x898b50,0}};
+inline constexpr uint32_t native_dependencies[][3]={{0x88f780,0x2ad260,0},{0x2e9120,0x2229a0,0},{0x830fe0,0x802ef3,0},{0x22b130,0x899070,0}};
 inline bool supported(){return ssc_compat::supports(32)&&ssc_compat::supports(4)&&ssc_compat::supports(8);}
 // HUD survival timer (mode 6): 3b9d69 uses ceil(world+3bc) while positive,
 // then switches to -world+3cc for overtime. The gameplay countdown at +3bc
@@ -24,10 +24,10 @@ inline bool supported(){return ssc_compat::supports(32)&&ssc_compat::supports(4)
 // Guard the HUD selector/formatter as well as the nominal-duration helper.
 inline bool recording_clock_supported(uintptr_t base){
  static uintptr_t checked=0;static bool valid=false;if(checked==base)return valid;checked=base;valid=false;
- struct Span{uint32_t rva,length;uint64_t hash;};const Span spans[]={{0x241a10,314,0x14c034f51cef48faULL},{0x2301e0,36,0x855ce547d3b0fb6bULL},{0x3bb679,91,0xfbb35eb56c62bac3ULL},{0x3be031,70,0x48dc0063bd75de22ULL}};
+ struct Span{uint32_t rva,length;uint64_t hash;};const Span spans[]={{0x241a90,314,0xbf9796a99c880b3dULL},{0x230260,36,0xd3bf237b4c7ec7d4ULL},{0x3bb6d9,91,0x9c1898318279c446ULL},{0x3be091,70,0xc680a48b663bc0fbULL}};
  for(const auto& span:spans){uint64_t hash=14695981039346656037ULL;for(uint32_t i=0;i<span.length;++i){unsigned char byte=0;if(!ssc_names::read(base+span.rva+i,byte))return false;hash=(hash^byte)*1099511628211ULL;}if(hash!=span.hash)return false;}
  float minimum=0,step=0,sign=0;double half=0;
- valid=ssc_names::read(base+0xc7b580,minimum)&&minimum==30&&ssc_names::read(base+0xc7b404,step)&&step==5&&ssc_names::read(base+0xc7a980,half)&&half==.5&&ssc_names::read(base+0xc7bedc,sign)&&sign==-1;return valid;
+ valid=ssc_names::read(base+0xc7b588,minimum)&&minimum==30&&ssc_names::read(base+0xc7b40c,step)&&step==5&&ssc_names::read(base+0xc7a988,half)&&half==.5&&ssc_names::read(base+0xc7bee4,sign)&&sign==-1;return valid;
 }
 inline double recording_hud_countdown(float remaining,float overtime){
  if(!std::isfinite(remaining)||remaining>7200||remaining<-14400)return NAN;
@@ -46,8 +46,8 @@ inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
  o.connected=true;
  if(!read(base+ssc_compat::resolve(0xde95d0),world)||!world)return o;
  if(!read(world+0x128,mode)||mode!=6||!read(world+0x485,survival)||survival||!read(world+0x3e0,raw_round)||raw_round<1||raw_round>100||!read(world+0x46c,last)||last<raw_round-1||last>100||!read(world+0x3c0,countdown)||!std::isfinite(countdown)||!read(world+0x6ae8,ending)||!std::isfinite(ending))return o;
- if(!read(world+0xa658,first)||!read(world+0xa660,end)||!first||end<first||(end-first)%0x34b8||(end-first)/0x34b8>2048||!read(base+ssc_compat::resolve(0xe21138),steam)||first!=steam||!read(base+ssc_compat::resolve(0xe1d678),local)||local<0||uintptr_t(local)>=(end-first)/0x34b8)return o;
- actor=first+uintptr_t(local)*0x34b8;
+ if(!read(world+0xa650,first)||!read(world+0xa658,end)||!first||end<first||(end-first)%0x34b0||(end-first)/0x34b0>2048||!read(base+ssc_compat::resolve(0xe21140),steam)||first!=steam||!read(base+ssc_compat::resolve(0xe1d688),local)||local<0||uintptr_t(local)>=(end-first)/0x34b0)return o;
+ actor=first+uintptr_t(local)*0x34b0;
  if(!read(actor+0x78,slot)||slot!=local||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active)return o;
  o.actor=actor;o.valid=true;o.active=raw_round>=2&&countdown<=0&&ending<=0;o.ending=raw_round>=2&&(ending>0||countdown>0);o.preparing=countdown>0&&ending<=0;o.session=world;o.round=raw_round-1;o.last_round=last;o.values["roundNumber"]=std::to_string(o.round);
  if(ssc_compat::supports(2)&&o.round>=1&&recording_clock_supported(base)){
@@ -85,7 +85,7 @@ inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
   if(read(actor+0x2998,equipped)&&equipped>=0)for(auto record=weapons;record<weapons_end;record+=0x748){int id=-1;if(read(record+0x20c,id)&&id==equipped){auto name=ssc_rpc::native_string(record+0x48);if(!name.empty()&&printable(name)){o.values["weaponName"]=name;sample_weapon(record,o.values);}break;}}
  }
  uintptr_t classes=0,classes_end=0;
- if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe27148),classes)&&read(base+ssc_compat::resolve(0xe27150),classes_end)&&classes&&classes_end>=classes&&(classes_end-classes)%0x98==0&&(classes_end-classes)/0x98<=512&&uintptr_t(class_id)<(classes_end-classes)/0x98){auto name=ssc_rpc::native_string(classes+uintptr_t(class_id)*0x98+0x18);if(!name.empty())o.values["className"]=name;}
+ if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe16a98),classes)&&read(base+ssc_compat::resolve(0xe16aa0),classes_end)&&classes&&classes_end>=classes&&(classes_end-classes)%0x98==0&&(classes_end-classes)/0x98<=512&&uintptr_t(class_id)<(classes_end-classes)/0x98){auto name=ssc_rpc::native_string(classes+uintptr_t(class_id)*0x98+0x18);if(!name.empty())o.values["className"]=name;}
  return o;
 }
 using NativeSender=void(*)(uintptr_t,unsigned char,uintptr_t,const void*);
@@ -96,7 +96,7 @@ inline bool send_native(uintptr_t base,uintptr_t world,uintptr_t actor,const std
  // The native client chat-input path calls this with flag=0. It deep-copies the
  // temporary native-layout string into its own outbound queue, then shows it locally.
  ssc_chat::NativeString message{reinterpret_cast<uintptr_t>(text.data()),0,text.size(),std::max(size_t(16),text.size())};
- if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x222920));
+ if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x2229a0));
  sender(world,0,actor,&message);
  // Engine::dispatch limits automatic messages. Observe the native wheel's
  // cooldown above, but never impose an additional lockout on manual input.

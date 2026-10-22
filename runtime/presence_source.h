@@ -28,9 +28,9 @@ inline void add_rating(Snapshot& s,bool is_ranked,float rating,float matches,int
 inline void sample_rating(uintptr_t base,Snapshot& snapshot){
     if(snapshot.phase!=2)return;
     using ssc_names::read;uintptr_t world=0,first=0,last=0,steam_first=0;int local=-1,slot=-1;
-    if(!read(base+ssc_compat::resolve(0xde95d0),world)||!world||!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048
-        ||!read(base+ssc_compat::resolve(0xe21138),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe1d678),local)||local<0||uintptr_t(local)>=(last-first)/0x34b8)return;
-    auto actor=first+uintptr_t(local)*0x34b8;if(!read(actor+0x78,slot)||slot!=local)return;
+    if(!read(base+ssc_compat::resolve(0xde95d0),world)||!world||!read(world+0xa650,first)||!read(world+0xa658,last)||!first||last<first||(last-first)%0x34b0||(last-first)/0x34b0>2048
+        ||!read(base+ssc_compat::resolve(0xe21140),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe1d688),local)||local<0||uintptr_t(local)>=(last-first)/0x34b0)return;
+    auto actor=first+uintptr_t(local)*0x34b0;if(!read(actor+0x78,slot)||slot!=local)return;
     RankedFields f;
     if(!read(world+0x128,f.mode)||!read(world+0x3e0,f.round)||!read(world+0x485,f.survival)||!read(world+0x2d2,f.singleplayer)
         ||!read(world+0x2f4,f.disabled)||!read(world+0x121,f.practice)||!read(world+0x30f,f.newbie)
@@ -73,13 +73,13 @@ inline Snapshot native_fallback(uintptr_t base){
             if(round>=2&&round<=100)s.details+=" - Round "+std::to_string(round-1);else s.state="Preparing round";break;
         default:s.details="Skillshot City";break;}
     uintptr_t first=0,last=0,steam_first=0;int local=-1,slot=-1,kind=-1,level=-1,class_id=-1;unsigned char active=0;
-    if(!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048
-        ||!read(base+ssc_compat::resolve(0xe21138),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe1d678),local)||local<0||uintptr_t(local)>=(last-first)/0x34b8)return s;
-    auto actor=first+uintptr_t(local)*0x34b8;
+    if(!read(world+0xa650,first)||!read(world+0xa658,last)||!first||last<first||(last-first)%0x34b0||(last-first)/0x34b0>2048
+        ||!read(base+ssc_compat::resolve(0xe21140),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe1d688),local)||local<0||uintptr_t(local)>=(last-first)/0x34b0)return s;
+    auto actor=first+uintptr_t(local)*0x34b0;
     if(!read(actor+0x78,slot)||slot!=local||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active||!read(actor+0x870,level)||level<0||level>10000)return s;
     s.state="Level "+std::to_string(level);
     uintptr_t classes=0,end=0;
-    if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe27148),classes)&&read(base+ssc_compat::resolve(0xe27150),end)&&classes&&end>=classes&&(end-classes)%0x98==0&&(end-classes)/0x98<=512&&uintptr_t(class_id)<(end-classes)/0x98){
+    if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe16a98),classes)&&read(base+ssc_compat::resolve(0xe16aa0),end)&&classes&&end>=classes&&(end-classes)%0x98==0&&(end-classes)/0x98<=512&&uintptr_t(class_id)<(end-classes)/0x98){
         auto label=native_string(classes+uintptr_t(class_id)*0x98+0x18);if(!label.empty())s.state=label+" - "+s.state;
     }
     return s;

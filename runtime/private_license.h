@@ -1,10 +1,11 @@
 #pragma once
 #include "beta_auth.h"
+#include "proton_device_store.h"
 namespace ssc_auth {
 namespace license {
 inline void wipe(std::string& s){ssc_beta::wipe(s);}
 enum class State {idle,checking,accepted,expired,code_denied,device_denied,unavailable,limited,storage,account};
-inline const wchar_t* label(State s){switch(s){case State::expired:return L"Access expired - waiting for renewal";case State::checking:return L"Checking private access...";case State::accepted:return L"Private access activated";case State::code_denied:return L"Invalid, expired or already used code";case State::device_denied:return L"Account or device not approved";case State::unavailable:return L"Server unavailable - try again later";case State::limited:return L"Rate limited - please wait before retrying";case State::storage:return L"Secure device storage unavailable";case State::account:return L"Sign in to Steam to activate";default:return L"Enter your private activation code";}}
+inline const wchar_t* label(State s){switch(s){case State::expired:return L"Access expired - waiting for renewal";case State::checking:return L"Checking private access...";case State::accepted:return L"Private access activated";case State::code_denied:return L"Invalid, expired or already used code";case State::device_denied:return L"Account or device not approved";case State::unavailable:return L"Server unavailable - try again later";case State::limited:return L"Rate limited - please wait before retrying";case State::storage:return proton()?L"Linux keyring unavailable - unlock it and launch via Steam":L"Secure device storage unavailable";case State::account:return L"Sign in to Steam to activate";default:return L"Enter your private activation code";}}
 struct Failure {State state;};
 inline void ok(const ssc_beta::Reply& r){if(r.status==200)return;State s=State::unavailable;if(r.status==429)s=State::limited;
  try{auto j=parse(r.body);auto c=string(j,"code",64);if(c=="activation_denied")s=State::code_denied;else if(c=="denied"||c=="device_denied"||c=="device_limit")s=State::device_denied;else if(c=="rate_limited"||c=="busy")s=State::limited;}catch(...){}throw Failure{s};}
@@ -18,13 +19,11 @@ struct Device {
  void derive(){ssc_auth_privacy::secrets_used=true;require(crypto_sign_seed_keypair(pub.data(),secret.data(),seed.data())==0);}
  std::string thumb()const{return sha("{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\""+b64(pub.data(),32)+"\"}");}
 };
-// No Proton DPAPI equivalence claim: device enrollment is blocked until a native
-// secret-store/permissions bridge has been validated for that environment.
+// Windows uses DPAPI; Proton uses the native Linux launcher/keyring bridge.
 struct Store {
  std::filesystem::path directory;
- bool supported()const{return !GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"wine_get_version");}
  bool load(uint64_t id,Device& key,bool create){
-  if(!supported())throw Failure{State::storage};
+  if(proton()){auto result=proton_seed(id,create,key.seed);if(result<0)throw Failure{State::storage};if(!result)return false;key.derive();return true;}
   ssc_beta::Storage storage;storage.description=L"SSC private device";storage.path=directory/(L"private-device-"+std::to_wstring(id)+L".bin");
   std::error_code ec;bool exists=std::filesystem::exists(storage.path,ec);if(ec)throw Failure{State::storage};
   if(exists){auto saved=storage.load();try{require(saved.account==id);auto bytes=un64(saved.token,32);require(bytes.size()==32);std::copy(bytes.begin(),bytes.end(),key.seed.begin());sodium_memzero(bytes.data(),bytes.size());wipe(saved.token);key.derive();return true;}catch(...){wipe(saved.token);throw Failure{State::storage};}}
