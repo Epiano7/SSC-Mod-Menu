@@ -54,7 +54,7 @@ inline bool snapshot(uintptr_t context,Build& b,std::array<int,54>& offers,unsig
  float animation=0;if(!read(context+0x3148,animation)||!std::isfinite(animation)||animation>0)return false;
  if(!read(game+0xe04350,first)||!read(game+0xe04358,last)||!first||last<first||(last-first)%12||(last-first)/12>3)return false;
  const unsigned native_count=unsigned((last-first)/12);if(native_count<2)return false;count=0;
- // The native panel copies this displayed list at 0x3e0ef1. The actor's
+ // The native panel copies this displayed list at 0x3e0f51. The actor's
  // separate offer copy can lag a queued pick until Ctrl is reopened.
  // build_snapshot already proves this is the local player's panel.
  for(unsigned i=0;i<native_count;++i){int id=-1;if(!read(first+i*12,id))return false;
@@ -144,8 +144,8 @@ inline void icon(uintptr_t renderer,uintptr_t sheet,float x,float y,float w,floa
 }
 inline bool attach(){
  game=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));auto bytes=reinterpret_cast<unsigned char*>(game);
- if(!ssc_compat::supports(128)||ssc_creator::hash(bytes+0x3e0830,14780)!=0xbf94ed3465dda0c1ULL||!ssc_record::validate_build_code(game,[](uintptr_t p,auto& v){return read(p,v);})||ssc_creator::hash(bytes+0x951bf0,1212)!=0x1019d02c1c1f552eULL||ssc_creator::hash(bytes+0x3dbe70,14692)!=0xed1e095e9d3293eeULL)return false;
- struct Site{uint32_t call,target;uintptr_t hook;};const Site sites[]={{0x3d9aa4,0x3e0830,reinterpret_cast<uintptr_t>(panel)},{0x3e0c33,0x3dbe70,reinterpret_cast<uintptr_t>(draw)},{0x3df000,0x488670,reinterpret_cast<uintptr_t>(icon)}};
+ if(!ssc_compat::supports(128)||ssc_creator::hash(bytes+0x3e0890,14780)!=0xac117decdc534957ULL||!ssc_record::validate_build_code(game,[](uintptr_t p,auto& v){return read(p,v);})||ssc_creator::hash(bytes+0x952170,1212)!=0xbb72baa53ac2028cULL||ssc_creator::hash(bytes+0x3dbed0,14692)!=0x42fe0ada6ef7b248ULL)return false;
+ struct Site{uint32_t call,target;uintptr_t hook;};const Site sites[]={{0x3d9b04,0x3e0890,reinterpret_cast<uintptr_t>(panel)},{0x3e0c93,0x3dbed0,reinterpret_cast<uintptr_t>(draw)},{0x3df060,0x4886d0,reinterpret_cast<uintptr_t>(icon)}};
  for(auto s:sites){int32_t rel=0;std::memcpy(&rel,bytes+s.call+1,4);if(bytes[s.call]!=0xe8||int64_t(s.call)+5+rel!=s.target)return false;}
  unsigned char* bridge=nullptr;for(uintptr_t n=0x10000;n<0x60000000&&!bridge;n+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((game+n)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
  const unsigned char jump[]={0xff,0x25,0,0,0,0};for(unsigned i=0;i<3;++i){std::memcpy(bridge+i*16,jump,6);std::memcpy(bridge+i*16+6,&sites[i].hook,8);}DWORD old=0;if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}DWORD protections[3]{};

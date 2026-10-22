@@ -29,12 +29,12 @@ int main(int argc,char** argv){
  // Exercise the production actor->embedded-profile path, not only the decoder.
  auto fixture=static_cast<unsigned char*>(VirtualAlloc(nullptr,0x1000000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));assert(fixture);
  for(const auto& span:build_spans)std::memcpy(fixture+span.rva,reinterpret_cast<void*>(base+span.rva),span.length);
- std::vector<unsigned char> world(0xa680),actor(0x34b8);
+ std::vector<unsigned char> world(0xa680),actor(0x34b0);
  put(profile,0x1018,s);put(profile,0x1020,s+skills.size());put(profile,0x1028,s+skills.size());
  std::memcpy(actor.data()+0xa0,profile.data(),profile.size());
  auto actor_ptr=reinterpret_cast<uintptr_t>(actor.data()),world_ptr=reinterpret_cast<uintptr_t>(world.data());
- std::memcpy(fixture+0xde95d0,&world_ptr,8);std::memcpy(fixture+0xe21138,&actor_ptr,8);
- put(world,0xa658,actor_ptr);put(world,0xa660,actor_ptr+actor.size());
+ std::memcpy(fixture+0xde95d0,&world_ptr,8);std::memcpy(fixture+0xe21140,&actor_ptr,8);
+ put(world,0xa650,actor_ptr);put(world,0xa658,actor_ptr+actor.size());
  put(actor,0x78,0);put(actor,0x81,(unsigned char)1);put(actor,0x350,3);put(actor,0x870,10);
  auto integrated=sample_local_build(reinterpret_cast<uintptr_t>(fixture));
  assert(integrated["skills_status"]=="observed"&&integrated["skills"].size()==2&&integrated["skills"][0]["stimmed"]==true);

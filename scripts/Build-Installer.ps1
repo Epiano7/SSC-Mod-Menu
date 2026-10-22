@@ -11,7 +11,7 @@ $sources=@("$root\installer\Engine.cs","$root\installer\Setup.cs","$root\install
 $common=@('/nologo','/warnaserror','/platform:x64','/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Web.Extensions.dll')
 if($RuntimeDirectory) {
     # Approved runtime/proxy hashes for the packaged release.
-    $approved=@{'opengl32.dll'='86D894C575524AD1D44F5C11C5B59CE98BAF75040CD4C2DC8A0344AC4E858428';'runtime.dll'='A1EC3A955F0B330DE0BBC0D6865B660C075AC8EE7629A5C23961DD8056A46CCD'}
+    $approved=@{'opengl32.dll'='B19F4948F1CD4D1BA072D301FDE58A7BDDD02B8CDCAAA714B0D32071AEE134EB';'runtime.dll'='E094BA88BEFF458C0B50504F99DCB8C5DA04D10BB6A5DC1EF0BB10CD93C54424'}
     foreach($name in $approved.Keys) {
         $path=(Resolve-Path -LiteralPath (Join-Path $RuntimeDirectory $name)).Path
         if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $approved[$name]) { throw "Unapproved payload hash for $name. Run runtime and isolated installation checks before updating the approved release hashes." }
@@ -42,3 +42,5 @@ if($LASTEXITCODE) { throw 'Updater test compilation failed' }
 & "$build\updater_test.exe"
 if($LASTEXITCODE) { throw 'Updater tests failed' }
 Get-FileHash -LiteralPath "$build\SSC-Mod-Menu-Setup.exe" -Algorithm SHA256
+
+

@@ -45,4 +45,4 @@ Bundled dependency notices are included under `licenses` and `python`.
 
 ## Private access
 
-Activation for privately approved beta testing is currently available on native Windows only. It remains disabled under Proton until secure device-key storage has been validated. Public modules do not require activation
+This Linux private-access test build uses your desktop Secret Service keyring (libsecret-1.so.0, such as GNOME Keyring or a compatible KWallet service). Unlock your login keyring and launch the game through Steam after running Install/Update from this package so the native helper is refreshed. No plaintext device-key fallback is used. Missing/locked keyrings show an activation error; public modules still work without private activation. Keep the keyring entry when updating or reinstalling: deleting it creates a new device identity and may require code renewal. Public modules do not require activation

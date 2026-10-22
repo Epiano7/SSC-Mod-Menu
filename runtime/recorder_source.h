@@ -23,9 +23,9 @@ inline Json sample_local_build(uintptr_t base){
     Json result={{"class_id",nullptr},{"level",nullptr},{"health",nullptr},{"max_health",nullptr},{"inventory_weapons",nullptr},{"build_schema",1},{"skills",nullptr},{"skills_status","actor_unavailable"},{"stim_source","replicated_skill_ids"}};
     if(!ssc_compat::supports(4))return result;
     using ssc_names::read;uintptr_t world=0,first=0,last=0,steam_first=0;int local=-1,slot=-1,kind=-1;unsigned char active=0;
-    if(!read(base+ssc_compat::resolve(0xde95d0),world)||!world||!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048
-       ||!read(base+ssc_compat::resolve(0xe21138),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe1d678),local)||local<0||uintptr_t(local)>=(last-first)/0x34b8)return result;
-    auto actor=first+uintptr_t(local)*0x34b8;
+    if(!read(base+ssc_compat::resolve(0xde95d0),world)||!world||!read(world+0xa650,first)||!read(world+0xa658,last)||!first||last<first||(last-first)%0x34b0||(last-first)/0x34b0>2048
+       ||!read(base+ssc_compat::resolve(0xe21140),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe1d688),local)||local<0||uintptr_t(local)>=(last-first)/0x34b0)return result;
+    auto actor=first+uintptr_t(local)*0x34b0;
     if(!read(actor+0x78,slot)||slot!=local||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active)return result;
     int class_id=-1,level=-1,round=-1,mode=-1;
     if(read(actor+0x350,class_id)&&class_id>=0&&class_id<512)result["class_id"]=class_id;

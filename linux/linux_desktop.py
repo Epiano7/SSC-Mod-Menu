@@ -361,7 +361,21 @@ def launch(args):
     bridge = Bridge(relay.name, log=log) if relay else None
     if relay:
         env['SSC_DISCORD_RELAY'] = 'Z:' + relay.name.replace('/', '\\')
+    # Capability file is private; device keys stay in keyring / process memory.
+    private_relay = tempfile.TemporaryDirectory(prefix='.ssc-private-', dir=Path(record['game']) / 'SSCMods') if record else None
+    private_helper = None
+    env.pop('SSC_PRIVATE_RELAY', None)
     try:
+        if private_relay:
+            try:
+                private_helper = subprocess.Popen([sys.executable, str(Path(__file__).with_name('private_storage.py')), private_relay.name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                env['SSC_PRIVATE_RELAY'] = 'Z:' + private_relay.name.replace('/', '\\')
+            except OSError:
+                log('Private-access helper could not start; continuing without private access')
+            import time
+            deadline = time.monotonic() + 3
+            while private_helper is not None and private_helper.poll() is None and not (Path(private_relay.name) / 'endpoint.json').exists() and time.monotonic() < deadline:
+                time.sleep(.05)
         process = subprocess.Popen(args, env=env)
         while process.poll() is None:
             if bridge:
@@ -381,6 +395,13 @@ def launch(args):
             time.sleep(0.5)
         return process.returncode
     finally:
+        if private_helper is not None:
+            private_helper.terminate()
+            try: private_helper.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                private_helper.kill(); private_helper.wait()
+        if private_relay:
+            private_relay.cleanup()
         if bridge:
             bridge.close()
         if relay:

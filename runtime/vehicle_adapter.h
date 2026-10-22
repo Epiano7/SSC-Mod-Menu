@@ -24,8 +24,8 @@ inline bool context(uintptr_t car,uintptr_t& actor,float& heading){
  // Initial adapter is deliberately local-authority solo only: the multiplayer
  // command serializer must be reviewed before this can affect online controls.
  if(!read(world+0x6a38,host)||!read(world+0x6a39,transport)||!read(world+0x120,dedicated)||!read(world+0x2d2,solo)||!read(world+0x160,humans)||!read(world+0x485,survival)||!read(world+0x128,mode)||host!=1||dedicated!=0||humans!=1||!(transport==0||solo==1||(mode==6&&survival==1)))return false;
- if(!read(world+0xa658,first)||!read(world+0xa660,end)||!read(world+0x6b98,slot)||!first||end<first||slot<0||slot>=128||uintptr_t(slot+1)>(end-first)/0x34b8)return false;
- actor=first+uintptr_t(slot)*0x34b8;
+ if(!read(world+0xa650,first)||!read(world+0xa658,end)||!read(world+0x6b98,slot)||!first||end<first||slot<0||slot>=128||uintptr_t(slot+1)>(end-first)/0x34b0)return false;
+ actor=first+uintptr_t(slot)*0x34b0;
  if(!read(actor+0x2ad8,linked)||linked!=car||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||active!=1||!read(actor+0x8a0,actor_mode)||actor_mode==3||!read(actor+0x13a4,health)||!std::isfinite(health)||health<=0)return false;
  // Native 9dd400 consumes seat zero's controls, not every occupant's.
  if(!read(car+0x368,seats)||!read(car+0x370,seats_end)||!seats||seats_end<seats||seats_end-seats<0x68||seats_end-seats>16*0x68||!read(seats+0x60,driver)||driver!=actor)return false;
@@ -47,8 +47,8 @@ inline void control(uintptr_t car){
 }
 inline uint64_t hash(const unsigned char* p,size_t n){uint64_t h=14695981039346656037ULL;for(size_t i=0;i<n;++i)h=(h^p[i])*1099511628211ULL;return h;}
 inline bool matches(const unsigned char* p,size_t n){
- if(n<0xfb0cc4||hash(p+0x9dfb90,0x230)!=0x8e3640ac399a2fcfULL||hash(p+0x9d76e0,0x980)!=0x9a832aca4d179355ULL)return false;
- int32_t rel=0;std::memcpy(&rel,p+0x9dfdb1,4);return p[0x9dfdb0]==0xe8&&int64_t(0x9dfdb5)+rel==0x9d76e0;
+ if(n<0xfb0cc4||hash(p+0x9e0110,0x230)!=0x3a5ebd79e8185252ULL||hash(p+0x9d7c60,0x980)!=0x45ee565d0e7a19f3ULL)return false;
+ int32_t rel=0;std::memcpy(&rel,p+0x9e0331,4);return p[0x9e0330]==0xe8&&int64_t(0x9e0335)+rel==0x9d7c60;
 }
 inline bool attach(){
  auto p=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));
@@ -60,9 +60,9 @@ inline bool attach(){
  const unsigned char jump[]={0xff,0x25,0,0,0,0};auto target=reinterpret_cast<uintptr_t>(control);
  std::memcpy(bridge,jump,6);std::memcpy(bridge+6,&target,8);DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=p+0x9dfdb0;
+ FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=p+0x9e0330;
  if(!VirtualProtect(site,5,PAGE_EXECUTE_READWRITE,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- image=origin;original=reinterpret_cast<Control>(p+0x9d76e0);
+ image=origin;original=reinterpret_cast<Control>(p+0x9d7c60);
  int32_t relative=int32_t(reinterpret_cast<uintptr_t>(bridge)-reinterpret_cast<uintptr_t>(site+5));std::memcpy(site+1,&relative,4);
  DWORD ignored=0;VirtualProtect(site,5,old,&ignored);FlushInstructionCache(GetCurrentProcess(),site,5);return true;
 }

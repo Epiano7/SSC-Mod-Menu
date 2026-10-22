@@ -40,11 +40,11 @@ int main(){
  assert(identity_scope==-1&&color_scope==0);
  // Real MSVC account-string and actor layouts: predicate sees raw name,
  // then native code consumes it before the formatted label is drawn.
- std::vector<unsigned char> image(0x1000000),world(0xb000),actors(0x34b8*2);
+ std::vector<unsigned char> image(0x1000000),world(0xb000),actors(0x34b0*2);
  image_base=reinterpret_cast<uintptr_t>(image.data());auto w=reinterpret_cast<uintptr_t>(world.data()),a=reinterpret_cast<uintptr_t>(actors.data());
- put(image_base+0xde95d0,w);put(w+0xa658,a);put(w+0xa660,a+actors.size());put(image_base+0xe21138,a);put(image_base+0xe1d678,0);
+ put(image_base+0xde95d0,w);put(w+0xa650,a);put(w+0xa658,a+actors.size());put(image_base+0xe21140,a);put(image_base+0xe1d688,0);
  small(image_base+0xe031e8,"owner");put(a+0x78,0);put(a+0x7dc,0);put(a+0x81,(unsigned char)1);small(a+0x6f0,"owner");small(a+0x798,"owner");
- auto bot=a+0x34b8;put(bot+0x78,1);put(bot+0x7dc,1);put(bot+0x81,(unsigned char)1);small(bot+0x798,"robot");
+ auto bot=a+0x34b0;put(bot+0x78,1);put(bot+0x7dc,1);put(bot+0x81,(unsigned char)1);small(bot+0x798,"robot");
  put(image_base+0xfb389c,1);put(w+0x190,0);put(w+0x28c,1);
  shared_label_world=w;shared_label_index["robot"]=bot;render_access=true;render_access_at=GetTickCount64();native_predicate=consume_account;lookup_shared=shared_fixture;
  std::array<unsigned char,32> raw{};auto rawaddr=reinterpret_cast<uintptr_t>(raw.data());
