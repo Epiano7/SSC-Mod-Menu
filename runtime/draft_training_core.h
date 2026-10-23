@@ -20,7 +20,7 @@ public:
  bool active=false;
  void begin(const std::string& id,int number,uint64_t now,bool complete){
   start=now;bytes=0;active=true;have_build=false;saturated=false;events=Json::array();pending[0]=pending[1]=-1;last_advice[0]=last_advice[1]=nullptr;
-  document={{"schema",1},{"round_id",id},{"round",number},{"game_build",26127173},{"collector",1},{"model",1},{"start_observed",complete},{"truncated",false}};
+  document={{"schema",1},{"round_id",id},{"round",number},{"game_build",26156777},{"collector",1},{"model",1},{"start_observed",complete},{"truncated",false}};
  }
  void append(Json event,uint64_t now){
   if(!active||saturated)return;

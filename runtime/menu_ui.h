@@ -1057,7 +1057,7 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"v0.1.24",cyan);
+        text(50,153,L"v0.1.25",cyan);
         bullet(201,L"Updated compatibility for the latest game build" );
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
@@ -1472,7 +1472,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.24",cyan);
+            text(266,157,L"0.1.25",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
@@ -1552,3 +1552,4 @@ void layout_panel(int width,int height) {
     panel_x=manager?int((width-(auto_guide_visible()?1120:panel_w)*draw_scale)*.5f):int(width-panel_w*draw_scale-24+(1-e)*24);
     panel_y=manager?int((height-panel_h*draw_scale)*.5f+(1-e)*18):int(40+(1-e)*12);
 }
+
