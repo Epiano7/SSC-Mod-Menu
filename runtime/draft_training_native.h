@@ -2,10 +2,10 @@
 #include "draft_advisor.h"
 namespace ssc_training {
 struct NativeDraft {int counter=0,player_class=0;std::vector<int> offers,previous;bool operator==(const NativeDraft& b)const{return counter==b.counter&&player_class==b.player_class&&offers==b.offers&&previous==b.previous;}};
-// Build 26156777: reviewed current/previous vectors at +4b8/+4d0;
+// Build 26182958: reviewed current/previous vectors at +4b8/+4d0;
 // +5ec remains the generation counter, NOT remaining rerolls.
 // This guard permits observations only; it does not certify reroll predictions.
-inline bool native_supported(){static uintptr_t checked=0;static bool valid=false;auto base=ssc_advisor::game;if(!base)return false;if(checked!=base){checked=base;valid=ssc_creator::hash(reinterpret_cast<unsigned char*>(base+0x922420),0x5b16)==0x8fdf79639b00dd97ULL;}return valid;}
+inline bool native_supported(){static uintptr_t checked=0;static bool valid=false;auto base=ssc_advisor::game;if(!base)return false;if(checked!=base){checked=base;valid=ssc_creator::hash(reinterpret_cast<unsigned char*>(base+0x922600),0x5b16)==0x5cbfbbbbe9213e45ULL;}return valid;}
 template<class Reader>bool read_native_draft(uintptr_t context,NativeDraft& out,Reader read){
  NativeDraft value;if(!read(context+0x2b0,value.player_class)||value.player_class<1||value.player_class>8||!read(context+0x5ec,value.counter)||value.counter<0||value.counter>1024)return false;
  for(int which=0;which<2;++which){auto address=context+(which?0x4d0:0x4b8);uintptr_t first=0,end=0,cap=0;
