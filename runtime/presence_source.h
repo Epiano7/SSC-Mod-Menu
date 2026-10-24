@@ -37,10 +37,10 @@ inline void sample_rating(uintptr_t base,Snapshot& snapshot){
         ||!read(actor+0x81,f.active)||!read(actor+0x7dc,f.kind)||!read(actor+0x700,f.name_length)||!read(actor+0x6e0,f.login)
         ||!read(actor+0x6e4,f.authenticated)||!read(actor+0x270,f.committed)||!read(actor+0xf98,f.bonus)
         ||!read(actor+0xab4,f.account_level)||!read(actor+0x204,f.eligibility)
-        ||!read(base+ssc_compat::resolve(0xfb5a24),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfb5a28),f.bonus_threshold)||!ranked(f))return;
+        ||!read(base+ssc_compat::resolve(0xfb5a2c),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfb5a30),f.bonus_threshold)||!ranked(f))return;
     // Values used by the native own-profile "RATING THIS MONTH" display at 5f3a5f.
     float rating=-1,matches=-1;int required=0,profile_loaded=0;
-    if(read(base+ssc_compat::resolve(0xe031f8),profile_loaded)&&profile_loaded&&read(base+ssc_compat::resolve(0xe03a9c),rating)&&read(base+ssc_compat::resolve(0xe03a98),matches)&&read(base+ssc_compat::resolve(0xfb59f8),required))add_rating(snapshot,true,rating,matches,required);
+    if(read(base+ssc_compat::resolve(0xe031f8),profile_loaded)&&profile_loaded&&read(base+ssc_compat::resolve(0xe03a9c),rating)&&read(base+ssc_compat::resolve(0xe03a98),matches)&&read(base+ssc_compat::resolve(0xfb5a00),required))add_rating(snapshot,true,rating,matches,required);
     else add_rating(snapshot,true,-1,-1,0);
 }
 inline std::string copy_steam_text(const char* value){
