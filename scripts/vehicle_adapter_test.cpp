@@ -9,7 +9,7 @@ static unsigned calls=0;static unsigned char observed[4];
 static void native(uintptr_t car){++calls;std::memcpy(observed,reinterpret_cast<void*>(car+0x14f),4);}
 template<class T> void put(uintptr_t p,size_t off,T v){std::memcpy(reinterpret_cast<void*>(p+off),&v,sizeof v);}
 int main(int argc,char**argv){
- std::vector<unsigned char> im(0xfb0000),wm(0xc100),am(0x34b0),vm(0x958),sm(0x68);
+ std::vector<unsigned char> im(0x1000000),wm(0xc100),am(0x34b0),vm(0x958),sm(0x68);
  image=reinterpret_cast<uintptr_t>(im.data());auto w=reinterpret_cast<uintptr_t>(wm.data()),a=reinterpret_cast<uintptr_t>(am.data()),v=reinterpret_cast<uintptr_t>(vm.data()),seat=reinterpret_cast<uintptr_t>(sm.data());
  put(image,0xdea5d0,w);put(w,0x6a38,(unsigned char)1);put(w,0x6a39,(unsigned char)1);put(w,0x160,1);put(w,0x128,6);put(w,0x485,(unsigned char)1);put(w,0xa650,a);put(w,0xa658,a+0x34b0);put(w,0x6b98,0);put(a,0x2ad8,v);put(a,0x81,(unsigned char)1);put(a,0x13a4,100.f);put(v,0x368,seat);put(v,0x370,seat+0x68);put(seat,0x60,a);
  original=native;enabled=true;blocked=false;
