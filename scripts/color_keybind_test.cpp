@@ -42,10 +42,10 @@ int main(){
  // then native code consumes it before the formatted label is drawn.
  std::vector<unsigned char> image(0x1000000),world(0xb000),actors(0x34b0*2);
  image_base=reinterpret_cast<uintptr_t>(image.data());auto w=reinterpret_cast<uintptr_t>(world.data()),a=reinterpret_cast<uintptr_t>(actors.data());
- put(image_base+0xde95d0,w);put(w+0xa650,a);put(w+0xa658,a+actors.size());put(image_base+0xe21140,a);put(image_base+0xe1d688,0);
- small(image_base+0xe031e8,"owner");put(a+0x78,0);put(a+0x7dc,0);put(a+0x81,(unsigned char)1);small(a+0x6f0,"owner");small(a+0x798,"owner");
+ put(image_base+0xdea5d0,w);put(w+0xa650,a);put(w+0xa658,a+actors.size());put(image_base+0xe22140,a);put(image_base+0xe1e688,0);
+ small(image_base+0xe041e8,"owner");put(a+0x78,0);put(a+0x7dc,0);put(a+0x81,(unsigned char)1);small(a+0x6f0,"owner");small(a+0x798,"owner");
  auto bot=a+0x34b0;put(bot+0x78,1);put(bot+0x7dc,1);put(bot+0x81,(unsigned char)1);small(bot+0x798,"robot");
- put(image_base+0xfb389c,1);put(w+0x190,0);put(w+0x28c,1);
+ put(image_base+0xfb489c,1);put(w+0x190,0);put(w+0x28c,1);
  shared_label_world=w;shared_label_index["robot"]=bot;render_access=true;render_access_at=GetTickCount64();native_predicate=consume_account;lookup_shared=shared_fixture;
  std::array<unsigned char,32> raw{};auto rawaddr=reinterpret_cast<uintptr_t>(raw.data());
  small(rawaddr,"robot");assert(event_predicate(nullptr,0,raw.data())==0);assert(event_appearance.bot);assert(std::strcmp(reinterpret_cast<char*>(raw.data()),"consumed")==0);
@@ -54,14 +54,14 @@ int main(){
  small(rawaddr,"owner");event_predicate(nullptr,0,raw.data());assert(event_appearance.own);draw_event();assert(scope_seen==1);
  small(rawaddr,"unknown");event_predicate(nullptr,0,raw.data());draw_event();assert(scope_seen==0&&phase_seen==.8f);
  // Canonical UI rows work without a world, and override native rainbow or friend green.
- put(image_base+0xde95d0,uintptr_t(0));frame_styles.clear();
+ put(image_base+0xdea5d0,uintptr_t(0));frame_styles.clear();
  auto row=[&](){return canonical_account_draw(nullptr,0,0,raw.data(),12,0,1,0,.4f,0,0,0,0,.8f);};
  small(rawaddr,"remote");assert(row()==42&&scope_seen==3&&phase_seen==0&&alpha_seen==.4f);
  small(rawaddr,"owner");row();assert(scope_seen==1&&red>.19f&&red<.21f);
  small(rawaddr,"unknown");row();assert(scope_seen==0&&red==0&&green==1&&phase_seen==.8f);
  assert(identity_scope==-1&&color_scope==0);
  // Vehicle attribution uses its actual occupant, including prefixed/renamed bot labels.
- put(image_base+0xde95d0,w);std::array<unsigned char,0x400> vehicle{};std::array<unsigned char,0x70> seats{};
+ put(image_base+0xdea5d0,w);std::array<unsigned char,0x400> vehicle{};std::array<unsigned char,0x70> seats{};
  auto v=reinterpret_cast<uintptr_t>(vehicle.data()),seat=reinterpret_cast<uintptr_t>(seats.data());put(v+0x368,seat);put(seat+0x60,bot);
  auto car=[&](){return ssc_vehicle_name_draw(nullptr,0,0,raw.data(),12,1,1,1,.5f,0,0,0,0,.8f,v);};
  small(rawaddr,"not-account");render_access=true;render_access_at=GetTickCount64();car();assert(green>.73f&&green<.74f&&phase_seen==-1);
