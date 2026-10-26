@@ -346,9 +346,17 @@ namespace SSCMods.Setup {
                 }
             }
             if(preserve.Count==0) {
-                File.Delete(Destination(root,ManifestName));
                 string dir=System.IO.Path.Combine(root,"SSCMods");
-                if(!Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir);
+                string journal=Destination(root,ManifestName);
+                if(Directory.EnumerateFileSystemEntries(dir).Any(p=>!String.Equals(p,journal,StringComparison.OrdinalIgnoreCase))) {
+                    // Preserve leftover logs/settings without blocking a fresh install.
+                    // Move the journal too: if the move fails, uninstall can be retried.
+                    string backup=Path.Combine(root,"SSCMods-preserved-"+Guid.NewGuid().ToString("N"));
+                    Directory.Move(dir,backup);
+                } else {
+                    File.Delete(journal);
+                    if(!Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir);
+                }
             }
             return preserve;
         }
