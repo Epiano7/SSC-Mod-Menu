@@ -1,4 +1,3 @@
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/F2F620EVRQ)
 <a href="https://epiano7.dev" target="_blank" rel="noopener noreferrer"><img src="https://epiano7.dev/assets/buttons/epiano7.png" width="88" height="31" alt="epiano7.dev"></a>
 [![Downloads](https://raw.githubusercontent.com/Epiano7/SSC-Mod-Menu/traffic-data/downloads.svg)](https://github.com/Epiano7/SSC-Mod-Menu/releases)
 ![Traffic](https://raw.githubusercontent.com/Epiano7/SSC-Mod-Menu/traffic-data/badge.svg)
