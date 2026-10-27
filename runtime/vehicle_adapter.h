@@ -47,8 +47,8 @@ inline void control(uintptr_t car){
 }
 inline uint64_t hash(const unsigned char* p,size_t n){uint64_t h=14695981039346656037ULL;for(size_t i=0;i<n;++i)h=(h^p[i])*1099511628211ULL;return h;}
 inline bool matches(const unsigned char* p,size_t n){
- if(n<0xfb1cc4||hash(p+0x9e1200,0x230)!=0x880fd7214d0cc3a5ULL||hash(p+0x9d8d00,0x980)!=0x792fe13face9c263ULL)return false;
- int32_t rel=0;std::memcpy(&rel,p+0x9e1421,4);return p[0x9e1420]==0xe8&&int64_t(0x9e1425)+rel==0x9d8d00;
+ if(n<0xfb1cc4||hash(p+0x9e1050,0x230)!=0x376252f5c5d2808cULL||hash(p+0x9d8b50,0x980)!=0x27e3b46d4f62144aULL)return false;
+ int32_t rel=0;std::memcpy(&rel,p+0x9e1271,4);return p[0x9e1270]==0xe8&&int64_t(0x9e1275)+rel==0x9d8b50;
 }
 inline bool attach(){
  auto p=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));
@@ -60,9 +60,9 @@ inline bool attach(){
  const unsigned char jump[]={0xff,0x25,0,0,0,0};auto target=reinterpret_cast<uintptr_t>(control);
  std::memcpy(bridge,jump,6);std::memcpy(bridge+6,&target,8);DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=p+0x9e1420;
+ FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=p+0x9e1270;
  if(!VirtualProtect(site,5,PAGE_EXECUTE_READWRITE,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- image=origin;original=reinterpret_cast<Control>(p+0x9d8d00);
+ image=origin;original=reinterpret_cast<Control>(p+0x9d8b50);
  int32_t relative=int32_t(reinterpret_cast<uintptr_t>(bridge)-reinterpret_cast<uintptr_t>(site+5));std::memcpy(site+1,&relative,4);
  DWORD ignored=0;VirtualProtect(site,5,old,&ignored);FlushInstructionCache(GetCurrentProcess(),site,5);return true;
 }

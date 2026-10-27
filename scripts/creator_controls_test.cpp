@@ -12,8 +12,8 @@ int main(int argc,char** argv){
  HANDLE file=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);assert(file!=INVALID_HANDLE_VALUE);
  HANDLE mapping=CreateFileMappingW(file,nullptr,PAGE_READONLY|SEC_IMAGE_NO_EXECUTE,0,0,nullptr);assert(mapping);
  auto view=static_cast<const unsigned char*>(MapViewOfFile(mapping,FILE_MAP_READ,0,0,0));assert(view);
- assert(ssc_creator::matches(view,0x84a288));assert(!ssc_creator::matches(view,0x84a287));
- std::vector<unsigned char> changed(view,view+0x84a288);changed[0x8465f0]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));changed[0x8465f0]^=1;changed[0x3b9527]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));
+ assert(ssc_creator::matches(view,0x84a0c8));assert(!ssc_creator::matches(view,0x84a0c7));
+ std::vector<unsigned char> changed(view,view+0x84a0c8);changed[0x846430]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));changed[0x846430]^=1;changed[0x3b9007]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));
  UnmapViewOfFile(view);CloseHandle(mapping);CloseHandle(file);
  WNDCLASSW wc{};wc.style=CS_OWNDC;wc.lpfnWndProc=DefWindowProcW;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"SSCCreatorTest";assert(RegisterClassW(&wc));
  HWND window=CreateWindowW(wc.lpszClassName,L"SSC creator test",WS_OVERLAPPEDWINDOW,0,0,64,64,nullptr,nullptr,wc.hInstance,nullptr);assert(window);

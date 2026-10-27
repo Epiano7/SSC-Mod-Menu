@@ -23,8 +23,8 @@ inline bool attach(){
  const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
  struct Site {uint32_t call,target;uintptr_t hook;};
  const Site sites[]={
-  {0x3bada5,0x3d9790,reinterpret_cast<uintptr_t>(panel)},
-  {0x7d4765,0x7f8210,reinterpret_cast<uintptr_t>(captures_input)}
+  {0x3ba885,0x3d9270,reinterpret_cast<uintptr_t>(panel)},
+  {0x7d44f5,0x7f7ff0,reinterpret_cast<uintptr_t>(captures_input)}
  };
  unsigned char* addresses[2]{};uintptr_t targets[2]{};int32_t saved[2]{};
  for(size_t i=0;i<2;++i){

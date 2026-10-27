@@ -16,7 +16,7 @@ inline void sample_weapon(uintptr_t record,Values& values){
 }
 
 // Fingerprint both producers/consumers of world+6aa0 and the native send route.
-inline constexpr uint32_t native_dependencies[][3]={{0x890190,0x2ad5e0,0},{0x2e94a0,0x222be0,0},{0x8319f0,0x8038e3,0},{0x22b370,0x899a80,0}};
+inline constexpr uint32_t native_dependencies[][3]={{0x88fff0,0x2ad0c0,0},{0x2e8f80,0x222bb0,0},{0x831830,0x8036c3,0},{0x22b340,0x8998e0,0}};
 inline bool supported(){return ssc_compat::supports(32)&&ssc_compat::supports(4)&&ssc_compat::supports(8);}
 // HUD survival timer (mode 6): 3b9d69 uses ceil(world+3bc) while positive,
 // then switches to -world+3cc for overtime. The gameplay countdown at +3bc
@@ -24,10 +24,10 @@ inline bool supported(){return ssc_compat::supports(32)&&ssc_compat::supports(4)
 // Guard the HUD selector/formatter as well as the nominal-duration helper.
 inline bool recording_clock_supported(uintptr_t base){
  static uintptr_t checked=0;static bool valid=false;if(checked==base)return valid;checked=base;valid=false;
- struct Span{uint32_t rva,length;uint64_t hash;};const Span spans[]={{0x241cd0,314,0x7881ece0feb781cULL},{0x2304a0,36,0x51dac33189d8282ULL},{0x3bb854,91,0x909856ab97c42e7cULL},{0x3be201,70,0xbdc4d83026392c6cULL}};
+ struct Span{uint32_t rva,length;uint64_t hash;};const Span spans[]={{0x2417b0,314,0x21a552bf3dda58bcULL},{0x230470,36,0xe98cfdeae7659332ULL},{0x3bb334,91,0xa89e9c7608b1d858ULL},{0x3bdce1,70,0x9ee4d08bd71fadf2ULL}};
  for(const auto& span:spans){uint64_t hash=14695981039346656037ULL;for(uint32_t i=0;i<span.length;++i){unsigned char byte=0;if(!ssc_names::read(base+span.rva+i,byte))return false;hash=(hash^byte)*1099511628211ULL;}if(hash!=span.hash)return false;}
  float minimum=0,step=0,sign=0;double half=0;
- valid=ssc_names::read(base+0xc7c608,minimum)&&minimum==30&&ssc_names::read(base+0xc7c48c,step)&&step==5&&ssc_names::read(base+0xc7ba10,half)&&half==.5&&ssc_names::read(base+0xc7cf64,sign)&&sign==-1;return valid;
+ valid=ssc_names::read(base+0xc7c5a0,minimum)&&minimum==30&&ssc_names::read(base+0xc7c424,step)&&step==5&&ssc_names::read(base+0xc7b9a0,half)&&half==.5&&ssc_names::read(base+0xc7cefc,sign)&&sign==-1;return valid;
 }
 inline double recording_hud_countdown(float remaining,float overtime){
  if(!std::isfinite(remaining)||remaining>7200||remaining<-14400)return NAN;
@@ -96,7 +96,7 @@ inline bool send_native(uintptr_t base,uintptr_t world,uintptr_t actor,const std
  // The native client chat-input path calls this with flag=0. It deep-copies the
  // temporary native-layout string into its own outbound queue, then shows it locally.
  ssc_chat::NativeString message{reinterpret_cast<uintptr_t>(text.data()),0,text.size(),std::max(size_t(16),text.size())};
- if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x222be0));
+ if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x222bb0));
  sender(world,0,actor,&message);
  // Engine::dispatch limits automatic messages. Observe the native wheel's
  // cooldown above, but never impose an additional lockout on manual input.
