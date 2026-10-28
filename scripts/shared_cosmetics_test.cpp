@@ -3,7 +3,7 @@
 #include <iostream>
 using namespace ssc_shared;
 const Time start{100000,100000};
-std::string response(Json appearance={{"mode","solid"},{"colors",Json::array({0x55e74f})}}){
+std::string response(Json appearance={{"mode","solid"},{"colors",Json::array({0x55e73f})}}){
  return Json{{"ok",true},{"profiles",Json::array({{{"account_key","player_one"},{"style",appearance},{"ttl_seconds",30}}})}}.dump();
 }
 int main(){
@@ -20,7 +20,7 @@ int main(){
  }
 
  Cache c;Style s;c.context(123,true);auto p=c.begin({"player_one"},start);
- assert(c.accept(p,response(),{100200,100200}));assert(c.get("player_one",{100300,100300},s)&&s.colors[0]==0x55e74f);
+ assert(c.accept(p,response(),{100200,100200}));assert(c.get("player_one",{100300,100300},s)&&s.colors[0]==0x55e73f);
  assert(!c.get("player",{100300,100300},s));assert(!c.get("Player_one",{100300,100300},s));
  assert(!c.accept(p,response(),{100400,100400})); // replay
  for(auto now:{Time{130000,130000},Time{100100,99999},Time{100100,130000}}){
