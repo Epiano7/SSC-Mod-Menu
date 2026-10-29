@@ -11,10 +11,10 @@
       "runtime/draft_advisor.h": "02fa3e0e22eb1d982a032ea163c405a440918d0385565556488d78731075f8ca",
       "runtime/draft_training.h": "78a502d97bf3b8537f77c40556fbf722b60f6e6cf0e02878c7bcac7f4af87c94",
       "runtime/draft_training_core.h": "0de2f721cbf7d81b5aa6cc760d1ce7311a3bf45db037c104588796fb63dc43fa",
-      "runtime/draft_training_native.h": "011c1358af0a8e6a6087ff9601c85526de660fcb6eb80ecae23bf7093298e892",
+      "runtime/draft_training_native.h": "15acf7cc98a1b36ed085226659aa290c5787a369bd4829bc67331e6e8844c6a4",
       "runtime/draft_training_source.h": "d0d9cc5b4dbabea2bf7ca86f99ee84881216f06b711daadd6bd04a0b04200704"
     },
-    "sha256": "12c8e0dba737b5a5e9b544b403e969bf576a2bb2ea694cae6cd4d00bbbcd57fe"
+    "sha256": "7ca9f46c1ebe4f3db25b0b6f38519ad477b88868e1c35b03bfe5be5c1161892d"
   },
   "public_files": {
     ".gitattributes": "23302dd90b8bb74b44d365fafef8df20f809b61cb347023951ecf60a88a29651",
