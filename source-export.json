@@ -240,7 +240,7 @@
     "scripts/Build-AudioCodec.ps1": "3ee5e929943f2d31d174ad256852f85d5331c84bf5ebbc562fb5dfcc8e2c610f",
     "scripts/Build-AuthCrypto.ps1": "65bed304aa930e788c6c6727477257134bc9e358b4988da5174cb2b6aa61faa4",
     "scripts/Build-CompatibilityProbe.ps1": "13d001f6c637949804e794e8513a7b281114a3191fa48adfffe99b3c3be2bbdd",
-    "scripts/Build-Installer.ps1": "3e27a2c9e556930ae592b29c3dcff2809d5010061e7dcd37a2b160aa94ba7cc5",
+    "scripts/Build-Installer.ps1": "1be010ba076c2054abe28b682a55ace10292bbc6d872b107186eede10c982d9e",
     "scripts/Build-Linux-Launcher.ps1": "4a03586bb0ee6ede15a741e349d2c47571b237ccf48c5461ec556107139f1dfc",
     "scripts/Build-Linux.py": "19e9ee1527de058183da6560ba0adb97a119af65c568552385fcf1849a229d7a",
     "scripts/Build-Release.ps1": "7d29c1e6932be33acd2fb7c9dd7c33bd5239030e03791479315d4113d14a9ccc",
