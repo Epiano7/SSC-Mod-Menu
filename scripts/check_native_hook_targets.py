@@ -1,9 +1,11 @@
 """Read-only direct-call ABI regression check for native hook tables."""
 from pathlib import Path
 import argparse,re,struct,pefile
-p=argparse.ArgumentParser();p.add_argument('game');a=p.parse_args();root=Path(__file__).resolve().parents[1];image=pefile.PE(a.game);count=0
-for source in (root/'runtime').glob('*.h'):
- text=source.read_text()
+p=argparse.ArgumentParser();p.add_argument('game');p.add_argument('--private-source',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];image=pefile.PE(a.game);count=0
+from verify_public_source import verify
+verify(root,a.private_source)
+for source in list((root/'runtime').glob('*.h'))+list((a.private_source/'runtime').glob('*.h')):
+ text=source.read_text(encoding="utf-8")
  if source.name!='quick_chat.h':text=re.sub(r'inline constexpr uint32_t native_dependencies\[\]\[3\]=\{.*?;','',text)
  for call,target in re.findall(r'\{(0x[0-9a-f]+),\s*(0x[0-9a-f]+),\s*(?:reinterpret_cast|0\})',text):
   call,target=int(call,16),int(target,16);code=image.get_data(call,5)
