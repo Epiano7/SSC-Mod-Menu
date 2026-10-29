@@ -88,7 +88,7 @@ inline bool register_mouse(HWND window){
 }
 inline bool restore_mouse_registration(){if(!raw_mouse)return true;RAWINPUTDEVICE d=had_raw_mouse?saved_raw_mouse:RAWINPUTDEVICE{1,2,RIDEV_REMOVE,nullptr};if(!RegisterRawInputDevices(&d,1,sizeof d))return false;raw_mouse=false;return true;}
 inline void release_mouse(){if(mouse_window){restore_mouse_registration();ClipCursor(&saved_clip);if(GetForegroundWindow()==mouse_window){SetCursorPos(saved_cursor.x,saved_cursor.y);SetCursor(saved_shape);}mouse_window=nullptr;}}
-inline void restore_bounds(){if(bounds_saved&&base){std::memcpy(reinterpret_cast<void*>(base+0xfb1c80),saved_bounds,sizeof saved_bounds);bounds_saved=false;}}
+inline void restore_bounds(){if(bounds_saved&&base){std::memcpy(reinterpret_cast<void*>(base+0xfb1c78),saved_bounds,sizeof saved_bounds);bounds_saved=false;}}
 inline void stop(){capture::session.cancel();photo_frozen=false;focus_suspended=false;slow_latched=false;state.stop();pending_since=0;pending_actor=pending_world=0;entry_status=L"";camera.reset();release_mouse();restore_bounds();ssc_creator::freecam_hide=false;}
 inline bool start(uint64_t now){camera.reset();return state.start(now);}
 inline bool select_mode(int mode){
@@ -142,10 +142,10 @@ inline void APIENTRY view(float x,float y,float z){
   if(fly&&draw_distance>0)wanted=std::max(near_plane+1.f,float(draw_distance));
   if(std::isfinite(wanted)&&near_plane>0&&wanted>near_plane&&wanted!=far_plane){projection[10]=-(wanted+near_plane)/(wanted-near_plane);projection[14]=-2*wanted*near_plane/(wanted-near_plane);glMatrixMode(GL_PROJECTION);glLoadMatrixf(projection);glMatrixMode(GL_MODELVIEW);}
  }
- if(base&&(fly||camera.zoom>1.f)){if(!bounds_saved){std::memcpy(saved_bounds,reinterpret_cast<void*>(base+0xfb1c80),sizeof saved_bounds);bounds_saved=true;}
+ if(base&&(fly||camera.zoom>1.f)){if(!bounds_saved){std::memcpy(saved_bounds,reinterpret_cast<void*>(base+0xfb1c78),sizeof saved_bounds);bounds_saved=true;}
   float bounds[4];if(fly){bounds[0]=-256;bounds[1]=-256;bounds[2]=state.max_x+512;bounds[3]=state.max_y+512;rendered_camera.visible_bounds(projection,state.max_x,state.max_y,bounds);}
   else {bounds[0]=state.x+(saved_bounds[0]-state.x)*camera.zoom;bounds[1]=state.y+(saved_bounds[1]-state.y)*camera.zoom;bounds[2]=saved_bounds[2]*camera.zoom;bounds[3]=saved_bounds[3]*camera.zoom;}
-  std::memcpy(reinterpret_cast<void*>(base+0xfb1c80),bounds,sizeof bounds);
+  std::memcpy(reinterpret_cast<void*>(base+0xfb1c78),bounds,sizeof bounds);
  }
 }
 inline float* center(uintptr_t context,float* output){
@@ -225,7 +225,7 @@ using Scene=void(*)();inline Scene native_scene=nullptr;
 inline void scene(){
  // This is the native render-only Shadows switch, scoped to one world draw.
  // Restore it even when Freecam stops during that draw; never save game config.
- auto flag=reinterpret_cast<unsigned char*>(base+0xfb19dd);
+ auto flag=reinterpret_cast<unsigned char*>(base+0xfb19d5);
  const unsigned char previous=*flag;
  const bool hidden=state.active&&hide_shadows;
  if(hidden)*flag=0;
@@ -235,38 +235,38 @@ inline void scene(){
 using DebugDraw=void(*)(uintptr_t,uintptr_t,uintptr_t,int);inline DebugDraw native_debug=nullptr;
 inline void debug_draw(uintptr_t a,uintptr_t b,uintptr_t c,int d){if(clean_view()||(state.active&&hide_diagnostics)){ssc_creator::WriteMask mask;native_debug(a,b,c,d);}else native_debug(a,b,c,d);}
 inline bool matches(const unsigned char* b,size_t size){
- if(size<0x86801c)return false;
- const unsigned char caller[]={0x0,0xf,0x28,0xc2,0xf2,0xf,0x59,0xd8,0xf2,0xf,0x11,0x1d,0xfc,0xf9,0x74,0x0,0xe8,0x5f,0x6f,0x98,0xff,0x40,0x32,0xff,0xf2,0xf,0x11,0x35,0xec,0xf9,0x74,0x0};
- if(std::memcmp(b+0x867ffc,caller,sizeof caller)!=0)return false;
- if(ssc_creator::hash(b+0x857930,0x1b36)!=0xf143d8360b99154aULL)return false;
- if(ssc_creator::hash(b+0x1aa5c0,0x7e7)!=0x46d3c44a93915292ULL)return false;
- {int32_t d=0;std::memcpy(&d,b+0x1ef10e,4);if(b[0x1ef10c]!=0xff||b[0x1ef10d]!=0x15||int64_t(0x1ef112)+d!=0xb88b30)return false;}
- if(ssc_creator::hash(b+0x2b6b60,0x355)!=0x3f15cd1bb60b65f0ULL||ssc_creator::hash(b+0x214bc9,0x30)!=0xada1483408e68162ULL)return false;
- if(ssc_creator::hash(b+0x852ad0,0x49fe)!=0xa52d4b033fe960b1ULL||ssc_creator::hash(b+0x84f190,0x393b)!=0xb2cf58c93f610ee2ULL||ssc_creator::hash(b+0x84c120,0xdb4)!=0xcc6e850d3a6d8028ULL)return false;
- for(auto function:{std::pair<uint32_t,uint64_t>{0x589c20,0xa5c865fbf87c5ddbULL},{0x58f240,0xee6ad0d46ccb2cbfULL},{0x84add0,0x4ba3a009881a9bc3ULL}}){size_t length=function.first==0x589c20?0x1e09:function.first==0x58f240?0xa3e:0x1344;if(ssc_creator::hash(b+function.first,length)!=function.second)return false;}
- for(uint32_t site:{0x589d6au,0x589d84u,0x58f38fu,0x58f3a8u,0x84b8ecu,0x84b906u,0x8531c1u,0x8531dbu,0x852685u,0x85269eu,0x84c248u,0x84c262u,0x857da6u,0x857dc0u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdf0870)return false;}
- if(ssc_creator::hash(b+0x432370,0x2e5)!=0x2630fb897690250aULL)return false;
- if(ssc_creator::hash(b+0x1f1070,0x1d1)!=0x906b5145dc70fe10ULL)return false;
- for(uint32_t site:{0x1f02dbu,0x1f057fu,0x1f11a1u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdf0868)return false;}
- if(ssc_creator::hash(b+0x4516a0,0x490)!=0x35e20abee737860eULL||ssc_creator::hash(b+0x1eef70,6566)!=0x9b6a2db8aa758ac7ULL||ssc_creator::hash(b+0x3b9140,7554)!=0x6f6c71aaf9165256ULL)return false;
- for(auto pair:{std::pair<uint32_t,uint32_t>{0x1ef711,0x4516a0},{0x1f0853,0x3b9140},{0x214bd0,0x2b6b60},{0x1aa503,0x1aa5c0}}){int32_t d=0;std::memcpy(&d,b+pair.first+1,4);if(b[pair.first]!=0xe8||int64_t(pair.first)+5+d!=pair.second)return false;}return true;
+ if(size<0x86868c)return false;
+ const unsigned char caller[]={0x0,0xf,0x28,0xc2,0xf2,0xf,0x59,0xd8,0xf2,0xf,0x11,0x1d,0x84,0xf3,0x74,0x0,0xe8,0x7f,0x67,0x98,0xff,0x40,0x32,0xff,0xf2,0xf,0x11,0x35,0x74,0xf3,0x74,0x0};
+ if(std::memcmp(b+0x86866c,caller,sizeof caller)!=0)return false;
+ if(ssc_creator::hash(b+0x857fa0,0x1b36)!=0x92c4a4d883b69754ULL)return false;
+ if(ssc_creator::hash(b+0x1aa450,0x7e7)!=0xba82e3132f9d8008ULL)return false;
+ {int32_t d=0;std::memcpy(&d,b+0x1eef9e,4);if(b[0x1eef9c]!=0xff||b[0x1eef9d]!=0x15||int64_t(0x1eefa2)+d!=0xb88b30)return false;}
+ if(ssc_creator::hash(b+0x2b6b80,0x355)!=0x8c70f0ca7cee041bULL||ssc_creator::hash(b+0x214c09,0x30)!=0x6bc129cf97318c83ULL)return false;
+ if(ssc_creator::hash(b+0x853140,0x49fe)!=0x43cc5a4cb5ec2132ULL||ssc_creator::hash(b+0x84f800,0x393b)!=0xf15d4866b1cd229dULL||ssc_creator::hash(b+0x84c790,0xdb4)!=0x8a863ad6aefaac94ULL)return false;
+ for(auto function:{std::pair<uint32_t,uint64_t>{0x589fb0,0xa36a63acdf68f205ULL},{0x58f5d0,0xf7f26570b1eec4dULL},{0x84b440,0x5ce99e3d37a5dbcaULL}}){size_t length=function.first==0x589fb0?0x1e09:function.first==0x58f5d0?0xa3e:0x1344;if(ssc_creator::hash(b+function.first,length)!=function.second)return false;}
+ for(uint32_t site:{0x58a0fau,0x58a114u,0x58f71fu,0x58f738u,0x84bf5cu,0x84bf76u,0x853831u,0x85384bu,0x852cf5u,0x852d0eu,0x84c8b8u,0x84c8d2u,0x858416u,0x858430u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdf0870)return false;}
+ if(ssc_creator::hash(b+0x4326d0,0x2e5)!=0x61adcf46b9f0416cULL)return false;
+ if(ssc_creator::hash(b+0x1f0f00,0x1d1)!=0xfb577741e94c3d83ULL)return false;
+ for(uint32_t site:{0x1f016bu,0x1f040fu,0x1f1031u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdf0868)return false;}
+ if(ssc_creator::hash(b+0x451a00,0x490)!=0xf3cccd110532d65fULL||ssc_creator::hash(b+0x1eee00,6566)!=0x4f9996c1a89af469ULL||ssc_creator::hash(b+0x3b9230,7554)!=0xdc22719976d9e8d1ULL)return false;
+ for(auto pair:{std::pair<uint32_t,uint32_t>{0x1ef5a1,0x451a00},{0x1f06e3,0x3b9230},{0x214c10,0x2b6b80},{0x1aa393,0x1aa450}}){int32_t d=0;std::memcpy(&d,b+pair.first+1,4);if(b[pair.first]!=0xe8||int64_t(pair.first)+5+d!=pair.second)return false;}return true;
 }
 inline bool attach(){
  auto b=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));if(!b)return false;auto dos=reinterpret_cast<IMAGE_DOS_HEADER*>(b);if(dos->e_magic!=IMAGE_DOS_SIGNATURE)return false;auto nt=reinterpret_cast<IMAGE_NT_HEADERS*>(b+dos->e_lfanew);if(nt->Signature!=IMAGE_NT_SIGNATURE||!matches(b,nt->OptionalHeader.SizeOfImage))return false;
- base=reinterpret_cast<uintptr_t>(b);ground_supported=ssc_creator::hash(b+0x5828a0,0x229)==0x3dbb90ba8fc648faULL;unsigned char* bridge=nullptr;
- native_time_scale=reinterpret_cast<TimeScale>(b+0x2b6b60);
- native_scene=reinterpret_cast<Scene>(b+0x1eef70);
- native_debug=reinterpret_cast<DebugDraw>(b+0x1aa5c0);
+ base=reinterpret_cast<uintptr_t>(b);ground_supported=ssc_creator::hash(b+0x582c30,0x229)==0x4486bf09e5bb33a6ULL;unsigned char* bridge=nullptr;
+ native_time_scale=reinterpret_cast<TimeScale>(b+0x2b6b80);
+ native_scene=reinterpret_cast<Scene>(b+0x1eee00);
+ native_debug=reinterpret_cast<DebugDraw>(b+0x1aa450);
  native_listener=*reinterpret_cast<Listener3f*>(b+0xb88b30);
- native_spectator_request=reinterpret_cast<SpectatorRequest>(b+0x432370);
+ native_spectator_request=reinterpret_cast<SpectatorRequest>(b+0x4326d0);
  for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((base+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));
  if(!bridge)return false;
  uintptr_t hooks[]={reinterpret_cast<uintptr_t>(center),reinterpret_cast<uintptr_t>(hud),reinterpret_cast<uintptr_t>(view),reinterpret_cast<uintptr_t>(view),reinterpret_cast<uintptr_t>(view),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(time_scale),reinterpret_cast<uintptr_t>(listener),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(scene)};const unsigned char jump[]={0xff,0x25,0,0,0,0};
  for(int i=0;i<22;++i){std::memcpy(bridge+16*i,jump,6);std::memcpy(bridge+16*i+6,&hooks[i],8);}DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,352);
- unsigned char* sites[]={b+0x1ef711,b+0x1f0853,b+0x1f02db,b+0x1f057f,b+0x1f11a1,b+0x589d6a,b+0x589d84,b+0x58f38f,b+0x58f3a8,b+0x84b8ec,b+0x84b906,b+0x8531c1,b+0x8531db,b+0x852685,b+0x85269e,b+0x84c248,b+0x84c262,b+0x214bd0,b+0x1ef10c,b+0x857da6,b+0x857dc0,b+0x86800c};DWORD protection[22]{};const size_t lengths[]={5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,6,6,6,5};
+ unsigned char* sites[]={b+0x1ef5a1,b+0x1f06e3,b+0x1f016b,b+0x1f040f,b+0x1f1031,b+0x58a0fa,b+0x58a114,b+0x58f71f,b+0x58f738,b+0x84bf5c,b+0x84bf76,b+0x853831,b+0x85384b,b+0x852cf5,b+0x852d0e,b+0x84c8b8,b+0x84c8d2,b+0x214c10,b+0x1eef9c,b+0x858416,b+0x858430,b+0x86867c};DWORD protection[22]{};const size_t lengths[]={5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,6,6,6,5};
  for(int i=0;i<22;++i)if(!VirtualProtect(sites[i],lengths[i],PAGE_EXECUTE_READWRITE,&protection[i])){for(int j=0;j<i;++j){DWORD ignored;VirtualProtect(sites[j],lengths[j],protection[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
- original_center=reinterpret_cast<Center>(b+0x4516a0);original_hud=reinterpret_cast<Hud>(b+0x3b9140);
+ original_center=reinterpret_cast<Center>(b+0x451a00);original_hud=reinterpret_cast<Hud>(b+0x3b9230);
  for(int i=0;i<22;++i){int32_t d=int32_t(reinterpret_cast<uintptr_t>(bridge+16*i)-reinterpret_cast<uintptr_t>(sites[i]+5));sites[i][0]=0xe8;std::memcpy(sites[i]+1,&d,4);if(lengths[i]==6)sites[i][5]=0x90;FlushInstructionCache(GetCurrentProcess(),sites[i],lengths[i]);}
  for(int i=21;i>=0;--i){DWORD ignored;VirtualProtect(sites[i],lengths[i],protection[i],&ignored);}return true;
 }

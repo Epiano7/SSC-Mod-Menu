@@ -45,7 +45,7 @@ int main(){
  put(image_base+0xdea5d0,w);put(w+0xa650,a);put(w+0xa658,a+actors.size());put(image_base+0xe22140,a);put(image_base+0xe1e688,0);
  small(image_base+0xe041e8,"owner");put(a+0x78,0);put(a+0x7dc,0);put(a+0x81,(unsigned char)1);small(a+0x6f0,"owner");small(a+0x798,"owner");
  auto bot=a+0x34b0;put(bot+0x78,1);put(bot+0x7dc,1);put(bot+0x81,(unsigned char)1);small(bot+0x798,"robot");
- put(image_base+0xfb489c,1);put(w+0x190,0);put(w+0x28c,1);
+ put(image_base+0xfb4894,1);put(w+0x190,0);put(w+0x28c,1);
  shared_label_world=w;shared_label_index["robot"]=bot;render_access=true;render_access_at=GetTickCount64();native_predicate=consume_account;lookup_shared=shared_fixture;
  std::array<unsigned char,32> raw{};auto rawaddr=reinterpret_cast<uintptr_t>(raw.data());
  small(rawaddr,"robot");assert(event_predicate(nullptr,0,raw.data())==0);assert(event_appearance.bot);assert(std::strcmp(reinterpret_cast<char*>(raw.data()),"consumed")==0);
