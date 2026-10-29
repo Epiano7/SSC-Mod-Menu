@@ -31,3 +31,20 @@ settings.ini
 /docs/cosmetics-name-coverage.md
 /docs/compatibility-hotfix-service.md
 /docs/combat-tracking.md
+
+# Private build inputs and credentials stay outside the public tree.
+/private-build-input/
+/private/
+/server/
+/runtime/advisor*
+/runtime/draft*
+/runtime/postgame*
+/scripts/advisor*
+/scripts/draft*
+/scripts/postgame*
+/scripts/post_game*
+.env
+.env.*
+*.key
+*.pfx
+*.p12

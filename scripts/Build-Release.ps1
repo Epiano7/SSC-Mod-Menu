@@ -7,6 +7,8 @@ param(
     [Parameter(Mandatory)][string]$LinuxLauncher
 )
 $ErrorActionPreference='Stop'
+& $Python "$PSScriptRoot/verify_public_source.py"
+if($LASTEXITCODE){throw 'Public source export inventory failed; publication blocked'}
 & "$PSScriptRoot/Build-Installer.ps1" -RuntimeDirectory $RuntimeDirectory -BuildDirectory $BuildDirectory
 & $Python "$PSScriptRoot/Build-Linux.py" --runtime $RuntimeDirectory --python-archive $LinuxPythonArchive --launcher $LinuxLauncher --output (Join-Path $BuildDirectory 'SSC-Mod-Menu-Linux.tar.gz')
 if($LASTEXITCODE){throw 'Linux packaging failed'}

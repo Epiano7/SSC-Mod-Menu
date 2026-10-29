@@ -80,7 +80,7 @@ If something goes wrong, open **All Modules > About > Open logs**, and dm them t
   joining his lobbies in the last 2 minutes and winning
   - chill for being a chill guy (and for giving some great suggestions)
   - geri, founder of the Geri Challenge (fan-made challenge where you aren't allowed to draft skills)
-  - mang for answering a ton of questions I had as a new player and for their work on a synergy chart (which is planned to be implemented in the mod soon)
+  - mang for answering a ton of questions I had as a new player and for their work on a synergy chart
   - deus for building my hatred for snipers so much that I always keep one in my second weapon slot :D
 
 
@@ -89,3 +89,12 @@ If something goes wrong, open **All Modules > About > Open logs**, and dm them t
 ## Private access
 
 Privately approved beta testers can enter an activation code under **Private access**. Later launches check access automatically. Private activation currently requires native Windows; see the [Linux guide](linux/README.md) for platform limits
+
+
+## Source distribution
+
+This is a mixed-source project. The installer, public modules, compatibility probe
+and native Freecam/Driving fixtures are published here. Research/collector internals
+are private build inputs pinned by `source-export.json`. A full runtime build requires
+the matching owner-provided component. This source cleanup changes no released
+binary or installed settings. See [source policy](docs/source-distribution.md).
