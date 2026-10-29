@@ -27,7 +27,7 @@ int main(int argc,char**argv){
  put(a,0x8a0,3);unchanged();put(a,0x8a0,0);
  put(w,0x6b98,128);unchanged();put(w,0x6b98,0);
  put(v,0x370,seat);unchanged();put(v,0x370,seat+0x68);
- put(image,0xfb1cc0,10.f);unchanged();put(image,0xfb1cc0,0.f);
+ put(image,0xfb1cb8,10.f);unchanged();put(image,0xfb1cb8,0.f);
  run(std::numeric_limits<float>::quiet_NaN());assert(observed[0]==1&&mapper.sector==-1);
  unsigned char all[]={1,1,1,1};std::memcpy(vm.data()+0x14f,all,4);put(v,0x90,90.f);control(v);assert(std::memcmp(all,observed,4)==0);
  vm[0x14e]=7;vm[0x153]=9;run(90);assert(vm[0x14e]==7&&vm[0x153]==9);assert(calls==20);
@@ -40,7 +40,7 @@ int main(int argc,char**argv){
  const unsigned char outputs[4][4]={{1,0,0,0},{0,1,0,0},{0,0,0,1},{0,0,1,0}};
  for(int i=0;i<4;++i){mapper.reset();std::memcpy(vm.data()+0x14f,inputs[i],4);control(v);assert(std::memcmp(observed,outputs[i],4)==0);}
  assert(!matches(im.data(),im.size()));
- if(argc>1){std::ifstream f(argv[1],std::ios::binary);assert(f);std::vector<char> data((std::istreambuf_iterator<char>(f)),{});auto dos=reinterpret_cast<const IMAGE_DOS_HEADER*>(data.data());auto nt=reinterpret_cast<const IMAGE_NT_HEADERS*>(data.data()+dos->e_lfanew);std::vector<unsigned char> mapped(nt->OptionalHeader.SizeOfImage);auto sections=IMAGE_FIRST_SECTION(nt);for(unsigned i=0;i<nt->FileHeader.NumberOfSections;++i)std::memcpy(mapped.data()+sections[i].VirtualAddress,data.data()+sections[i].PointerToRawData,sections[i].SizeOfRawData);assert(matches(mapped.data(),mapped.size()));for(size_t off:{size_t(0x9e0ec0),size_t(0x9e10e0),size_t(0x9d89c0)}){mapped[off]^=1;assert(!matches(mapped.data(),mapped.size()));mapped[off]^=1;}assert(!matches(mapped.data(),0x9e10e5));}
+ if(argc>1){std::ifstream f(argv[1],std::ios::binary);assert(f);std::vector<char> data((std::istreambuf_iterator<char>(f)),{});auto dos=reinterpret_cast<const IMAGE_DOS_HEADER*>(data.data());auto nt=reinterpret_cast<const IMAGE_NT_HEADERS*>(data.data()+dos->e_lfanew);std::vector<unsigned char> mapped(nt->OptionalHeader.SizeOfImage);auto sections=IMAGE_FIRST_SECTION(nt);for(unsigned i=0;i<nt->FileHeader.NumberOfSections;++i)std::memcpy(mapped.data()+sections[i].VirtualAddress,data.data()+sections[i].PointerToRawData,sections[i].SizeOfRawData);assert(matches(mapped.data(),mapped.size()));for(size_t off:{size_t(0x9e1720),size_t(0x9e1940),size_t(0x9d9220)}){mapped[off]^=1;assert(!matches(mapped.data(),mapped.size()));mapped[off]^=1;}assert(!matches(mapped.data(),0x9e1945));}
  std::cout<<"PASS: native control adapter, four headings, local driver, solo-only gate, menus/freecam gate, seat/account bounds, native passthrough, conflicting keys, invalid state and executable guards\n";
 }
 

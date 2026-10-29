@@ -37,10 +37,10 @@ inline void sample_rating(uintptr_t base,Snapshot& snapshot){
         ||!read(actor+0x81,f.active)||!read(actor+0x7dc,f.kind)||!read(actor+0x700,f.name_length)||!read(actor+0x6e0,f.login)
         ||!read(actor+0x6e4,f.authenticated)||!read(actor+0x270,f.committed)||!read(actor+0xf98,f.bonus)
         ||!read(actor+0xab4,f.account_level)||!read(actor+0x204,f.eligibility)
-        ||!read(base+ssc_compat::resolve(0xfb6a2c),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfb6a30),f.bonus_threshold)||!ranked(f))return;
+        ||!read(base+ssc_compat::resolve(0xfb6a24),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfb6a28),f.bonus_threshold)||!ranked(f))return;
     // Values used by the native own-profile "RATING THIS MONTH" display at 5f3a5f.
     float rating=-1,matches=-1;int required=0,profile_loaded=0;
-    if(read(base+ssc_compat::resolve(0xe041f8),profile_loaded)&&profile_loaded&&read(base+ssc_compat::resolve(0xe04a9c),rating)&&read(base+ssc_compat::resolve(0xe04a98),matches)&&read(base+ssc_compat::resolve(0xfb6a00),required))add_rating(snapshot,true,rating,matches,required);
+    if(read(base+ssc_compat::resolve(0xe041f8),profile_loaded)&&profile_loaded&&read(base+ssc_compat::resolve(0xe04a9c),rating)&&read(base+ssc_compat::resolve(0xe04a98),matches)&&read(base+ssc_compat::resolve(0xfb69f8),required))add_rating(snapshot,true,rating,matches,required);
     else add_rating(snapshot,true,-1,-1,0);
 }
 inline std::string copy_steam_text(const char* value){
@@ -60,7 +60,7 @@ inline std::string native_string(uintptr_t address){
 }
 inline Snapshot native_fallback(uintptr_t base){
     using ssc_names::read;Snapshot s;int session=0;double joining=0;
-    if(!read(base+ssc_compat::resolve(0xfb26e4),session)||!read(base+ssc_compat::resolve(0xfb26f8),joining)||!std::isfinite(joining))return s;
+    if(!read(base+ssc_compat::resolve(0xfb26dc),session)||!read(base+ssc_compat::resolve(0xfb26f0),joining)||!std::isfinite(joining))return s;
     if(session==1)return from_steam("#Status_AtMainMenu","");
     if(session!=2)return s;
     if(joining>0){s.details="Joining game";s.state="Loading";s.phase=3;return s;}
@@ -89,7 +89,7 @@ inline Snapshot native_fallback(uintptr_t base){
 inline Snapshot sample_steam(bool show_rating=true){
     auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));int initialized=0;
     auto fallback=native_fallback(base);if(show_rating)sample_rating(base,fallback);
-    if(!ssc_names::read(base+ssc_compat::resolve(0xfb14c4),initialized)||initialized<=0)return fallback;
+    if(!ssc_names::read(base+ssc_compat::resolve(0xfb14bc),initialized)||initialized<=0)return fallback;
     auto dll=GetModuleHandleW(L"steam_api64.dll");if(!dll)return fallback;
     using Interface=void*(*)();using OwnId=uint64_t(*)(void*);using Presence=const char*(*)(void*,uint64_t,const char*);
     auto friends=reinterpret_cast<Interface>(GetProcAddress(dll,"SteamAPI_SteamFriends_v017"));
