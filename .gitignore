@@ -9,13 +9,8 @@ __pycache__/
 *.pyc
 menu.ini
 settings.ini
-
 /tests/
-
-# Local native-game port diagnostics (not part of the Proton release)
 /runtime/linux/
-
-# Internal planning and investigation documents stay outside the public repository.
 /docs/planned-features.md
 /docs/completed-features.md
 /docs/beta-access-api.md
@@ -31,8 +26,6 @@ settings.ini
 /docs/cosmetics-name-coverage.md
 /docs/compatibility-hotfix-service.md
 /docs/combat-tracking.md
-
-# Private build inputs and credentials stay outside the public tree.
 /private-build-input/
 /private/
 /server/
