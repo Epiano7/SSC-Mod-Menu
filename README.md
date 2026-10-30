@@ -89,12 +89,3 @@ If something goes wrong, open **All Modules > About > Open logs**, and dm them t
 ## Private access
 
 Privately approved beta testers can enter an activation code under **Private access**. Later launches check access automatically. Private activation currently requires native Windows; see the [Linux guide](linux/README.md) for platform limits
-
-
-## Source distribution
-
-This is a mixed-source project. The installer, public modules, compatibility probe
-and native Freecam/Driving fixtures are published here. Research/collector internals
-are private build inputs pinned by `source-export.json`. A full runtime build requires
-the matching owner-provided component. This source cleanup changes no released
-binary or installed settings. See [source policy](docs/source-distribution.md).
