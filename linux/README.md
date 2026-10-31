@@ -42,7 +42,3 @@ If the installer cannot open, check `~/.local/state/ssc-mod-menu/logs` (or `XDG_
 Audio import, HUD editing, cosmetics, quick chat, Auto Messages, clipboard integration, Discord presence, and update/restart behavior still need broader gameplay testing on Linux.
 
 Bundled dependency notices are included under `licenses` and `python`.
-
-## Private access
-
-This Linux private-access test build uses your desktop Secret Service keyring (libsecret-1.so.0, such as GNOME Keyring or a compatible KWallet service). Unlock your login keyring and launch the game through Steam after running Install/Update from this package so the native helper is refreshed. No plaintext device-key fallback is used. Missing/locked keyrings show an activation error; public modules still work without private activation. Keep the keyring entry when updating or reinstalling: deleting it creates a new device identity and may require code renewal. Public modules do not require activation

@@ -23,6 +23,7 @@
 #include "local_recorder.h"
 #include "recorder_source.h"
 #include "hud_editor.h"
+#include "dark_flash.h"
 #include "geri_mode.h"
 #include "creator_controls.h"
 #include "freecam.h"
@@ -33,6 +34,8 @@
 #include "tracking_recording.h"
 #include "draft_training_source.h"
 #include "statistics_reader.h"
+#include "postgame_report.h"
+#include "postgame_history.h"
 #include "update_module.h"
 #include "diagnostics.h"
 
@@ -103,7 +106,7 @@ void render(HDC dc) {
         performance_at=now;performance_frames=slow_frames=0;frame_sum=frame_max=0;ssc_perf::milliseconds.fill(0);ssc_perf::calls.fill(0);
       }
     }
-    ssc_names::begin_render_frame();
+    ssc_names::begin_render_frame(shared_receive);
     static ULONGLONG auth_start_at=0;
     if(now-auth_start_at>=1000){auth_start_at=now;ssc_auth::service().start();}
     static ULONGLONG shared_at=0;
@@ -126,16 +129,57 @@ void render(HDC dc) {
     if(private_visible!=private_was_visible){private_was_visible=private_visible;dirty=true;controls.clear();pressed=hovered=keyboard_focus=0;if(!private_visible&&settings_page==18)show_manager(-1);}
     static ULONGLONG diagnostics_at=0;
     if(developer_tools&&now-diagnostics_at>15000){diagnostics_at=now;char report[160];snprintf(report,sizeof(report),"Draw diagnostics: rainbow=%u audio=%u",ssc_names::cosmetic_draws.load(),ssc_sound::substituted.load());log(report);}
-    ssc_auto::tick(now,ssc_record::state().enabled||(ssc_training::enabled&&ssc_advisor::private_access()));
+    ssc_auto::tick(now,ssc_record::state().enabled);
+    const auto& pg=ssc_auto::tracking_observation;
+    const bool pg_fresh=ssc_auto::tracking_at&&now>=ssc_auto::tracking_at&&now-ssc_auto::tracking_at<=500;
+    ssc_postgame_live::state.observe(pg.session,pg_fresh&&pg.valid,pg.active,pg.ending,pg.preparing,pg.round,pg.last_round);
+    if(postgame_visible()&&!ssc_postgame_live::state.eligible&&rpc_preview.phase!=1)close_menu(true);
+    // Capture only when a fresh tracking sample exists; no profile scan each frame.
+    static ULONGLONG review_sample_at=0;
+    if(!ssc_record::state().enabled){ssc_review_context::state.reset();review_sample_at=0;}
+    else if(pg_fresh&&pg.valid&&review_sample_at!=ssc_auto::tracking_at){
+        review_sample_at=ssc_auto::tracking_at;
+        ssc_review_context::Rating rating;
+        auto& context=ssc_review_context::state;
+        if(presence_supported&&(!context.decided||(context.start_observed&&!context.starting.player_id)||(context.start_observed&&!context.starting.ranked&&pg.recording_round_seconds>=0&&pg.recording_round_seconds<=2)||context.session!=pg.session||pg.round<context.last_round)&&pg.active&&pg.round==1){
+            ssc_rpc::Snapshot snapshot;snapshot.phase=2;
+            ssc_rpc::sample_rating(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),snapshot,&rating);
+        }
+        context.observe(pg.session,pg.round,pg.active,ssc_auto::round_tracker.complete,pg.recording_round_seconds,now,rating,ssc_record::state().dropped.load());
+        if(context.decided&&!context.emitted&&ssc_record::state().match_open){
+            ssc_record::diagnostic({{"event","post_game_context"},{"data",context.json()}});
+            context.emitted=true;
+        }
+    }
+    // Open the asynchronous recording before the first build observation;
+    // leave round/match closure until after its final snapshot is appended.
+    if(pg.active)ssc_record::track_observation(now);
     ssc_training::tick(now,state_dir);
-    ssc_advisor::tick();
+
+    if(postgame_history_pending&&!ssc_review_history::busy.load()){
+        postgame_history_pending=false;
+        auto saved=std::atomic_load(&ssc_review_history::result);
+        if(postgame_visible()&&rpc_preview.phase==1&&postgame_history_revision==ssc_postgame_live::state.revision){
+            postgame_history_error=saved?ssc_chat::widen(saved->error):L"Could not load saved match.";
+            if(saved&&saved->error.empty()){
+                ssc_postgame_art::images=saved->icons;ssc_postgame_art::states.clear();
+                ssc_postgame_live::state.rounds.clear();ssc_postgame_live::state.bytes=0;
+                for(const auto& round:saved->rounds)ssc_postgame_live::state.capture(round);
+                postgame_round=std::max(0,int(saved->rounds.size())-1);postgame_build_step=-1;
+                postgame_saved=true;if(ssc_review_online::requested)ssc_review_online::client().load(ssc_postgame_live::state.match_id);
+            }dirty=true;
+        }
+    }
+    static unsigned analysis_revision=0;static std::string analysis_match_seen;auto analysis_now=ssc_review_online::revision.load();if(analysis_now!=analysis_revision||analysis_match_seen!=ssc_postgame_live::state.match_id){analysis_revision=analysis_now;analysis_match_seen=ssc_postgame_live::state.match_id;if(ssc_review_online::requested||analysis_now){auto answer=ssc_review_online::client().snapshot(analysis_match_seen);postgame_analysis_match=answer->match;postgame_analysis_status=answer->status;postgame_analysis_message=answer->message;postgame_analysis=answer->report;}else{postgame_analysis=nullptr;postgame_analysis_match.clear();}if(postgame_visible())dirty=true;}
+    if(postgame_visible()&&animations&&postgame_score_started&&now>=postgame_score_started&&now-postgame_score_started<1000)dirty=true;
+    // Live advisor retired; recording collection remains separately gated.
     if(rpc_preview.phase==1)ssc_freecam::stop();
     bool was_freecam=ssc_freecam::state.active;auto pending_freecam=ssc_freecam::pending_since;
     ssc_freecam::tick(now,opened,game_window,ssc_freecam::frame_seconds());
     if(!was_freecam&&ssc_freecam::state.active)finish_freecam_entry();
     if(pending_freecam!=ssc_freecam::pending_since)dirty=true;
     ssc_vehicle::blocked=opened||ssc_freecam::state.active||GetForegroundWindow()!=game_window;
-    ssc_record::track_observation(now);
+    if(!pg.active)ssc_record::track_observation(now);
     static ULONGLONG presence_at=0;
     if(now-presence_at>=1000){presence_at=now;rpc_preview=presence_supported?ssc_rpc::sample_steam(rpc_rating):ssc_rpc::Snapshot{};static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);refresh_dynamic_panel(now,true);if(ssc_record::state().enabled){auto observed=presence_supported?ssc_rpc::native_fallback(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_rpc::Snapshot{};ssc_record::sample(observed.phase,observed.details,observed.state,now,observed.phase==2?ssc_record::sample_local_build(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_record::Json(nullptr));if(opened&&manager&&settings_page==12)dirty=true;}}
     static ULONGLONG update_at=0;
@@ -143,10 +187,10 @@ void render(HDC dc) {
         if(presence_supported&&rpc_preview.phase==1&&!welcome_seen&&!opened){opened=true;show_manager(8);}
         if(presence_supported&&rpc_preview.phase==1&&!opened&&ssc_cosmetic_access::account_id&&ssc_cosmetic_access::tier(ssc_cosmetic_access::current)!=ssc_cosmetic_access::Tier::checking&&!cosmetics_policy.known(ssc_cosmetic_access::account_id)){bool show=cosmetics_policy.consume(ssc_cosmetic_access::account_id);save();if(show){cosmetics_notice_shown=true;show_cosmetics_notice();}}
         if(update_notes_due(rpc_preview.phase)){opened=true;show_manager(14);}
-        if(presence_supported&&rpc_preview.phase==1&&!ssc_update::checked)ssc_update::check(state_dir);
+        if(!ssc_update::checked)ssc_update::check(state_dir);
         if(ssc_update::poll(window,rpc_preview.phase==1||!presence_supported))dirty=true;
-        if(rpc_preview.phase!=1&&opened&&(update_popup||cosmetics_popup||(manager&&settings_page==7)))close_menu(true);
-        if(ssc_update::notification_due(presence_supported&&rpc_preview.phase==1)&&!opened){ssc_update::notified=true;manager=false;update_popup=true;opened=true;dirty=true;}
+        if(rpc_preview.phase==2&&opened&&(update_popup||cosmetics_popup||(manager&&settings_page==7)))close_menu(true);
+        if(ssc_update::notification_due(!presence_supported||rpc_preview.phase!=2)&&!opened){ssc_update::notified=true;manager=false;update_popup=true;opened=true;dirty=true;}
     }
     RECT hud_client{};GetClientRect(window,&hud_client);if(ssc_hud::finish_frame(hud_client.right,hud_client.bottom,now)&&ssc_hud::editing)dirty=true;
     if(opened&&manager&&settings_page==11&&ssc_lab::duel_animating()){ssc_lab::advance_duel(seconds);static ULONGLONG duel_paint_at=0;if(now-duel_paint_at>=16||!ssc_lab::duel_animating()){duel_paint_at=now;dirty=true;}}
@@ -308,9 +352,12 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     std::error_code error;std::filesystem::create_directories(state_dir,error);if(error)return;
     ssc_diagnostics::initialize(state_dir);ssc_auth::service().configure(state_dir);ssc_shared::service().configure(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
-    log("SSC Mod Menu 0.1.30 startup");log_game_build();
+    ssc_dark_flash::diagnostic=log;
+    log("SSC Mod Menu 0.1.31 startup");log_game_build();
+    // Updates must remain available when native gameplay guards reject a build.
+    ssc_update::check(state_dir);
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
-    if(!supported){native_supported=false;log("Unsupported executable; runtime inactive");return;}
+    if(!supported){native_supported=false;log("Unsupported executable; runtime inactive");ssc_update::notify_without_overlay();return;}
     presence_supported=(supported&4)!=0;native_supported=true;
     log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");
     char result[128];std::snprintf(result,sizeof(result),"Compatibility: cosmetics=%d HUD=%d presence=%d scan=%llums",int((supported&1)!=0),int((supported&2)!=0),int(presence_supported),static_cast<unsigned long long>(GetTickCount64()-started));log(result);
@@ -324,7 +371,7 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
         wchar_t executable[32768];DWORD length=GetModuleFileNameW(nullptr,executable,32768);
         if(length&&length<32768){ssc_sound::initialize(std::filesystem::path(executable).parent_path(),state_dir,sound_requested);ssc_sound::attached=attach_sound();log(ssc_music::attach()?"Music file adapter attached":"Music file adapter unavailable");log(ssc_sound::attached?"Audio buffer adapter attached (WAV effects / OGG music; restart applies changes)":"Audio adapter unavailable");}
     }catch(const std::exception&){log("Sound catalog unavailable; originals preserved");}
-    ssc_advisor::attached=ssc_advisor::attach();log(ssc_advisor::attached?"Draft advisor attached":"Draft advisor unavailable");
+    ssc_advisor::attached=ssc_advisor::attach();log(ssc_advisor::attached?"Post-game recording adapter validated":"Post-game recording adapter unavailable");
     ssc_geri::attached=ssc_geri::attach();log(ssc_geri::attached?"Geri panel adapter attached":"Geri panel adapter unavailable");
     ssc_creator::attached=ssc_creator::attach();log(ssc_creator::attached?"Creator crosshair adapter attached":"Creator crosshair adapter unavailable");
     ssc_hud::diagnostics_draw=ssc_freecam::attached?reinterpret_cast<uintptr_t>(ssc_freecam::debug_draw):0;

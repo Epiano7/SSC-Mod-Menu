@@ -37,6 +37,10 @@ The installer runs natively; the game and mod use Proton. The native Linux game 
 - **Freecam:** a separate module that adds a freecam to both singleplayer and multiplayer rounds. Currently it is only available in multiplayer if you are in spectator mode. You can choose between a 2D pan mode (keeps the camera facing the game and allows you to adjust the X and Z on one plane) or the 3D camera (all 3 axis supported with an optional setting to turn down the render distance). There are lots of other small QoL settings under the module menu as well that are not listed.
 - **Auto Messages:** message rules using events, conditions, variables, and repeat counts. Choose **Conditions are met** to watch your conditions continuously, or use a round/level/health event. Under **Edit rule → Timing / Cancellation**, require conditions to stay true for up to 60 seconds, delay sending for up to 60 seconds, and optionally cancel if you die. Each rule triggers at most once per round, and pending messages cancel on round changes, disconnects, or rule edits. Existing rules retain their previous timing. Rule sharing uses `SSC-AM3` (a custom sharing system), older versions of the menu used `SSC-AM1` and `SSC-AM2` which are still supported.
 
+- **Match Summary:** experimental post-match scoring, build history, comparisons and Level/XP graphs. Enable Recording before the match; press **F7** after the final round or open the last summary from the module. Scores are calculated on your PC.
+- **Flashbang:** choose an inverted black flash or a fully opaque custom image, with the original strength and fade timing.
+- **Map Capture Submissions:** optional F9 still and panorama contributions from single-player 3D Freecam. Get an upload code from [Skillshot Guesser](https://ssg.epiano7.dev/contribute), paste it in Location Capture settings and enable sending. Submissions require review before inclusion.
+
 ## Other features
 
 - **Weapon Lab:** search weapons by name, tier, or type. Compare up to four weapons with stronger values highlighted; adjust health, shields, and miss chance; and watch a timed duel with reloads. Simulations are estimates and do not account for skills or other round perks like shop purchases 
@@ -74,7 +78,7 @@ If something goes wrong, open **All Modules > About > Open logs**, and dm them t
 - everyone in the [SSC discord](https://discord.gg/skillshotcity) that provided feedback regarding early module dev, thank you!
 - for some more specific names:
   - yari_check for testing out the Linux build and helping me suffer through an Arch VM install
-  - jyxalag for reviewing early builds and testing out the private access feature
+  - jyxalag for reviewing and testing early builds
   - alsamandal for resisting against the Manga Recruit monopoly!
   - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk), and for putting up with me 
   joining his lobbies in the last 2 minutes and winning
@@ -85,7 +89,3 @@ If something goes wrong, open **All Modules > About > Open logs**, and dm them t
 
 
 [Build instructions](docs/build.md) | [Contributing](CONTRIBUTING.md) | [Installer details](installer/README.md)
-
-## Private access
-
-Privately approved beta testers can enter an activation code under **Private access**. Later launches check access automatically. Private activation currently requires native Windows; see the [Linux guide](linux/README.md) for platform limits

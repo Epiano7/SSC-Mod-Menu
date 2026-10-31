@@ -3,6 +3,25 @@
 #include "auto_messages.h"
 #include "combat_stats.h"
 namespace ssc_auto {
+// Native weapon HUD (group 8, 41c120): +4b0 stores the assigned slot.
+// 0 = melee, 1 = throwable, 2/3 = first/second gun. Array order is unstable.
+inline void sample_inventory_slots(uintptr_t begin,uintptr_t end,Values& values){
+ using ssc_names::read;
+ if(end<begin||(end-begin)%0x748||(end-begin)/0x748>16||(!begin&&end))return;
+ const int native_slots[]={2,3,0};
+ for(int i=0;i<3;++i){
+  auto key="weapon"+std::to_string(i+1);values.erase(key);uintptr_t match=0;bool valid=true;
+  for(auto record=begin;record<end;record+=0x748){
+   int slot=-1;if(!read(record+0x4b0,slot)||slot<0||slot>3){valid=false;break;}
+   if(slot==native_slots[i]){if(match){valid=false;break;}match=record;}
+  }
+  if(!valid)continue;
+  if(!match){values[key]="None";continue;}
+  auto name=ssc_rpc::native_string(match+0x48);
+  if(!name.empty()&&printable(name))values[key]=name;
+ }
+}
+
 inline void sample_weapon(uintptr_t record,Values& values){
  using ssc_names::read;
  int tier=-1,type=-1,ammo=-1,mag=-1,rpm=-1,projectiles=-1,extra=-1;float reload=-1;
@@ -81,7 +100,7 @@ inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
  uintptr_t weapons=0,weapons_end=0;int equipped=-1;
  if(read(actor+0x12a0,weapons)&&read(actor+0x12a8,weapons_end)&&weapons_end>=weapons&&(weapons_end-weapons)%0x748==0&&(weapons_end-weapons)/0x748<=16&&(weapons||!weapons_end)){
   o.values["weaponCount"]=std::to_string((weapons_end-weapons)/0x748);
-  for(int i=0;i<3;++i){auto key="weapon"+std::to_string(i+1);if(uintptr_t(i)>=(weapons_end-weapons)/0x748)o.values[key]="None";else {auto name=ssc_rpc::native_string(weapons+uintptr_t(i)*0x748+0x48);if(printable(name))o.values[key]=name;}}
+  sample_inventory_slots(weapons,weapons_end,o.values);
   if(read(actor+0x2998,equipped)&&equipped>=0)for(auto record=weapons;record<weapons_end;record+=0x748){int id=-1;if(read(record+0x20c,id)&&id==equipped){auto name=ssc_rpc::native_string(record+0x48);if(!name.empty()&&printable(name)){o.values["weaponName"]=name;sample_weapon(record,o.values);}break;}}
  }
  uintptr_t classes=0,classes_end=0;

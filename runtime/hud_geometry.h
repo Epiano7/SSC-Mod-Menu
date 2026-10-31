@@ -5,7 +5,7 @@ struct Bounds {float left=10,top=10,right=-10,bottom=-10;unsigned points=0;};
 inline std::array<Bounds,9> measured_frame{},queued_frame{};
 inline std::array<bool,9> measured{};
 inline std::array<ULONGLONG,9> last_seen{};
-inline bool editing=false,freeze_bounds=false,capture_frame=true;
+inline bool editing=false,freeze_bounds=false,capture_frame=false;
 inline int active_item=-1,view_w=0,view_h=0,capture_depth=0;
 inline ULONGLONG capture_at=0;
 inline std::array<unsigned,9> primitive_count{};
@@ -74,7 +74,7 @@ inline void APIENTRY capture_v3(GLfloat x,GLfloat y,GLfloat z){capture_vertex(x,
 // vertices bypass our glBegin/glVertex hooks after the first frame.
 inline void capture_cached_quad(){
  // The map stencil and immediate caption already define its visible region.
- if(active_item<0||active_item==2||!capture_frame||freeze_bounds)return;
+ if((!enabled&&!editing)||active_item<0||active_item==2||!capture_frame||freeze_bounds)return;
  GLint stencil=GL_ALWAYS;glGetIntegerv(GL_STENCIL_FUNC,&stencil);
  if(active_item==2&&glIsEnabled(GL_STENCIL_TEST)&&stencil!=GL_ALWAYS)return;
  GLfloat color[4];glGetFloatv(GL_CURRENT_COLOR,color);if(color[3]<=0)return;
@@ -88,7 +88,7 @@ inline __attribute__((noinline)) void APIENTRY capture_call_list(GLuint list){
 }
 inline bool writable_slot(uintptr_t address){MEMORY_BASIC_INFORMATION info{};return VirtualQuery(reinterpret_cast<void*>(address),&info,sizeof(info))&&info.State==MEM_COMMIT&&(info.Protect&(PAGE_READWRITE|PAGE_EXECUTE_READWRITE));}
 inline bool start_capture(){
- if(!game_base||!capture_frame||game_base!=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))return false;
+ if((!enabled&&!editing)||!game_base||!capture_frame||game_base!=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))return false;
  if(capture_depth){++capture_depth;return true;}
  auto b=reinterpret_cast<BeginProc*>(game_base+ssc_compat::resolve(0xdf0708));auto v2=reinterpret_cast<Vertex2Proc*>(game_base+ssc_compat::resolve(0xdf07a0));auto v3=reinterpret_cast<Vertex3Proc*>(game_base+ssc_compat::resolve(0xdf0790));
  auto c4=reinterpret_cast<Color4Proc*>(game_base+ssc_compat::resolve(0xdf0688));auto c3=reinterpret_cast<Color3Proc*>(game_base+ssc_compat::resolve(0xdf0840));auto end=reinterpret_cast<EndProc*>(game_base+ssc_compat::resolve(0xdf06b0));
@@ -126,7 +126,7 @@ inline void apply_bounds(int index,const Bounds& bounds){
 }
 // Native batched sprite/glyph rectangles, before any GL batching or flushing.
 inline void capture_queued_rectangle(const unsigned char* stack){
- if(active_item<0||!capture_frame||freeze_bounds||!stack)return;
+ if((!enabled&&!editing)||active_item<0||!capture_frame||freeze_bounds||!stack)return;
  int width=view_w,height=view_h;
  if(game_base==reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){width=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfb1ab8));height=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfb1abc));}
  if(width<=0||height<=0)return;
@@ -149,7 +149,7 @@ inline bool finish_frame(int width,int height,ULONGLONG now){
  }
  if(view_w&&view_h&&(width!=view_w||height!=view_h))measured.fill(false);
  view_w=width;view_h=height;
- capture_frame=now-capture_at>=(editing?150u:250u);
+ capture_frame=(enabled||editing)&&now-capture_at>=(editing?150u:250u);
  if(capture_frame)capture_at=now;
  return changed_bounds;
 }

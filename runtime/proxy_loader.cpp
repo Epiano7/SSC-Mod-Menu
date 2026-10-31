@@ -9,6 +9,7 @@ static FARPROC functions[sizeof(names)/sizeof(names[0])];
 static HMODULE self;
 static PROC(WINAPI* original_gl_lookup)(LPCSTR)=nullptr;
 static FARPROC title_upload=nullptr;
+static PROC(WINAPI* runtime_lookup)(const char*,PROC)=nullptr;
 static ssc_title::Upload texture_original=nullptr;
 static ssc_title::Query texture_query=nullptr;
 static std::once_flag texture_setup;
@@ -24,7 +25,7 @@ static PROC WINAPI lookup_gl(LPCSTR name){
     auto result=original_gl_lookup(name);
     auto value=reinterpret_cast<INT_PTR>(result);
     if(title_upload&&name&&!std::strcmp(name,"glTexImage2D")&&value>3&&value!=-1)return title_upload;
-    return result;
+    return runtime_lookup?runtime_lookup(name,result):result;
 }
 static BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
     wchar_t path[32768];
@@ -57,6 +58,7 @@ static BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
         runtime+=L"\\SSCMods\\runtime.dll";
         HMODULE module=LoadLibraryExW(runtime.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_SYSTEM32);
         if(module) {
+            runtime_lookup=reinterpret_cast<decltype(runtime_lookup)>(GetProcAddress(module,"SscModLookupGL"));
             auto start=reinterpret_cast<void(WINAPI*)()>(GetProcAddress(module,"SscModInitialize"));
             if(start) start();
         }

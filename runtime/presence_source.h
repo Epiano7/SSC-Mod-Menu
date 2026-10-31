@@ -1,6 +1,7 @@
 #pragma once
 #include "compatibility.h"
 #include "presence_module.h"
+#include "postgame_context.h"
 #include "cosmetic_adapter.h"
 
 namespace ssc_rpc {
@@ -9,6 +10,19 @@ struct RankedFields {
     unsigned char active=0,survival=0,singleplayer=0,disabled=0,practice=0,newbie=0,authenticated=0,committed=0;
     uint64_t name_length=0;float bonus=0,normal_threshold=0,bonus_threshold=0;
 };
+// Diagnostic bits describe the existing native predicate; they grant no eligibility.
+inline uint32_t ranked_blockers(const RankedFields& f){
+ uint32_t bits=0;
+ if(!f.active||f.kind!=0)bits|=1;
+ if(f.mode!=6||f.survival||f.singleplayer||f.disabled||f.practice||f.newbie)bits|=2;
+ if(!f.name_length||f.name_length>1024)bits|=4;
+ if(f.login&&!f.authenticated)bits|=8;
+ if(f.round>=2&&!f.committed)bits|=16;
+ if(!std::isfinite(f.normal_threshold)||!std::isfinite(f.bonus_threshold)||!std::isfinite(f.bonus)||f.normal_threshold<0||f.normal_threshold>1000000||f.bonus_threshold<0||f.bonus_threshold>1000000)bits|=32;
+ else if(f.account_level<int(f.bonus>0?f.bonus_threshold:f.normal_threshold))bits|=64;
+ if(f.eligibility<=1)bits|=128;
+ return bits;
+}
 inline bool ranked(const RankedFields& f){
     // Native Tab label predicate 7f8720(actor, false), restricted to the local human.
     return f.active&&f.kind==0&&f.mode==6&&!f.survival&&!f.singleplayer&&!f.disabled&&!f.practice&&!f.newbie
@@ -25,9 +39,23 @@ inline void add_rating(Snapshot& s,bool is_ranked,float rating,float matches,int
     if(s.state!="In a round")label+=" | "+s.state;
     s.state=utf8_limit(label);
 }
-inline void sample_rating(uintptr_t base,Snapshot& snapshot){
+inline void sample_rating(uintptr_t base,Snapshot& snapshot,ssc_review_context::Rating* observation=nullptr){
+    if(observation)*observation={};
     if(snapshot.phase!=2)return;
-    using ssc_names::read;uintptr_t world=0,first=0,last=0,steam_first=0;int local=-1,slot=-1;
+    using ssc_names::read;
+    // Profile history and live ranked eligibility are separate observations.
+    // Freeze the former even when match eligibility is not yet available.
+    float profile_rating=-1,profile_matches=-1;int profile_required=0,profile_loaded=0;
+    const bool profile_valid=read(base+ssc_compat::resolve(0xe041f8),profile_loaded)&&profile_loaded&&
+        read(base+ssc_compat::resolve(0xe04a9c),profile_rating)&&read(base+ssc_compat::resolve(0xe04a98),profile_matches)&&
+        read(base+ssc_compat::resolve(0xfb69f8),profile_required)&&ssc_review_context::valid_rating(profile_rating,profile_matches,profile_required);
+    if(observation&&profile_valid)*observation={true,false,profile_matches<profile_required,profile_rating,profile_matches,profile_required};
+    // The actor login field is an authentication state (often 3), not a user ID.
+    // Read the loaded account profile's public game ID independently of actors.
+    int game_user_id=0;
+    auto id_offset=ssc_compat::resolve(0xe03ba8);
+    if(observation&&profile_valid&&id_offset&&read(base+id_offset,game_user_id)&&game_user_id>0)observation->player_id=game_user_id;
+    uintptr_t world=0,first=0,last=0,steam_first=0;int local=-1,slot=-1;
     if(!read(base+ssc_compat::resolve(0xdea5d0),world)||!world||!read(world+0xa650,first)||!read(world+0xa658,last)||!first||last<first||(last-first)%0x34b0||(last-first)/0x34b0>2048
         ||!read(base+ssc_compat::resolve(0xe22140),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe1e688),local)||local<0||uintptr_t(local)>=(last-first)/0x34b0)return;
     auto actor=first+uintptr_t(local)*0x34b0;if(!read(actor+0x78,slot)||slot!=local)return;
@@ -37,11 +65,11 @@ inline void sample_rating(uintptr_t base,Snapshot& snapshot){
         ||!read(actor+0x81,f.active)||!read(actor+0x7dc,f.kind)||!read(actor+0x700,f.name_length)||!read(actor+0x6e0,f.login)
         ||!read(actor+0x6e4,f.authenticated)||!read(actor+0x270,f.committed)||!read(actor+0xf98,f.bonus)
         ||!read(actor+0xab4,f.account_level)||!read(actor+0x204,f.eligibility)
-        ||!read(base+ssc_compat::resolve(0xfb6a24),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfb6a28),f.bonus_threshold)||!ranked(f))return;
-    // Values used by the native own-profile "RATING THIS MONTH" display at 5f3a5f.
-    float rating=-1,matches=-1;int required=0,profile_loaded=0;
-    if(read(base+ssc_compat::resolve(0xe041f8),profile_loaded)&&profile_loaded&&read(base+ssc_compat::resolve(0xe04a9c),rating)&&read(base+ssc_compat::resolve(0xe04a98),matches)&&read(base+ssc_compat::resolve(0xfb69f8),required))add_rating(snapshot,true,rating,matches,required);
-    else add_rating(snapshot,true,-1,-1,0);
+        ||!read(base+ssc_compat::resolve(0xfb6a24),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfb6a28),f.bonus_threshold))return;
+    if(observation&&profile_valid){observation->rank_blockers=ranked_blockers(f);}
+    if(!ranked(f))return;
+    add_rating(snapshot,true,profile_rating,profile_matches,profile_required);
+    if(observation&&profile_valid)observation->ranked=true;
 }
 inline std::string copy_steam_text(const char* value){
     if(!value)return {};

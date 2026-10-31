@@ -90,7 +90,7 @@ public:
   if(!id||!account_valid(own))status_=Status::account;else if(!receive&&!share&&!remove_)status_=Status::off;
   wake_.notify_all();
  }
- bool get(const std::string& account,Style& style){std::lock_guard<std::mutex> l(mutex_);if(steam_.read()!=account_){cache_.context(0,false);observed_.clear();return false;}
+ bool get(const std::string& account,Style& style){std::lock_guard<std::mutex> l(mutex_);if(stopping_||!receive_)return false;if(steam_.read()!=account_){cache_.context(0,false);observed_.clear();return false;}
   // Attributed chat senders may not be in a match roster (main-menu chat).
   // Queue only bounded public account keys; the worker performs all network I/O.
   if(!stopping_&&receive_&&account!=own_&&account_valid(account)&&(observed_.count(account)||observed_.size()<128)){
