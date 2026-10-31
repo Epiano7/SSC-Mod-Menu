@@ -9,12 +9,13 @@ int physical_menu_key(WPARAM key,LPARAM data){
  if(key==VK_MENU)return (data&(1LL<<24))?VK_RMENU:VK_LMENU;
  return int(key);
 }
-std::wstring menu_key_label(){
- wchar_t label[80]{};UINT scan=MapVirtualKeyW(UINT(menu_hotkey),MAPVK_VK_TO_VSC);
- bool extended=menu_hotkey==VK_RCONTROL||menu_hotkey==VK_RMENU||(menu_hotkey>=VK_PRIOR&&menu_hotkey<=VK_DOWN)||menu_hotkey==VK_INSERT||menu_hotkey==VK_DELETE||menu_hotkey==VK_DIVIDE||menu_hotkey==VK_NUMLOCK;
+std::wstring key_label(int key){
+ wchar_t label[80]{};UINT scan=MapVirtualKeyW(UINT(key),MAPVK_VK_TO_VSC);
+ bool extended=key==VK_RCONTROL||key==VK_RMENU||(key>=VK_PRIOR&&key<=VK_DOWN)||key==VK_INSERT||key==VK_DELETE||key==VK_DIVIDE||key==VK_NUMLOCK;
  if(GetKeyNameTextW(LONG(scan<<16)|(extended?1<<24:0),label,80))return label;
- return L"Key "+std::to_wstring(menu_hotkey);
+ return L"Key "+std::to_wstring(key);
 }
+std::wstring menu_key_label(){return key_label(menu_hotkey);}
 using Swap=BOOL(WINAPI*)(HDC);
 Swap original_swap;
 WNDPROC previous_proc;
@@ -54,6 +55,18 @@ int lab_drag=-1;bool speed_dragging=false,slow_binding=false,photo_binding=false
 bool scale_dragging=false;int scale_preview=100;float scale_drag_left=0,scale_drag_width=1;
 bool bot_color_error=false;
 bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buffer;
+#include "postgame_share.h"
+#include "postgame_graph.h"
+bool postgame_imported=false;std::vector<nlohmann::json> postgame_import_rounds;std::string postgame_share_status;
+int postgame_tab=0,postgame_round=0,postgame_skill_page=0,postgame_build_step=-1,postgame_detail=4;bool postgame_tab_up=false;
+int postgame_hotkey=VK_F7,postgame_binding_release=0;bool postgame_binding=false;
+bool postgame_history_pending=false,postgame_saved=false;unsigned postgame_history_revision=0;std::wstring postgame_history_error;
+nlohmann::json postgame_analysis;std::string postgame_analysis_match,postgame_analysis_status,postgame_analysis_message,postgame_score_token;uint64_t postgame_score_started=0;
+int postgame_graph_metric=0,postgame_graph_cached_metric=-1;unsigned postgame_graph_revision=~0u;std::string postgame_graph_match;
+float postgame_mouse_x=-1,postgame_mouse_y=-1;
+std::vector<ssc_review_graph::Round> postgame_graph_data;
+std::vector<std::pair<int,int>> postgame_graph_events;
+bool postgame_visible(){return opened&&manager&&settings_page==29;}
 bool statistics_graph_visible(){return manager&&settings_page==21&&!ssc_hud::editing;}
 bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hud::editing;}
 
@@ -68,6 +81,7 @@ int panel_w=540,panel_h=384,panel_x=24,panel_y=40;
 float draw_scale=1.f,visibility=0.f,modal_visibility=0.f;
 ULONGLONG last_frame=0;
 int hovered=0,pressed=0,keyboard_focus=0;
+std::map<int,int> option_scroll,option_limits;
 GLuint texture;
 HGLRC owner_context;
 HDC canvas;
@@ -102,7 +116,7 @@ void log(const char* message) {
 }
 void activate(int id);
 void commit_text(){if(color_editing&&settings_page==4&&color_buffer.size()==6)activate(189);if(chat_editing)activate(321);if(color_editing&&settings_page==18&&ssc_names::private_visible()){unsigned rgb,alpha;if(ssc_names::parse_bot_color(color_buffer,rgb,alpha))activate(537);}}
-void cancel_edit(){capture_binding=false;photo_binding=false;slow_binding=false;speed_dragging=false;close_color_picker();private_editing=false;private_label_editing=false;credits_popup=false;commit_text();dropdown=-1;chat_editing=false;sound_search_editing=false;color_editing=false;rpc_editing=false;rpc_error=false;dirty=true;}
+void cancel_edit(){postgame_binding=false;capture_binding=false;photo_binding=false;slow_binding=false;speed_dragging=false;close_color_picker();private_editing=false;private_label_editing=false;credits_popup=false;commit_text();dropdown=-1;chat_editing=false;sound_search_editing=false;color_editing=false;rpc_editing=false;rpc_error=false;dirty=true;}
 void save() {
     ssc_names::cosmetics=cosmetic_requested&&ssc_compat::supports(1);
     ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);
@@ -134,9 +148,12 @@ void save() {
     out<<"hide_crosshair="<<ssc_creator::hide_crosshair.load()<<"\n";
     out<<"draft_advisor="<<ssc_advisor::enabled<<"\n";
     out<<"draft_advisor_api="<<ssc_advisor::use_api<<"\n";
+    out<<"postgame_online_analysis="<<ssc_review_online::requested<<"\n";
     out<<"draft_training_upload="<<ssc_training::enabled<<"\n";
     out<<"geri_mode="<<ssc_geri::enabled.load()<<"\n";
     out<<"cooldown_pulse="<<ssc_cooldown::settings.enabled<<"\ncooldown_duration_ms="<<ssc_cooldown::settings.duration_ms<<"\n";
+    out<<"dark_flashbang="<<ssc_dark_flash::enabled.load()<<"\n";
+    out<<"flash_image_mode="<<ssc_flash_image::mode.load()<<"\n";
     out<<"hud_hover_fade="<<ssc_hud::hover_fade<<"\n";out<<"hud_enabled="<<ssc_hud::enabled<<"\n";for(const auto& item:ssc_hud::items){out<<"hud_box_"<<item.key<<"="<<item.home_x<<","<<item.home_y<<","<<item.w<<","<<item.h<<"\n";out<<"hud_"<<item.key<<"="<<item.x<<","<<item.y<<","<<item.scale<<"\n";}
     out<<"shared_defaults_applied=1\n";
     out<<"shared_receive="<<shared_receive<<"\nshared_publish="<<shared_publish<<"\n";
@@ -144,7 +161,7 @@ void save() {
     out<<"cosmetic_rainbow="<<ssc_names::rainbow<<"\ncosmetic_rgb="<<ssc_names::solid_rgb<<"\n";out<<"welcome_seen="<<welcome_seen<<"\n";out<<"schema=2\nclock="<<clock_enabled
        <<"\nsound_requested="<<sound_requested<<"\ncosmetic_requested="<<cosmetic_requested<<"\nmatch_sound_level="<<match_sound_level
        <<"\nrpc_requested="<<rpc_requested<<"\nrpc_id="<<rpc_id<<"\nrpc_timer="<<rpc_timer<<"\nrpc_rating="<<rpc_rating
-       <<"\nmenu_hotkey="<<menu_hotkey<<"\nrecording_enabled="<<recording_requested<<"\nanimations="<<animations<<"\nui_scale="<<ui_scale<<"\n";out.close();
+       <<"\npostgame_hotkey="<<postgame_hotkey<<"\nmenu_hotkey="<<menu_hotkey<<"\nrecording_enabled="<<recording_requested<<"\nanimations="<<animations<<"\nui_scale="<<ui_scale<<"\n";out.close();
     // Attempt every independent save, even if another settings file failed.
     bool menu_saved=out&&MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);
     save_failed=!auto_saved||!chat_saved||!menu_saved;dirty=true;
@@ -166,6 +183,7 @@ void move_hud(float x,float y){
     ssc_hud::constrain(item);dirty=true;
 }
 void load_settings() {
+    ssc_flash_image::load(state_dir);
     ssc_chat::load(state_dir);ssc_auto::load(state_dir);
     std::ifstream in(state_dir/L"menu.ini");std::string line;const bool had_settings=in.good();bool notice_known=false;bool version2=false,quick_freecam_known=false;
     // Defaults are inert. Only v2 carries the test clock forward.
@@ -174,6 +192,8 @@ void load_settings() {
         std::string key=line.substr(0,at),value=line.substr(at+1);int number=0;
         if(key=="private_menu_label"){if(!value.empty()&&value.back()=='\r')value.pop_back();if(valid_private_label(value))private_label=value;continue;}
         if(key=="bot_name_hex"){unsigned rgb,alpha;if(ssc_names::parse_bot_color(std::wstring(value.begin(),value.end()),rgb,alpha)){ssc_names::bot_rgb=rgb;ssc_names::bot_alpha=alpha;}continue;}
+        if(key=="dark_flashbang"){ssc_dark_flash::enabled=value=="1";continue;}
+        if(key=="flash_image_mode"){ssc_flash_image::mode=value=="1"?1:0;continue;}
         if(key=="hud_hover_fade"){ssc_hud::hover_fade=value!="0";continue;}
         if(key=="hud_enabled"){ssc_hud::enabled=value=="1";continue;}
         if(key.rfind("hud_box_",0)==0){for(int i=0;i<int(ssc_hud::items.size());++i)if(key==std::string("hud_box_")+ssc_hud::items[i].key){float x,y,w,h;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f,%f%c",&x,&y,&w,&h,&extra)==4&&std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&x>=-.5f&&y>=-.5f&&w>0&&h>0){ssc_hud::apply_bounds(i,{x,y,x+w,y+h,2});ssc_hud::measured[i]=false;}}continue;}
@@ -205,8 +225,8 @@ void load_settings() {
         else if(key=="freecam_speed")ssc_freecam::state.speed=float(std::clamp(number,30,600));
         else if(key=="freecam_draw_distance")ssc_freecam::draw_distance=(number==1000||number==2000||number==4000||number==8000)?number:0;
         else if(key=="hide_crosshair")ssc_creator::hide_crosshair=number!=0;
-        else if(key=="draft_advisor")ssc_advisor::enabled=number!=0;
-        else if(key=="draft_advisor_api")ssc_advisor::use_api=number!=0;
+        else if(key=="draft_advisor")ssc_advisor::enabled=false;
+        else if(key=="draft_advisor_api")ssc_advisor::use_api=false;
         else if(key=="draft_training_upload")ssc_training::enabled=number!=0;
         else if(key=="geri_mode")ssc_geri::enabled=number!=0;
         else if(key=="cooldown_pulse")ssc_cooldown::settings.enabled=number!=0;
@@ -230,6 +250,8 @@ void load_settings() {
         else if(key=="match_sound_level")match_sound_level=number==1;
         else if(key=="recording_enabled")recording_requested=number==1;
         else if(key=="animations")animations=number!=0;
+        else if(key=="postgame_online_analysis")ssc_review_online::requested=number!=0;
+        else if(key=="postgame_hotkey")postgame_hotkey=valid_menu_key(number)&&number!=VK_ESCAPE?number:VK_F7;
         else if(key=="menu_hotkey")menu_hotkey=valid_menu_key(number)?number:VK_RSHIFT;
         else if(key=="ui_scale"&&number>=50&&number<=200)ui_scale=number;
     }
@@ -274,6 +296,7 @@ void finish_freecam_entry(){
     close_menu(true);
 }
 void show_manager(int page=-1) {
+    if(page!=29)postgame_imported=false;
     if(page==18&&!ssc_names::private_visible())page=-1;
     update_popup=false;cosmetics_popup=false;
     finish_scale();finish_lab_slider();if(page!=11){ssc_lab::picker=-1;ssc_lab::editing=-1;}
@@ -328,6 +351,35 @@ void move_color_picker(int x,int y){float px=(x-panel_x)/draw_scale,py=(y-panel_
  picker_apply();
 }
 void activate(int id) {
+    if(id==3300){ShellExecuteW(nullptr,L"open",L"https://ssg.epiano7.dev/contribute",nullptr,nullptr,SW_SHOWNORMAL);return;}
+    if(id==3301){if(!ssc_capture_upload::connect(ssc_auto::read_clipboard(game_window,128)))ssc_capture_upload::status=-1;dirty=true;return;}
+    if(id==3302){if(!ssc_capture_upload::enabled.load()&&ssc_capture_upload::token().empty())ssc_capture_upload::status=-1;else ssc_capture_upload::enabled=!ssc_capture_upload::enabled.load();dirty=true;return;}
+    if(id==3303){if(!ssc_freecam::capture::writer().retry())ssc_capture_upload::status=-1;dirty=true;return;}
+    if(id==3304){ssc_capture_upload::disconnect();dirty=true;return;}
+
+    if(id==1310||id==1311){postgame_graph_metric=id-1310;dirty=true;return;}
+    if(id>=1320&&id<1325&&!postgame_imported){postgame_detail=id-1320;postgame_tab=3;dirty=true;return;}
+    if(id>=1400&&id<1500&&size_t(id-1400)<postgame_graph_events.size()&&!postgame_imported){auto [round,step]=postgame_graph_events[size_t(id-1400)];postgame_round=round;postgame_build_step=step;postgame_skill_page=0;postgame_tab=1;dirty=true;return;}
+
+    if(id==1125){ssc_review_online::requested=!ssc_review_online::requested;save();return;}
+    if(id==1300){const auto& rounds=postgame_imported?postgame_import_rounds:ssc_postgame_live::state.rounds;if(!rounds.empty()){int ri=std::clamp(postgame_round,0,int(rounds.size())-1);std::vector<nlohmann::json> builds;for(const auto& e:rounds[size_t(ri)]["events"])if(e.value("type",-1)==0)builds.push_back(e["build"]);if(!builds.empty()){int bi=postgame_build_step<0?int(builds.size())-1:std::clamp(postgame_build_step,0,int(builds.size())-1);auto code=ssc_review_share::encode(builds[size_t(bi)]);postgame_share_status=ssc_auto::copy_clipboard(game_window,code)?"Build code copied":"Could not copy this build";}}dirty=true;return;}
+    if(id==1301){auto build=ssc_review_share::decode(ssc_auto::read_clipboard(game_window,4096));if(build.is_null()){postgame_share_status="Clipboard does not contain a valid build code";dirty=true;return;}postgame_import_rounds={{{"round",1},{"duration_ms",0},{"events",nlohmann::json::array({{{"type",0},{"ms",0},{"build",build}}})}}};show_manager(29);postgame_imported=true;postgame_history_pending=false;postgame_history_error.clear();postgame_saved=false;postgame_tab=1;postgame_round=0;postgame_build_step=-1;postgame_share_status="Shared build / not a recorded match";dirty=true;return;}
+    if(id==1290||id==1291){option_scroll[settings_page]=std::clamp(option_scroll[settings_page]+(id==1290?-1:1),0,option_limits[settings_page]);keyboard_focus=hovered=pressed=0;dirty=true;return;}
+    if(id==1127){if(ssc_review_online::requested)ssc_review_online::client().submit(ssc_postgame_live::state.rounds);dirty=true;return;}
+    if(id>=1120&&id<=1124){postgame_detail=id-1120;dirty=true;return;}
+    if(id==1113){
+        if(presence_supported&&rpc_preview.phase==1&&!ssc_review_history::busy.load()){
+            show_manager(29);postgame_imported=false;opened=true;postgame_tab=0;postgame_history_error.clear();postgame_history_pending=true;
+            postgame_history_revision=ssc_postgame_live::state.revision;ssc_review_history::load(state_dir/L"recordings");dirty=true;
+        }return;
+    }
+    if(id==1110||id==1111){postgame_build_step=std::max(0,postgame_build_step+(id==1110?-1:1));postgame_skill_page=0;dirty=true;return;}
+    if(id==1109&&!postgame_imported){postgame_tab=3;dirty=true;return;}
+    if(id>=1100&&id<=1102&&(!postgame_imported||id==1101)){postgame_tab=id-1100;dirty=true;return;}
+    if(id==1103||id==1104){postgame_round=std::clamp(postgame_round+(id==1103?-1:1),0,std::max(0,int(ssc_postgame_live::state.rounds.size())-1));postgame_skill_page=0;postgame_build_step=-1;dirty=true;return;}
+    if(id==1105||id==1106){postgame_skill_page=std::clamp(postgame_skill_page+(id==1105?-1:1),0,8);dirty=true;return;}
+    if(id==1107){postgame_binding=!postgame_binding;dirty=true;return;}
+    if(id==1108){postgame_binding=false;postgame_hotkey=VK_F7;save();return;}
     if(id==55){menu_binding=!menu_binding;dirty=true;return;}
     if(id==56){menu_binding=false;menu_hotkey=VK_RSHIFT;save();return;}
     if(!module_ready(id))return;
@@ -450,7 +502,7 @@ void activate(int id) {
     else if(id==345){ssc_auto::variable=std::clamp(ssc_auto::variable,0,ssc_auto::selectable_variable_count-1);std::string token="{"+std::string(ssc_auto::variables[ssc_auto::variable])+"}";if(!chat_editing||chat_field!=0){chat_field=0;chat_buffer=ssc_auto::current().message;chat_editing=true;edit_cursor.begin(chat_buffer.size());}edit_cursor.insert(chat_buffer,token,100);chat_select_all=false;dirty=true;}
 
     else if(id==172){ssc_diagnostics::open_logs(state_dir);}
-    else if(id==160){if(!presence_supported||rpc_preview.phase==1)ssc_update::check(state_dir);dirty=true;}
+    else if(id==160){if(!presence_supported||rpc_preview.phase!=2)ssc_update::check(state_dir);dirty=true;}
     else if(id==161){if(!presence_supported||rpc_preview.phase==1)ssc_update::apply();dirty=true;}
     else if(id==283){if(ssc_update::valid_version(ssc_update::version)){ssc_update::ignored_version=ssc_update::version;save();}close_menu();}
     else if(id==540){ssc_names::gradient=true;color_editing=false;save();}
@@ -472,7 +524,7 @@ void activate(int id) {
     else if(id==105){ssc_sound::preview_original();dirty=true;}
     else if(id==1)close_menu();
     else if(id==3)show_manager();
-    else if(id==4){ssc_vehicle::enabled=false;ssc_freecam::stop();ssc_creator::hide_crosshair=false;ssc_geri::enabled=false;ssc_auth::service().enable(false);ssc_auto::enabled=false;ssc_auto::engine.reset();ssc_chat::enabled=false;ssc_hud::enabled=false;sound_requested=false;cosmetic_requested=false;rpc_requested=false;clock_enabled=false;save();}
+    else if(id==4){ssc_capture_upload::enabled=false;ssc_dark_flash::enabled=false;ssc_vehicle::enabled=false;ssc_freecam::stop();ssc_creator::hide_crosshair=false;ssc_geri::enabled=false;ssc_auth::service().enable(false);ssc_auto::enabled=false;ssc_auto::engine.reset();ssc_chat::enabled=false;ssc_hud::enabled=false;sound_requested=false;cosmetic_requested=false;rpc_requested=false;clock_enabled=false;save();}
     else if(id==5)show_quick();
     else if(id>=10&&id<=12){show_manager(id==10?-1:id-10);}
     else if(id==40){animations=!animations;visibility=opened?1.f:0.f;modal_visibility=opened&&manager?1.f:0.f;save();}
@@ -495,11 +547,17 @@ void activate(int id) {
     else if(id==570){if(ssc_geri::attached){ssc_geri::enabled=!ssc_geri::enabled.load();save();}}
     else if(id==193){ssc_cooldown::settings.enabled=!ssc_cooldown::settings.enabled;ssc_cooldown::tracker.clear();save();}
     else if(id>=197&&id<=199){ssc_cooldown::settings.duration_ms=id==197?1000:id==198?1500:2500;save();}
+    else if(id==1201){show_manager(30);}
+    else if(id==1202){ssc_flash_image::mode=0;save();}
+    else if(id==1203&&ssc_flash_image::ready()){ssc_flash_image::mode=1;save();}
+    else if(id==1204){if(ssc_flash_image::choose(game_window,state_dir)){ssc_dark_flash::enabled=true;save();}dirty=true;}
+    else if(id==1200){ssc_dark_flash::enabled=!ssc_dark_flash::enabled.load();save();}
     else if(id==192){ssc_hud::hover_fade=!ssc_hud::hover_fade;save();}
     else if(id==13){show_manager(9);}
     else if(id==15){show_manager(12);}
     else if(id==270){recording_requested=!recording_requested;if(recording_requested)ssc_record::start(state_dir/L"recordings");else ssc_record::stop();save();}
     else if(id==271){ShellExecuteW(nullptr,L"open",(state_dir/L"recordings").c_str(),nullptr,nullptr,SW_SHOWNORMAL);}
+    else if(id==1003){postgame_imported=false;if(presence_supported&&rpc_preview.phase==1&&ssc_postgame_live::state.rounds.empty()){activate(1113);}else if((presence_supported&&rpc_preview.phase==1)||ssc_postgame_live::state.eligible){show_manager(29);opened=true;postgame_history_error.clear();postgame_round=std::max(0,int(ssc_postgame_live::state.rounds.size())-1);}}
     else if(id==600){statistics_round=0;statistics_select_latest=true;show_manager(20);ssc_stats::refresh(state_dir/L"recordings");}
     else if(id==601){statistics_round=0;statistics_select_latest=true;ssc_stats::refresh(state_dir/L"recordings");dirty=true;}
     else if(id==602){std::vector<std::wstring> choices;for(auto name:ssc_stats::classes)choices.push_back(ssc_chat::widen(name));open_dropdown(602,choices,statistics_class);}
@@ -570,11 +628,31 @@ template<class S,class Accept> bool edit_input(S& value,UINT message,WPARAM wp,s
  return false;
 }
 LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
+    const int report_key=physical_menu_key(wp,lp);
+    const bool report_down=message==WM_KEYDOWN||message==WM_SYSKEYDOWN;
+    const bool report_up=message==WM_KEYUP||message==WM_SYSKEYUP;
+    if(message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wp)){postgame_tab_up=false;postgame_binding=false;postgame_binding_release=0;}
+    if(postgame_binding_release){
+        if(message==WM_CHAR||message==WM_SYSCHAR)return 0;
+        if(report_key==postgame_binding_release&&(report_down||report_up)){if(report_up)postgame_binding_release=0;return 0;}
+    }
+    if(postgame_binding&&opened&&manager&&settings_page==28&&report_down){
+        if(!(lp&(1LL<<30))){
+            if(report_key==VK_ESCAPE){postgame_binding=false;postgame_binding_release=report_key;dirty=true;}
+            else if(valid_menu_key(report_key)&&report_key!=menu_hotkey){postgame_hotkey=report_key;postgame_binding=false;postgame_binding_release=report_key;save();}
+        }return 0;
+    }
+    if(report_up&&report_key==postgame_hotkey&&postgame_tab_up){postgame_tab_up=false;return 0;}
+    if(report_down&&report_key==postgame_hotkey&&!menu_binding&&!ssc_hud::editing&&(!opened||postgame_visible())&&(ssc_postgame_live::state.eligible||postgame_visible())){
+        postgame_imported=false;postgame_saved=false;postgame_history_error.clear();postgame_tab_up=true;if(!(lp&(1LL<<30))){if(postgame_visible())close_menu(true);else{show_manager(29);opened=true;visibility=1;postgame_tab=0;postgame_round=std::max(0,int(ssc_postgame_live::state.rounds.size())-1);postgame_skill_page=0;postgame_build_step=-1;}}return 0;
+    }
+
     if(message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wp))ssc_freecam::suspend_focus();
     if(message==WM_SETFOCUS||(message==WM_ACTIVATEAPP&&wp))ssc_freecam::resume_focus();
     if(message==WM_DESTROY)ssc_freecam::lose_focus();
     if(message==WM_POWERBROADCAST&&(wp==PBT_APMSUSPEND||wp==PBT_APMRESUMEAUTOMATIC||wp==PBT_APMRESUMESUSPEND||wp==PBT_APMRESUMECRITICAL)){ssc_freecam::lose_focus();ssc_beta::service().invalidate();ssc_auth::service().invalidate();dirty=true;}
     if(message==WM_DESTROY){ssc_beta::service().stop();ssc_auth::service().stop();}
+    if(opened&&manager&&option_limits.count(settings_page)&&message==WM_MOUSEWHEEL){POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(window,&p);float x=(p.x-panel_x)/draw_scale,y=(p.y-panel_y)/draw_scale;if(x>=260&&x<=1100&&y>=155&&y<=640){option_scroll[settings_page]=std::clamp(option_scroll[settings_page]-GET_WHEEL_DELTA_WPARAM(wp)/WHEEL_DELTA,0,option_limits[settings_page]);keyboard_focus=hovered=pressed=0;dirty=true;return 0;}}
     if(opened&&dropdown>=0){if(message==WM_MOUSEWHEEL){dropdown_choice=std::clamp(dropdown_choice-GET_WHEEL_DELTA_WPARAM(wp)/WHEEL_DELTA,0,int(dropdown_items.size())-1);dirty=true;return 0;}if(message==WM_KEYDOWN){if(wp==VK_ESCAPE){dropdown=-1;dirty=true;suppress_escape_up=true;return 0;}if(wp==VK_UP||wp==VK_DOWN||wp==VK_TAB){dropdown_choice=std::clamp(dropdown_choice+(wp==VK_UP?-1:1),0,int(dropdown_items.size())-1);dirty=true;return 0;}if(wp==VK_RETURN){select_dropdown(dropdown_choice);return 0;}}if(message==WM_LBUTTONDOWN&&hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp))==0){dropdown=-1;pressed=0;dirty=true;return 0;}}
 
     if(opened&&manager&&settings_page==3&&message==WM_MOUSEWHEEL){POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(window,&p);float x=(p.x-panel_x)/draw_scale,y=(p.y-panel_y)/draw_scale;if(x>=266&&x<=1086&&y>=187&&y<=452){sound_wheel_remainder+=GET_WHEEL_DELTA_WPARAM(wp);int steps=sound_wheel_remainder/WHEEL_DELTA;sound_wheel_remainder%=WHEEL_DELTA;int last=std::max(0,int(sound_results.size())-5);sound_page=size_t(std::clamp(int(sound_page)-steps,0,last));dirty=true;return 0;}}
@@ -750,7 +828,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
             if(message==WM_MOUSEWHEEL){if(hud_drag>=0)return 0;POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(window,&p);int i=hud_hit((p.x-panel_x)/draw_scale,(p.y-panel_y)/draw_scale);if(i>=0){ssc_hud::selected=i;auto& item=ssc_hud::items[i];item.scale*=std::pow(1.1f,GET_WHEEL_DELTA_WPARAM(wp)/120.f);ssc_hud::constrain(item);save();}return 0;}
         }
         if(message==WM_CAPTURECHANGED)finish_hud_drag();
-        if(message==WM_MOUSEMOVE){if(statistics_graph_visible()){statistics_mouse_x=(GET_X_LPARAM(lp)-panel_x)/draw_scale;statistics_mouse_y=(GET_Y_LPARAM(lp)-panel_y)/draw_scale;dirty=true;}int id=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));if(hovered!=id){hovered=id;keyboard_focus=0;dirty=true;}}
+        if(message==WM_MOUSEMOVE){if(postgame_visible()){postgame_mouse_x=(GET_X_LPARAM(lp)-panel_x)/draw_scale;postgame_mouse_y=(GET_Y_LPARAM(lp)-panel_y)/draw_scale;dirty=true;}if(statistics_graph_visible()){statistics_mouse_x=(GET_X_LPARAM(lp)-panel_x)/draw_scale;statistics_mouse_y=(GET_Y_LPARAM(lp)-panel_y)/draw_scale;dirty=true;}int id=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));if(hovered!=id){hovered=id;keyboard_focus=0;dirty=true;}}
         if(message==WM_LBUTTONDOWN){pressed=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));dirty=true;}
         if(message==WM_LBUTTONUP){int id=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));int down=pressed;pressed=0;if(id&&id==down){activate(id);place_caret(id,GET_X_LPARAM(lp));}else if(!id){commit_text();}dirty=true;}
         if((message>=WM_KEYFIRST&&message<=WM_KEYLAST)||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;
@@ -795,7 +873,7 @@ void polygon(int x,int y,int w,int h,COLORREF color) {
     HBRUSH b=CreateSolidBrush(color);auto old=SelectObject(canvas,b);auto pen=SelectObject(canvas,GetStockObject(NULL_PEN));Polygon(canvas,p,8);SelectObject(canvas,old);SelectObject(canvas,pen);DeleteObject(b);
 }
 void prepare_canvas() {
-    canvas_w=auto_guide_visible()||statistics_graph_visible()?1440:1120;canvas_h=statistics_graph_visible()?900:720;
+    canvas_w=auto_guide_visible()||statistics_graph_visible()?1440:1120;canvas_h=statistics_graph_visible()?900:postgame_visible()?820:720;
     int rw=std::max(1,int(std::lround(canvas_w*raster_scale))),rh=std::max(1,int(std::lround(canvas_h*raster_scale)));
     if(canvas&&rw==raster_w&&rh==raster_h)return;
     if(canvas){DeleteDC(canvas);DeleteObject(bitmap);DeleteObject(font);DeleteObject(title_font);canvas=nullptr;}
@@ -939,13 +1017,27 @@ void preview_pixels(int x,int y,int size,const unsigned char* source,int width,i
  if(!sw){sw=width;}if(!sh){sh=height;}GdiFlush();auto dest=static_cast<unsigned char*>(pixels);
  int left=int(x*raster_scale),top=int(y*raster_scale),extent=std::max(1,int(size*raster_scale));for(int dy=0;dy<extent;++dy)for(int dx=0;dx<extent;++dx){int px=left+dx,py=top+dy;if(px<0||py<0||px>=raster_w||py>=raster_h)continue;int tx=sx+dx*sw/extent,ty=sy+dy*sh/extent;if(tx<0||ty<0||tx>=width||ty>=height)continue;auto src=source+(ty*width+tx)*4;auto dst=dest+(py*raster_w+px)*4;float a=src[3]/255.f;for(int k=0;k<3;++k)dst[k]=static_cast<unsigned char>(dst[k]*(1-a)+src[2-k]*a);dst[3]=255;}
 }
+struct ReportAtlasCache {GLuint cached=0;HGLRC context=nullptr;int width=0,height=0,cols=0,rows=0,tile=0;std::vector<unsigned char> atlas;};
+bool preview_native_tile(uintptr_t record,int index,int x,int y,int size,ReportAtlasCache& cache){
+ auto& cached=cache.cached;auto& width=cache.width;auto& height=cache.height;auto& cols=cache.cols;auto& rows=cache.rows;auto& tile=cache.tile;auto& atlas=cache.atlas;
+ if(cache.context!=wglGetCurrentContext()){cache={};cache.context=wglGetCurrentContext();}
+ if(wglGetCurrentContext()){GLuint id=0;int w=0,h=0,c=0,r=0,t=0;using ssc_names::read;if(record&&read(record+0x20,id)&&read(record+0x24,w)&&read(record+0x28,h)&&read(record+0x2c,c)&&read(record+0x30,r)&&read(record+0x34,t)&&w>0&&h>0&&w<=4096&&h<=4096&&c>0&&r>0&&t>0&&c*t<=w&&r*t<=h&&glIsTexture(id)&&id!=cached){GLint bound=0;glGetIntegerv(GL_TEXTURE_BINDING_2D,&bound);atlas.resize(size_t(w)*h*4);glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);glPixelStorei(GL_PACK_ALIGNMENT,1);glPixelStorei(GL_PACK_ROW_LENGTH,0);glPixelStorei(GL_PACK_SKIP_PIXELS,0);glPixelStorei(GL_PACK_SKIP_ROWS,0);using Bind=void(APIENTRY*)(GLenum,GLuint);auto bind=reinterpret_cast<Bind>(wglGetProcAddress("glBindBuffer"));GLint pack=0;if(bind){glGetIntegerv(0x88ed,&pack);bind(0x88eb,0);}glBindTexture(GL_TEXTURE_2D,id);glGetTexImage(GL_TEXTURE_2D,0,GL_RGBA,GL_UNSIGNED_BYTE,atlas.data());glBindTexture(GL_TEXTURE_2D,bound);if(bind)bind(0x88eb,pack);glPopClientAttrib();cached=id;width=w;height=h;cols=c;rows=r;tile=t;}}
+ if(index>=0&&!atlas.empty()&&index<cols*rows){preview_pixels(x,y,size,atlas.data(),width,height,index%cols*tile,index/cols*tile,tile,tile);return true;}return false;
+}
+bool preview_stock_tile(int index,int x,int y,int size){static ReportAtlasCache cache;return preview_native_tile(ssc_chat::attached?ssc_chat::stock_atlas():0,index,x,y,size,cache);}
+bool preview_skill_tile(int index,int x,int y,int size){
+ static ReportAtlasCache cache;
+ // Native skill-panel call at 3dec36 uses this atlas; startup validates its containing function.
+ const auto record=ssc_advisor::attached?ssc_advisor::game+0xe29330:0;
+ return preview_native_tile(record,index,x,y,size,cache);
+}
+
 void preview_icon(int slot,int x,int y,int size){
  const auto& config=ssc_chat::slots[slot];if(config.custom&&!ssc_wheel_images::images[slot].empty()){preview_pixels(x,y,size,ssc_wheel_images::images[slot].data(),64,64);return;}
- static GLuint cached=0;static int width=0,height=0,cols=0,rows=0,tile=0;static std::vector<unsigned char> atlas;
- if(wglGetCurrentContext()&&ssc_chat::attached){auto record=ssc_chat::stock_atlas();GLuint id=0;int w=0,h=0,c=0,r=0,t=0;using ssc_names::read;if(record&&read(record+0x20,id)&&read(record+0x24,w)&&read(record+0x28,h)&&read(record+0x2c,c)&&read(record+0x30,r)&&read(record+0x34,t)&&w>0&&h>0&&w<=4096&&h<=4096&&c>0&&r>0&&t>0&&c*t<=w&&r*t<=h&&glIsTexture(id)&&id!=cached){GLint bound=0;glGetIntegerv(GL_TEXTURE_BINDING_2D,&bound);atlas.resize(size_t(w)*h*4);glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);glPixelStorei(GL_PACK_ALIGNMENT,1);glPixelStorei(GL_PACK_ROW_LENGTH,0);glPixelStorei(GL_PACK_SKIP_PIXELS,0);glPixelStorei(GL_PACK_SKIP_ROWS,0);using Bind=void(APIENTRY*)(GLenum,GLuint);auto bind=reinterpret_cast<Bind>(wglGetProcAddress("glBindBuffer"));GLint pack=0;if(bind){glGetIntegerv(0x88ed,&pack);bind(0x88eb,0);}glBindTexture(GL_TEXTURE_2D,id);glGetTexImage(GL_TEXTURE_2D,0,GL_RGBA,GL_UNSIGNED_BYTE,atlas.data());glBindTexture(GL_TEXTURE_2D,bound);if(bind)bind(0x88eb,pack);glPopClientAttrib();cached=id;width=w;height=h;cols=c;rows=r;tile=t;}}
- int index=0x200+config.icon;if(!atlas.empty()&&index<cols*rows){preview_pixels(x,y,size,atlas.data(),width,height,index%cols*tile,index/cols*tile,tile,tile);return;}
+ if(preview_stock_tile(0x200+config.icon,x,y,size))return;
  const wchar_t* symbols[]={L">>",L"!",L"YES",L"NO",L"WP",L"THX",L"HI",L"GLHF",L"GG"};text(x,y+size/3,symbols[config.icon],cyan,false,12);
 }
+
 void wheel_preview(){
  const float cx=479,cy=375,radius=158;auto visible=ssc_chat::visible_order(wheel_round_ended);
  for(int position=0;position<8;++position){int i=visible[position];double angle=ssc_chat::preview_angle(position);float x=cx+float(std::cos(angle))*radius,y=cy+float(std::sin(angle))*radius;
@@ -1005,10 +1097,13 @@ void paint_statistics_graph(){
     else if(unknown_time)text(112,810,L"Some older or partial recordings lack a round clock.",muted,false,12);
     else if(!available)text(112,810,L"This metric was not available in this recording.",muted,false,12);
 }
+int option_list(int count,int visible){int limit=std::max(0,count-visible);option_limits[settings_page]=limit;int& start=option_scroll[settings_page];start=std::clamp(start,0,limit);if(limit){button(1290,958,108,54,38,L"^",false,start>0);button(1291,1026,108,54,38,L"v",false,start<limit);rectangle(1094,166,4,450,RGB(18,41,72));rectangle(1094,166+450*start/count,4,std::max(16,450*visible/count),cyan);}return start;}
+#include "postgame_menu.h"
 void paint_panel() {
     prepare_canvas();if(!pixels)return;controls.clear();wheel_hits.clear();
+    if(postgame_visible()){paint_postgame();return;}
     edit_visuals.clear();
-    panel_w=cosmetics_popup?960:statistics_graph_visible()?1440:manager?1120:640;panel_h=cosmetics_popup?600:statistics_graph_visible()?900:manager?720:update_popup?310:quick_height();
+    panel_w=cosmetics_popup?960:statistics_graph_visible()?1440:manager?1120:640;panel_h=cosmetics_popup?600:statistics_graph_visible()?900:postgame_visible()?820:manager?720:update_popup?310:quick_height();
     std::memset(pixels,0,raster_w*raster_h*4);
     rectangle(0,0,panel_w,panel_h,RGB(8,21,41));rectangle(4,4,panel_w-8,78,RGB(18,41,72));
     rectangle(4,82,panel_w-8,2,RGB(48,135,208));
@@ -1070,12 +1165,13 @@ void paint_panel() {
         else if(GetTickCount64()<ssc_freecam::notice_until)text(24,bottom+51,ssc_freecam::entry_status,RGB(255,190,120),false,11);
     } else {
         button(10,24,108,192,44,L"MODULES",settings_page==-1||(settings_page>=3&&settings_page<=6));
-        button(11,24,166,192,44,L"INTERFACE",settings_page==1);
-        button(13,24,224,192,44,L"MISC",settings_page==9);
-        button(12,24,282,192,44,L"ABOUT",settings_page==2);
-        button(14,24,340,192,44,L"WEAPON LAB",settings_page==11);button(15,24,398,192,44,L"RECORDING",settings_page==12);button(16,24,456,192,44,L"CREDITS",settings_page==13);
-        button(520,24,514,192,44,L"PRIVATE ACCESS",settings_page==19);
-        if(ssc_names::private_visible())button(510,24,572,192,44,ssc_chat::widen(private_label).c_str(),settings_page==18);
+        button(11,24,162,192,44,L"INTERFACE",settings_page==1);
+        button(997,24,216,192,44,L"MATCH SUMMARY",settings_page==28);
+        button(13,24,270,192,44,L"MISC",settings_page==9);
+        button(12,24,324,192,44,L"ABOUT",settings_page==2);
+        button(14,24,378,192,44,L"WEAPON LAB",settings_page==11);button(15,24,432,192,44,L"RECORDING",settings_page==12);button(16,24,486,192,44,L"CREDITS",settings_page==13);
+        button(520,24,540,192,44,L"PRIVATE ACCESS",settings_page==19);
+        if(ssc_names::private_visible())button(510,24,594,192,44,ssc_chat::widen(private_label).c_str(),settings_page==18);
         rectangle(238,108,1,546,RGB(38,65,101));
 
         if(settings_page==23){
@@ -1129,13 +1225,13 @@ void paint_panel() {
         } else if(settings_page==17){
             text(266,111,L"QUICK MENU",ink,true);
             const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving"};
-            for(int i=0;i<8;++i){int y=168+i*58;text(282,y+9,names[i]);toggle(i==7?982:i==6?965:481+i,978,y,(quick_mask&(1u<<i))!=0);}
+            int first=option_list(8,7);for(int row=0;row<7&&first+row<8;++row){int i=first+row,y=164+row*66;text(282,y+9,names[i]);toggle(i==7?982:i==6?965:481+i,978,y,(quick_mask&(1u<<i))!=0);}
         } else if(settings_page==-1) {
             text(266,111,L"MODULES",ink,true);
-            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving"};
-            const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load()};
-            const int ids[]={80,81,83,86,300,330,588,981},settings[]={91,92,93,94,301,302,585,980};
-            for(int i=0;i<8;++i){int y=168+i*58;rectangle(266,y,820,54,RGB(16,37,62));text(284,y+15,names[i],ink,true);toggle(ids[i],822,y+9,enabled[i]);button(settings[i],932,y+9,138,36,L"SETTINGS");}
+            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving",L"Flashbang"};
+            const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load(),ssc_dark_flash::enabled.load()};
+            const int ids[]={80,81,83,86,300,330,588,981,1200},settings[]={91,92,93,94,301,302,585,980,1201};
+            int first=option_list(9,7);for(int row=0;row<7&&first+row<9;++row){int i=first+row,y=164+row*66;rectangle(266,y,820,60,RGB(16,37,62));text(284,y+15,names[i],ink,true);toggle(ids[i],822,y+9,enabled[i]);button(settings[i],932,y+9,138,36,L"SETTINGS");}
             if(GetTickCount64()<ssc_freecam::notice_until){rectangle(266,636,820,26,RGB(50,37,53));text(276,640,ssc_freecam::entry_status,RGB(255,190,120),false,12);}
         } else if(settings_page==15){
             text(266,111,L"CUSTOM QUICK CHAT",ink,true);toggle(300,986,106,ssc_chat::enabled);
@@ -1259,34 +1355,36 @@ void paint_panel() {
             button(161,266,308,340,48,ssc_update::action_label(),true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
             button(1,630,308,180,48,L"LATER");
         } else if(settings_page==9){
-            text(266,111,L"MISC",ink,true);button(997,760,106,326,38,L"DRAFT ADVISOR");
-            text(282,198,L"HUD HOVER FADE");toggle(192,978,189,ssc_hud::hover_fade);
-            text(282,246,L"Fade HUD elements near your cursor.",muted);
-            text(282,310,L"READY SKILL PULSE");toggle(193,978,301,ssc_cooldown::settings.enabled);
-            text(282,354,L"Restore the health / skill HUD when a cooldown ends.",muted);
-            text(282,406,L"GERI CHALLENGE");toggle(570,978,397,ssc_geri::enabled.load());
-            text(282,449,ssc_geri::attached?L"Hide the skill draft and syringe selection panel.":L"Unavailable for this game build.",muted,false,14);
-            text(282,480,L"UI only; challenge rules are not enforced.",muted,false,12);
-            text(282,518,L"PULSE DURATION");
-            button(197,282,554,210,38,L"1 SECOND",ssc_cooldown::settings.duration_ms==1000);button(198,508,554,210,38,L"1.5 SECONDS",ssc_cooldown::settings.duration_ms==1500);button(199,734,554,210,38,L"2.5 SECONDS",ssc_cooldown::settings.duration_ms==2500);
-            button(585,282,606,350,38,L"FREECAM");text(670,619,L"HIDE CROSSHAIR",muted,false,12);toggle(586,978,606,ssc_creator::hide_crosshair.load());
-        } else if(settings_page==28){
-            text(266,111,L"DRAFT ADVISOR",ink,true);
-            if(!ssc_advisor::private_access()){
-                text(282,204,L"PRIVATE ACCESS REQUIRED",ink,true);
-                text(282,266,L"Activate your private key to use draft and syringe advice.",muted,false,15);
-                button(520,282,322,300,44,L"PRIVATE ACCESS");
-            }else{
-            text(282,204,L"HIGHLIGHT RECOMMENDED SKILL");toggle(998,978,195,ssc_advisor::enabled);
-            text(282,276,L"Uses your class, skills and current mutations.",muted,false,15);
-            text(282,322,L"API STATISTICS",muted,false,16);toggle(1001,978,312,ssc_advisor::use_api);
-            text(282,368,L"Sends visible offers and build IDs to skillshotcity.gg.",muted,false,14);
-            text(282,410,L"SHARE ROUND DATA FOR RESEARCH",muted,false,16);toggle(1002,978,400,ssc_training::enabled);
-            text(282,452,L"Auto-sends builds, advice, choices and round stats to our server.",muted,false,13);
-            text(282,480,L"No names, Steam IDs, chat or PC details. Separate from recordings.",muted,false,13);
-            text(282,555,ssc_training::status(),muted,false,13);
-            text(282,520,ssc_advisor::attached?ssc_advisor::advice_status:L"Unavailable for this game build.",muted,false,14);
+            text(266,111,L"MISC",ink,true);int first=option_list(4,3);
+            for(int visible=0;visible<3;++visible){int item=first+visible,y=168+visible*150;rectangle(266,y,820,138,RGB(16,37,62));
+             if(item==0){text(282,y+18,L"HUD HOVER FADE");toggle(192,978,y+9,ssc_hud::hover_fade);text(282,y+68,L"Fade HUD elements near your cursor.",muted,false,14);}
+             else if(item==1){text(282,y+18,L"READY SKILL PULSE");toggle(193,978,y+9,ssc_cooldown::settings.enabled);text(282,y+58,L"Restore the health / skill HUD when a cooldown ends.",muted,false,14);button(197,282,y+88,210,38,L"1 SECOND",ssc_cooldown::settings.duration_ms==1000);button(198,508,y+88,210,38,L"1.5 SECONDS",ssc_cooldown::settings.duration_ms==1500);button(199,734,y+88,210,38,L"2.5 SECONDS",ssc_cooldown::settings.duration_ms==2500);}
+             else if(item==2){text(282,y+18,L"GERI CHALLENGE");toggle(570,978,y+9,ssc_geri::enabled.load());text(282,y+68,ssc_geri::attached?L"Hide the skill draft and syringe selection panel.":L"Unavailable for this game build.",muted,false,14);text(282,y+102,L"UI only; challenge rules are not enforced.",muted,false,12);}
+             else if(item==3){text(282,y+18,L"HIDE CROSSHAIR");toggle(586,978,y+9,ssc_creator::hide_crosshair.load());text(282,y+68,L"Hide your crosshair for captures.",muted,false,14);}
             }
+        } else if(settings_page==30){
+            text(266,111,L"FLASHBANG",ink,true);
+            text(282,204,L"FLASH REPLACEMENT",ink,false,18);toggle(1200,978,190,ssc_dark_flash::enabled.load());
+            button(1202,282,270,250,42,L"BLACK",ssc_flash_image::mode.load()==0);
+            button(1203,550,270,250,42,L"IMAGE",ssc_flash_image::mode.load()==1,ssc_flash_image::ready());
+            button(1204,282,340,350,42,L"CHOOSE IMAGE");
+            text(282,410,L"Stretched to fill the screen. No transparent images.",muted,false,14);
+            text(282,446,L"Native flash strength and fade timing are preserved.",muted,false,14);
+            if(!ssc_flash_image::status.empty())text(282,505,ssc_flash_image::status.c_str(),cyan,false,14);
+        } else if(settings_page==28){
+            text(266,111,L"MATCH SUMMARY",ink,true);
+            text(282,204,recording_requested?L"RECORDING ON":L"RECORDING OFF",recording_requested?cyan:muted);button(15,710,190,330,44,L"RECORDING SETTINGS");
+            text(282,258,L"Enable Recording before the match starts.",muted,false,15);
+            text(282,294,L"Analysis runs on your PC using the public game API.",muted,false,14);
+            button(1003,282,338,330,44,L"OPEN POST-GAME REPORT",false,presence_supported&&rpc_preview.phase==1&&!ssc_postgame::busy.load());
+            button(1113,630,338,330,44,L"LAST SAVED MATCH",false,presence_supported&&rpc_preview.phase==1&&!ssc_review_history::busy.load());
+            if(ssc_advisor::private_access()){
+                text(282,412,L"MATCH ANALYSIS",ink,false,16);toggle(1125,978,402,ssc_review_online::requested);
+                text(282,452,L"Scores on your PC using the game API; shares round data for research.",muted,false,13);
+                text(282,492,L"SHARE EXTENDED DRAFT RESEARCH",muted,false,13);toggle(1002,978,480,ssc_training::enabled);
+            }
+            button(1107,282,550,540,40,postgame_binding?L"PRESS KEY (ESC CANCEL)":(L"SUMMARY KEY: "+key_label(postgame_hotkey)).c_str());button(1108,838,550,202,40,L"RESET KEY");
+            button(1301,282,606,330,40,L"PASTE BUILD CODE");text(640,619,L"Skills only; no account data.",muted,false,13);if(!postgame_share_status.empty())text(282,661,ssc_chat::widen(postgame_share_status).c_str(),cyan,false,12);
         } else if(settings_page==26){
             text(266,111,L"DRIVING",ink,true);
             text(282,204,L"CAMERA-RELATIVE CONTROLS");toggle(981,978,195,ssc_vehicle::enabled.load());
@@ -1310,13 +1408,15 @@ void paint_panel() {
             text(266,111,L"LOCATION CAPTURE",ink,true);button(962,850,106,236,38,L"< PHOTO");
             text(282,195,L"SAVE STILL + LOOK-AROUND",ink,false,18);
             text(282,240,L"Single-player 3D Freecam only. Simulation pauses briefly.",muted,false,13);
-            text(282,275,L"Captures save privately; they are never uploaded automatically.",muted,false,13);
+            text(282,275,L"Saves locally. Sending is opt-in and starts off each launch.",muted,false,13);
             {int binding=ssc_freecam::capture_key;std::wstring key=binding>=VK_F1&&binding<=VK_F12?L"F"+std::to_wstring(binding-VK_F1+1):std::wstring(1,wchar_t(binding));button(991,282,320,748,40,capture_binding?L"PRESS KEY (ESC CANCEL)":(L"CAPTURE KEY: "+key).c_str());}
-            button(992,282,390,748,40,L"OPEN CAPTURE FOLDER");
-            text(282,465,L"Includes a PNG still, six cube faces and private position data.",muted,false,13);
-            text(282,505,L"Map calibration and capture review are required before use.",muted,false,13);
-            text(282,545,L"Render effects may animate between faces; inspect for seams.",muted,false,13);
-            text(282,595,(L"FLOOR CLEARANCE (NATIVE UNITS): "+std::to_wstring(int(ssc_freecam::eye_height))).c_str(),muted,false,13);button(994,850,582,80,36,L"-");button(995,950,582,80,36,L"+");
+            button(992,282,390,350,40,L"OPEN CAPTURE FOLDER");button(3303,646,390,384,40,L"RETRY LAST UPLOAD",false,!ssc_freecam::capture::writer().busy);
+            button(3300,282,445,350,36,L"GET UPLOAD CODE");button(3301,646,445,384,36,L"PASTE UPLOAD CODE");
+            text(282,500,L"SEND NEW F9 CAPTURES FOR REVIEW",muted,false,14);toggle(3302,978,490,ssc_capture_upload::enabled.load());
+            text(282,540,ssc_capture_upload::message(),muted,false,12);
+            text(282,564,L"Compact still + six faces + location. 20/day. Owner review required.",muted,false,12);
+            button(3304,282,582,270,36,L"CLEAR UPLOAD CODE");
+            text(282,634,(L"FLOOR CLEARANCE (NATIVE UNITS): "+std::to_wstring(int(ssc_freecam::eye_height))).c_str(),muted,false,13);button(994,850,620,80,36,L"-");button(995,950,620,80,36,L"+");
         } else if(settings_page==24){
             text(266,111,L"FREECAM",ink,true);button(962,610,106,220,38,L"PHOTO SETTINGS");button(587,850,106,236,38,L"< MISC");
             button(592,282,190,230,38,L"PAN",!ssc_freecam::fly,!ssc_freecam::capture::session.active());button(593,528,190,250,38,L"3D FREECAM",ssc_freecam::fly&&!ssc_freecam::fps,!ssc_freecam::capture::session.active());button(993,794,190,236,38,L"3D + FLOOR",ssc_freecam::fps,!ssc_freecam::capture::session.active()&&ssc_freecam::ground_supported);
@@ -1363,9 +1463,9 @@ void paint_panel() {
             text(266,200,L"RECORDING");toggle(270,520,190,recording_requested);
             button(271,646,190,420,44,L"OPEN RECORDINGS FOLDER");
             const wchar_t* statuses[]={L"Stopped",L"Recording locally",L"Unable to write recording",L"Storage limit reached",L"Starting",L"Stopping",L"Waiting for an active BR round"};text(266,267,statuses[std::min(6u,ssc_record::state().status.load())],cyan);
-            text(266,318,L"Saves round data locally while you play BR.",muted,false,14);
-            text(266,356,L"Keeps your choice across rounds and game restarts.",muted,false,14);
-            button(600,266,422,400,44,L"VIEW PERSONAL STATISTICS");
+            text(266,318,L"Saves round stats, build choices and post-game report data.",muted,false,14);
+            text(266,356,L"Enable before a match. This setting persists across restarts.",muted,false,14);
+            button(600,266,422,400,44,L"VIEW PERSONAL STATISTICS");button(997,682,422,384,44,L"POST-GAME SUMMARY");
         } else if(settings_page==11){
             text(266,111,L"WEAPON LAB",ink,true);
             if(ssc_lab::weapons.empty())text(266,157,ssc_lab::status.c_str(),muted,false,14);
@@ -1472,7 +1572,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.30",cyan);
+            text(266,157,L"0.1.31",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
@@ -1544,9 +1644,9 @@ void paint_live_hud_toolbar(){
 void layout_panel(int width,int height) {
     if(ssc_hud::editing){panel_w=760;panel_h=68;float base=std::min(1.f,std::max(.1f,float(width-24)/panel_w));if(std::abs(raster_scale-base)>.00001f){raster_scale=base;dirty=true;}draw_scale=base;panel_x=int((width-panel_w*base)*.5f);panel_y=ssc_hud::items[ssc_hud::selected].y<.13f?int(height-panel_h*base-12):12;return;}
 
-    panel_w=cosmetics_popup?960:auto_guide_visible()||statistics_graph_visible()?1440:manager?1120:640;panel_h=cosmetics_popup?600:statistics_graph_visible()?900:manager?720:update_popup?310:quick_height();
+    panel_w=cosmetics_popup?960:auto_guide_visible()||statistics_graph_visible()?1440:manager?1120:640;panel_h=cosmetics_popup?600:statistics_graph_visible()?900:postgame_visible()?820:manager?720:update_popup?310:quick_height();
     float fit=std::min(float(width-40)/(auto_guide_visible()?1760:panel_w),float(height-40)/panel_h);
-    float base=std::min(float(ui_scale)/100.f,std::max(.1f,fit));float e=ease(visibility);
+    float base=postgame_visible()?std::min(float(ui_scale)/100.f,std::max(.1f,fit*.78f)):std::min(float(ui_scale)/100.f,std::max(.1f,fit));float e=ease(visibility);
     if(std::abs(raster_scale-base)>.00001f){raster_scale=base;dirty=true;}
     draw_scale=base*(manager?(.88f+.12f*e):(.96f+.04f*e));
     panel_x=manager?int((width-(auto_guide_visible()?1120:panel_w)*draw_scale)*.5f):int(width-panel_w*draw_scale-24+(1-e)*24);

@@ -25,6 +25,7 @@ def build(runtime, output, version=None, python_archive=None, launcher=None):
             raise ValueError(f'Unapproved release payload: {name}')
         files[name if name == 'opengl32.dll' else 'SSCMods/' + name] = content
     files['SSCMods/AUDIO-NOTICES.txt'] = (root / 'runtime/third_party/AUDIO-NOTICES.txt').read_bytes()
+    files['SSCMods/herobrine.png'] = (root / 'runtime/assets/landscape/herobrine.png').read_bytes()
     metadata = dict(schema=1, product='SSCMods', version=version, experimental=True, native_desktop=True,
                     game_sha256=game_hash, game_size=game_size,
                     files={name: hashlib.sha256(content).hexdigest() for name, content in files.items()})

@@ -20,7 +20,7 @@ inline bool valid_version(const std::string& value){
  unsigned parts=0,digits=0;for(char c:value){if(c=='.'){if(!digits||++parts>2)return false;digits=0;}else if(c>='0'&&c<='9'){if(++digits>5)return false;}else return false;}return parts==2&&digits>0;
 }
 inline bool notification_due(bool main_menu){return main_menu&&!notified&&!version.empty()&&!applying&&version!=ignored_version;}
-inline std::wstring message=L"Updates are checked once at the main menu.";
+inline std::wstring message=L"Updates are checked once when the mod starts.";
 inline bool available(){return !version.empty()&&!applying;}
 inline std::wstring quote(const std::wstring& value){return L"\""+value+L"\"";}
 inline bool launch(const std::wstring& args){
@@ -90,4 +90,24 @@ inline bool poll(HWND window,bool may_restart){
  if(process&&applying&&!closing&&may_restart&&result.rfind("ready ",0)==0){closing=true;PostMessageW(window,WM_CLOSE,0,0);}
  return changed;
 }
+// Only used when initialization rejects the executable and no overlay is attached.
+// Never install/restart automatically; offer the official release page instead.
+inline DWORD WINAPI fallback_notice(void*){
+ const auto started=GetTickCount64();
+ do{poll(nullptr,false);if(!process)break;Sleep(250);}while(GetTickCount64()-started<90000);
+ if(notification_due(true)){
+  notified=true;
+  const auto text=L"SSC Mod Menu "+std::wstring(version.begin(),version.end())+
+   L" is available. Gameplay modules are unavailable on this game build. Open the official update page?";
+  if(MessageBoxW(nullptr,text.c_str(),L"SSC Mod Menu update",MB_YESNO|MB_ICONINFORMATION|MB_SETFOREGROUND)==IDYES){
+   const auto url=L"https://github.com/Epiano7/SSC-Mod-Menu/releases/tag/v"+std::wstring(version.begin(),version.end());
+   ShellExecuteW(nullptr,L"open",url.c_str(),nullptr,nullptr,SW_SHOWNORMAL);
+  }
+ }
+ return 0;
+}
+inline void notify_without_overlay(){
+ if(auto thread=CreateThread(nullptr,0,fallback_notice,nullptr,0,nullptr))CloseHandle(thread);
+}
+
 }

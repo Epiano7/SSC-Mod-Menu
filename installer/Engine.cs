@@ -43,7 +43,7 @@ namespace SSCMods.Setup {
         public const string Product = "SSCMods";
         public const string ManifestName = "SSCMods/install-manifest.json";
         static readonly string[] Required = { "opengl32.dll", "SSCMods/runtime.dll", "SSCMods/Uninstall.exe" };
-        static readonly string[] Allowed = Required.Concat(new[]{"SSCMods/AUDIO-NOTICES.txt"}).ToArray();
+        static readonly string[] Allowed = Required.Concat(new[]{"SSCMods/AUDIO-NOTICES.txt","SSCMods/herobrine.png"}).ToArray();
         static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
         [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
         static extern bool CreateDirectory(string path, IntPtr attributes);

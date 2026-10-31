@@ -27,18 +27,26 @@ inline Context context(uintptr_t base){
  c.actor=first+uintptr_t(local)*0x34b0;if(!read(c.actor+0x78,slot)||slot!=local||!read(c.actor+0x7dc,kind)||kind!=0||!read(c.actor+0x81,active)||!active)return {};
  c.valid=true;c.round=raw-1;c.active=raw>=2&&countdown<=0&&ending<=0;c.ending=raw>=2&&(countdown>0||ending>0);c.preparing=countdown>0&&ending<=0;return c;
 }
+// Reject other actors using fresh globals before the expensive match validation.
+// Never cache the actor across respawns/rounds; context() still validates accepted events.
+inline bool local_candidate(uintptr_t actor){
+ uintptr_t registry=0;int local=-1;
+ return actor&&ssc_names::read(image_base+ssc_compat::resolve(0xe1e688),local)&&local>=0&&local<2048
+  &&ssc_names::read(image_base+ssc_compat::resolve(0xe22140),registry)&&registry
+  &&registry<=UINTPTR_MAX-uintptr_t(local)*0x34b0&&actor==registry+uintptr_t(local)*0x34b0;
+}
 inline bool owns_weapon(uintptr_t actor,uintptr_t weapon){uintptr_t begin=0,end=0;return ssc_names::read(actor+0x12a0,begin)&&ssc_names::read(actor+0x12a8,end)&&begin&&end>=begin&&(end-begin)%0x748==0&&(end-begin)/0x748<=16&&weapon>=begin&&weapon<end&&(weapon-begin)%0x748==0;}
 using Spawn=int(*)(uintptr_t,unsigned char,uintptr_t,unsigned char,uintptr_t,uintptr_t,float,float,unsigned char,unsigned char,unsigned char);
 using Append=uintptr_t(*)(uintptr_t,const float*);
 inline Spawn original_spawn=nullptr;inline Append original_append=nullptr;
 inline int spawn(uintptr_t actor,unsigned char p2,uintptr_t weapon,unsigned char p4,uintptr_t p5,uintptr_t p6,float p7,float p8,unsigned char p9,unsigned char p10,unsigned char p11){
  const auto result=original_spawn(actor,p2,weapon,p4,p5,p6,p7,p8,p9,p10,p11);
- if(enabled.load(std::memory_order_relaxed)&&result>0){try{auto c=context(image_base);if(c.valid&&actor==c.actor&&owns_weapon(actor,weapon)){std::lock_guard<std::mutex> lock(mutex);counter.fired(c,result);}}catch(...){enabled=false;}}
+ if(enabled.load(std::memory_order_relaxed)&&result>0&&local_candidate(actor)){try{auto c=context(image_base);if(c.valid&&actor==c.actor&&owns_weapon(actor,weapon)){std::lock_guard<std::mutex> lock(mutex);counter.fired(c,result);}}catch(...){enabled=false;}}
  return result;
 }
 extern "C" __attribute__((used,noinline)) inline uintptr_t ssc_combat_hit(uintptr_t vector,const float* values,uintptr_t shooter,uintptr_t victim,uintptr_t projectile){
  const auto result=original_append(vector,values);
- if(enabled.load(std::memory_order_relaxed)){try{auto c=context(image_base);if(c.valid&&shooter==c.actor&&victim!=shooter&&projectile){int kind=-1;float damage=0;if(ssc_names::read(victim+0x7dc,kind)&&ssc_names::read(reinterpret_cast<uintptr_t>(values)+4,damage)){std::lock_guard<std::mutex> lock(mutex);counter.hit(c,kind,damage);}}}catch(...){enabled=false;}}
+ if(enabled.load(std::memory_order_relaxed)&&victim!=shooter&&projectile&&local_candidate(shooter)){try{auto c=context(image_base);if(c.valid&&shooter==c.actor&&victim!=shooter&&projectile){int kind=-1;float damage=0;if(ssc_names::read(victim+0x7dc,kind)&&ssc_names::read(reinterpret_cast<uintptr_t>(values)+4,damage)){std::lock_guard<std::mutex> lock(mutex);counter.hit(c,kind,damage);}}}catch(...){enabled=false;}}
  return result;
 }
 extern "C" void ssc_combat_hit_bridge();

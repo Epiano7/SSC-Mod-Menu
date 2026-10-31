@@ -13,7 +13,7 @@ import tempfile
 
 APP_ID = '308600'
 MANIFEST = 'SSCMods/linux-manifest.json'
-OWNED = ('opengl32.dll', 'SSCMods/runtime.dll', 'SSCMods/AUDIO-NOTICES.txt')
+OWNED = ('opengl32.dll', 'SSCMods/runtime.dll', 'SSCMods/AUDIO-NOTICES.txt', 'SSCMods/herobrine.png')
 LAUNCH_OPTIONS = 'WINEDLLOVERRIDES="opengl32=n,b" %command%'
 
 
@@ -103,7 +103,7 @@ def installed(root):
         return None
     data = read_json(path)
     if (data.get('schema') != 1 or data.get('product') != 'SSCMods'
-            or set(data.get('files', {})) != set(OWNED)
+            or set(data.get('files', {})) not in (set(OWNED), set(OWNED[:-1]))
             or any(not isinstance(h, str) or not re.fullmatch('[a-f0-9]{64}', h)
                    for h in data['files'].values())):
         raise ValueError('Invalid ownership manifest; no files changed')
