@@ -46,18 +46,18 @@ inline void sample_rating(uintptr_t base,Snapshot& snapshot,ssc_review_context::
     // Profile history and live ranked eligibility are separate observations.
     // Freeze the former even when match eligibility is not yet available.
     float profile_rating=-1,profile_matches=-1;int profile_required=0,profile_loaded=0;
-    const bool profile_valid=read(base+ssc_compat::resolve(0xe041f8),profile_loaded)&&profile_loaded&&
-        read(base+ssc_compat::resolve(0xe04a9c),profile_rating)&&read(base+ssc_compat::resolve(0xe04a98),profile_matches)&&
-        read(base+ssc_compat::resolve(0xfb69f8),profile_required)&&ssc_review_context::valid_rating(profile_rating,profile_matches,profile_required);
+    const bool profile_valid=read(base+ssc_compat::resolve(0xe031f8),profile_loaded)&&profile_loaded&&
+        read(base+ssc_compat::resolve(0xe03a9c),profile_rating)&&read(base+ssc_compat::resolve(0xe03a98),profile_matches)&&
+        read(base+ssc_compat::resolve(0xfb5a38),profile_required)&&ssc_review_context::valid_rating(profile_rating,profile_matches,profile_required);
     if(observation&&profile_valid)*observation={true,false,profile_matches<profile_required,profile_rating,profile_matches,profile_required};
     // The actor login field is an authentication state (often 3), not a user ID.
     // Read the loaded account profile's public game ID independently of actors.
     int game_user_id=0;
-    auto id_offset=ssc_compat::resolve(0xe03ba8);
+    auto id_offset=ssc_compat::resolve(0xe02ba8);
     if(observation&&profile_valid&&id_offset&&read(base+id_offset,game_user_id)&&game_user_id>0)observation->player_id=game_user_id;
     uintptr_t world=0,first=0,last=0,steam_first=0;int local=-1,slot=-1;
-    if(!read(base+ssc_compat::resolve(0xdea5d0),world)||!world||!read(world+0xa650,first)||!read(world+0xa658,last)||!first||last<first||(last-first)%0x34b0||(last-first)/0x34b0>2048
-        ||!read(base+ssc_compat::resolve(0xe22140),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe1e688),local)||local<0||uintptr_t(local)>=(last-first)/0x34b0)return;
+    if(!read(base+ssc_compat::resolve(0xde95d0),world)||!world||!read(world+0xa650,first)||!read(world+0xa658,last)||!first||last<first||(last-first)%0x34b0||(last-first)/0x34b0>2048
+        ||!read(base+ssc_compat::resolve(0xe21140),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe1d688),local)||local<0||uintptr_t(local)>=(last-first)/0x34b0)return;
     auto actor=first+uintptr_t(local)*0x34b0;if(!read(actor+0x78,slot)||slot!=local)return;
     RankedFields f;
     if(!read(world+0x128,f.mode)||!read(world+0x3e0,f.round)||!read(world+0x485,f.survival)||!read(world+0x2d2,f.singleplayer)
@@ -65,7 +65,7 @@ inline void sample_rating(uintptr_t base,Snapshot& snapshot,ssc_review_context::
         ||!read(actor+0x81,f.active)||!read(actor+0x7dc,f.kind)||!read(actor+0x700,f.name_length)||!read(actor+0x6e0,f.login)
         ||!read(actor+0x6e4,f.authenticated)||!read(actor+0x270,f.committed)||!read(actor+0xf98,f.bonus)
         ||!read(actor+0xab4,f.account_level)||!read(actor+0x204,f.eligibility)
-        ||!read(base+ssc_compat::resolve(0xfb6a24),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfb6a28),f.bonus_threshold))return;
+        ||!read(base+ssc_compat::resolve(0xfb5a64),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfb5a68),f.bonus_threshold))return;
     if(observation&&profile_valid){observation->rank_blockers=ranked_blockers(f);}
     if(!ranked(f))return;
     add_rating(snapshot,true,profile_rating,profile_matches,profile_required);
@@ -88,11 +88,11 @@ inline std::string native_string(uintptr_t address){
 }
 inline Snapshot native_fallback(uintptr_t base){
     using ssc_names::read;Snapshot s;int session=0;double joining=0;
-    if(!read(base+ssc_compat::resolve(0xfb26dc),session)||!read(base+ssc_compat::resolve(0xfb26f0),joining)||!std::isfinite(joining))return s;
+    if(!read(base+ssc_compat::resolve(0xfb171c),session)||!read(base+ssc_compat::resolve(0xfb1730),joining)||!std::isfinite(joining))return s;
     if(session==1)return from_steam("#Status_AtMainMenu","");
     if(session!=2)return s;
     if(joining>0){s.details="Joining game";s.state="Loading";s.phase=3;return s;}
-    uintptr_t world=0;if(!read(base+ssc_compat::resolve(0xdea5d0),world)||!world)return s;
+    uintptr_t world=0;if(!read(base+ssc_compat::resolve(0xde95d0),world)||!world)return s;
     int mode=-1,round=0,team_size=0;unsigned char survival=0,singleplayer=0;
     if(!read(world+0x128,mode)||!read(world+0x3e0,round)||!read(world+0x480,team_size)||!read(world+0x485,survival)||!read(world+0x2d2,singleplayer))return s;
     s.phase=2;s.state="In game";
@@ -102,12 +102,12 @@ inline Snapshot native_fallback(uintptr_t base){
         default:s.details="Skillshot City";break;}
     uintptr_t first=0,last=0,steam_first=0;int local=-1,slot=-1,kind=-1,level=-1,class_id=-1;unsigned char active=0;
     if(!read(world+0xa650,first)||!read(world+0xa658,last)||!first||last<first||(last-first)%0x34b0||(last-first)/0x34b0>2048
-        ||!read(base+ssc_compat::resolve(0xe22140),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe1e688),local)||local<0||uintptr_t(local)>=(last-first)/0x34b0)return s;
+        ||!read(base+ssc_compat::resolve(0xe21140),steam_first)||first!=steam_first||!read(base+ssc_compat::resolve(0xe1d688),local)||local<0||uintptr_t(local)>=(last-first)/0x34b0)return s;
     auto actor=first+uintptr_t(local)*0x34b0;
     if(!read(actor+0x78,slot)||slot!=local||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active||!read(actor+0x870,level)||level<0||level>10000)return s;
     s.state="Level "+std::to_string(level);
     uintptr_t classes=0,end=0;
-    if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe17a98),classes)&&read(base+ssc_compat::resolve(0xe17aa0),end)&&classes&&end>=classes&&(end-classes)%0x98==0&&(end-classes)/0x98<=512&&uintptr_t(class_id)<(end-classes)/0x98){
+    if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe16a98),classes)&&read(base+ssc_compat::resolve(0xe16aa0),end)&&classes&&end>=classes&&(end-classes)%0x98==0&&(end-classes)/0x98<=512&&uintptr_t(class_id)<(end-classes)/0x98){
         auto label=native_string(classes+uintptr_t(class_id)*0x98+0x18);if(!label.empty())s.state=label+" - "+s.state;
     }
     return s;
@@ -117,7 +117,7 @@ inline Snapshot native_fallback(uintptr_t base){
 inline Snapshot sample_steam(bool show_rating=true){
     auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));int initialized=0;
     auto fallback=native_fallback(base);if(show_rating)sample_rating(base,fallback);
-    if(!ssc_names::read(base+ssc_compat::resolve(0xfb14bc),initialized)||initialized<=0)return fallback;
+    if(!ssc_names::read(base+ssc_compat::resolve(0xfb04fc),initialized)||initialized<=0)return fallback;
     auto dll=GetModuleHandleW(L"steam_api64.dll");if(!dll)return fallback;
     using Interface=void*(*)();using OwnId=uint64_t(*)(void*);using Presence=const char*(*)(void*,uint64_t,const char*);
     auto friends=reinterpret_cast<Interface>(GetProcAddress(dll,"SteamAPI_SteamFriends_v017"));

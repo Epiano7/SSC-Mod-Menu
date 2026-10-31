@@ -22,7 +22,7 @@ int main(){
  show_cosmetics_notice();dirty=false;refresh_dynamic_panel(10000);assert(dirty);
  close_menu();
  // Actual observer must record original false even if cosmetic predicate returns true.
- std::vector<unsigned char> image(0x1000000);ssc_names::image_base=reinterpret_cast<uintptr_t>(image.data());small(ssc_names::image_base+0xe041e8,"owner");std::array<unsigned char,32> name{};small(reinterpret_cast<uintptr_t>(name.data()),"owner");
+ std::vector<unsigned char> image(0x1000000);ssc_names::image_base=reinterpret_cast<uintptr_t>(image.data());small(ssc_names::image_base+0xe031e8,"owner");std::array<unsigned char,32> name{};small(reinterpret_cast<uintptr_t>(name.data()),"owner");
  ssc_names::native_predicate=native_false;ssc_names::cosmetics=true;ssc_names::attached=false;
  assert(ssc_names::predicate(nullptr,-1,name.data())==1);assert(!ssc_names::native_pass_value&&ssc_names::native_pass_account=="owner");
  ssc_names::native_predicate=native_true;assert(ssc_names::native_pass_probe(nullptr,-1,name.data())==1&&ssc_names::native_pass_value);

@@ -12,8 +12,8 @@ int main(int argc,char** argv){
  HANDLE file=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);assert(file!=INVALID_HANDLE_VALUE);
  HANDLE mapping=CreateFileMappingW(file,nullptr,PAGE_READONLY|SEC_IMAGE_NO_EXECUTE,0,0,nullptr);assert(mapping);
  auto view=static_cast<const unsigned char*>(MapViewOfFile(mapping,FILE_MAP_READ,0,0,0));assert(view);
- assert(ssc_creator::matches(view,0x84a598));assert(!ssc_creator::matches(view,0x84a597));
- std::vector<unsigned char> changed(view,view+0x84a598);changed[0x846900]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));changed[0x846900]^=1;changed[0x3b90e7]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));
+ assert(ssc_creator::matches(view,0x849418));assert(!ssc_creator::matches(view,0x849417));
+ std::vector<unsigned char> changed(view,view+0x849418);changed[0x845780]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));changed[0x845780]^=1;changed[0x3b8bb7]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));
  UnmapViewOfFile(view);CloseHandle(mapping);CloseHandle(file);
  WNDCLASSW wc{};wc.style=CS_OWNDC;wc.lpfnWndProc=DefWindowProcW;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"SSCCreatorTest";assert(RegisterClassW(&wc));
  HWND window=CreateWindowW(wc.lpszClassName,L"SSC creator test",WS_OVERLAPPEDWINDOW,0,0,64,64,nullptr,nullptr,wc.hInstance,nullptr);assert(window);
@@ -53,21 +53,21 @@ int main(int argc,char** argv){
  for(float impulse:{40.f,-70.f,500.f,-1000.f}){glMatrixMode(GL_PROJECTION);glLoadIdentity();glFrustum(-2,2,-2,2,5,3000);glMatrixMode(GL_MODELVIEW);glLoadIdentity();glRotatef(3,0,0,1);ssc_freecam::view(-100+impulse,-200,-300+impulse);glGetFloatv(GL_MODELVIEW_MATRIX,matrix);for(int j=0;j<16;++j)assert(std::abs(matrix[j]-stable[j])<.001f);glGetFloatv(GL_PROJECTION_MATRIX,matrix);for(int j=0;j<16;++j)assert(std::abs(matrix[j]-stable_projection[j])<.001f);}}
  // Pan at normal zoom must be byte-for-byte native matrices and render bounds.
  ssc_freecam::stop();ssc_freecam::state.observe(1,2,100,200,1000,1000,1000);assert(ssc_freecam::start(1000));ssc_freecam::fly=false;
- std::vector<unsigned char> memory(0xfb1c88);ssc_freecam::base=reinterpret_cast<uintptr_t>(memory.data());float original_bounds[]={10,20,300,400};std::memcpy(memory.data()+0xfb1c78,original_bounds,sizeof original_bounds);
+ std::vector<unsigned char> memory(0xfb0cc8);ssc_freecam::base=reinterpret_cast<uintptr_t>(memory.data());float original_bounds[]={10,20,300,400};std::memcpy(memory.data()+0xfb0cb8,original_bounds,sizeof original_bounds);
  glMatrixMode(GL_PROJECTION);glLoadIdentity();glFrustum(-1,1,1,-1,5,2000);float original_projection[16];glGetFloatv(GL_PROJECTION_MATRIX,original_projection);glMatrixMode(GL_MODELVIEW);glLoadIdentity();ssc_freecam::view(-100,-200,-300);
- glGetFloatv(GL_PROJECTION_MATRIX,matrix);assert(std::memcmp(matrix,original_projection,sizeof matrix)==0);assert(std::memcmp(memory.data()+0xfb1c78,original_bounds,sizeof original_bounds)==0&&!ssc_freecam::bounds_saved);
- ssc_freecam::camera.zoom=2;glLoadIdentity();ssc_freecam::view(-100,-200,-300);float changed_bounds[4];std::memcpy(changed_bounds,memory.data()+0xfb1c78,sizeof changed_bounds);assert(changed_bounds[2]==600&&changed_bounds[3]==800); // scale visible area, not the entire map
+ glGetFloatv(GL_PROJECTION_MATRIX,matrix);assert(std::memcmp(matrix,original_projection,sizeof matrix)==0);assert(std::memcmp(memory.data()+0xfb0cb8,original_bounds,sizeof original_bounds)==0&&!ssc_freecam::bounds_saved);
+ ssc_freecam::camera.zoom=2;glLoadIdentity();ssc_freecam::view(-100,-200,-300);float changed_bounds[4];std::memcpy(changed_bounds,memory.data()+0xfb0cb8,sizeof changed_bounds);assert(changed_bounds[2]==600&&changed_bounds[3]==800); // scale visible area, not the entire map
  glGetFloatv(GL_PROJECTION_MATRIX,matrix);float near_plane=matrix[14]/(matrix[10]-1);assert(std::abs(near_plane-5)<.001f);assert(ssc_freecam::camera.screen_y==-1);
- ssc_freecam::stop();assert(std::memcmp(memory.data()+0xfb1c78,original_bounds,sizeof original_bounds)==0);ssc_freecam::base=0;
+ ssc_freecam::stop();assert(std::memcmp(memory.data()+0xfb0cb8,original_bounds,sizeof original_bounds)==0);ssc_freecam::base=0;
  // A close 3D view must reduce submitted XY area while retaining the complete
  // frustum and tile margin; the far-plane option must preserve the near plane.
  ssc_freecam::state.observe(1,2,4000,4000,10000,10000,1000);assert(ssc_freecam::start(1000));ssc_freecam::fly=true;ssc_freecam::draw_distance=1000;ssc_freecam::base=reinterpret_cast<uintptr_t>(memory.data());
  glMatrixMode(GL_PROJECTION);glLoadIdentity();glFrustum(-1,1,1,-1,5,2000);glMatrixMode(GL_MODELVIEW);glLoadIdentity();ssc_freecam::view(-4000,-4000,-300);
  glGetFloatv(GL_PROJECTION_MATRIX,matrix);assert(std::abs(matrix[14]/(matrix[10]-1)-5)<.001f);assert(std::abs(matrix[14]/(matrix[10]+1)-1000)<.1f);
- std::memcpy(changed_bounds,memory.data()+0xfb1c78,sizeof changed_bounds);assert(changed_bounds[2]<1000&&changed_bounds[3]<1000);
+ std::memcpy(changed_bounds,memory.data()+0xfb0cb8,sizeof changed_bounds);assert(changed_bounds[2]<1000&&changed_bounds[3]<1000);
  assert(changed_bounds[0]<=3800&&changed_bounds[0]+changed_bounds[2]>=4200);
  float invalid_projection[16]{};float sentinel[]={1,2,3,4};assert(!ssc_freecam::camera.visible_bounds(invalid_projection,10000,10000,sentinel)&&sentinel[0]==1&&sentinel[3]==4);
- ssc_freecam::stop();assert(std::memcmp(memory.data()+0xfb1c78,original_bounds,sizeof original_bounds)==0);ssc_freecam::base=0;ssc_freecam::draw_distance=0;
+ ssc_freecam::stop();assert(std::memcmp(memory.data()+0xfb0cb8,original_bounds,sizeof original_bounds)==0);ssc_freecam::base=0;ssc_freecam::draw_distance=0;
  ssc_freecam::stop();glLoadIdentity();ssc_freecam::view(-400,-500,-900);glGetFloatv(GL_MODELVIEW_MATRIX,matrix);assert(matrix[12]==-400&&matrix[14]==-900);assert(glGetError()==GL_NO_ERROR);
  // At arbitrary yaw/pitch, billboard rotations cancel the view rotation.
  // Translation (world anchor) remains untouched and native scale stays usable.
