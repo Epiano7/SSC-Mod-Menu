@@ -156,20 +156,7 @@ void render(HDC dc) {
     if(pg.active)ssc_record::track_observation(now);
     ssc_training::tick(now,state_dir);
 
-    if(postgame_history_pending&&!ssc_review_history::busy.load()){
-        postgame_history_pending=false;
-        auto saved=std::atomic_load(&ssc_review_history::result);
-        if(postgame_visible()&&rpc_preview.phase==1&&postgame_history_revision==ssc_postgame_live::state.revision){
-            postgame_history_error=saved?ssc_chat::widen(saved->error):L"Could not load saved match.";
-            if(saved&&saved->error.empty()){
-                ssc_postgame_art::images=saved->icons;ssc_postgame_art::states.clear();
-                ssc_postgame_live::state.rounds.clear();ssc_postgame_live::state.bytes=0;
-                for(const auto& round:saved->rounds)ssc_postgame_live::state.capture(round);
-                postgame_round=std::max(0,int(saved->rounds.size())-1);postgame_build_step=-1;
-                postgame_saved=true;if(ssc_review_online::requested)ssc_review_online::client().load(ssc_postgame_live::state.match_id);
-            }dirty=true;
-        }
-    }
+    refresh_postgame_history();
     static unsigned analysis_revision=0;static std::string analysis_match_seen;auto analysis_now=ssc_review_online::revision.load();if(analysis_now!=analysis_revision||analysis_match_seen!=ssc_postgame_live::state.match_id){analysis_revision=analysis_now;analysis_match_seen=ssc_postgame_live::state.match_id;if(ssc_review_online::requested||analysis_now){auto answer=ssc_review_online::client().snapshot(analysis_match_seen);postgame_analysis_match=answer->match;postgame_analysis_status=answer->status;postgame_analysis_message=answer->message;postgame_analysis=answer->report;}else{postgame_analysis=nullptr;postgame_analysis_match.clear();}if(postgame_visible())dirty=true;}
     if(postgame_visible()&&animations&&postgame_score_started&&now>=postgame_score_started&&now-postgame_score_started<1000)dirty=true;
     // Live advisor retired; recording collection remains separately gated.
