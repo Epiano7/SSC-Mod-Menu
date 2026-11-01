@@ -60,7 +60,7 @@ bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buf
 bool postgame_imported=false;std::vector<nlohmann::json> postgame_import_rounds;std::string postgame_share_status;
 int postgame_tab=0,postgame_round=0,postgame_skill_page=0,postgame_build_step=-1,postgame_detail=4;bool postgame_tab_up=false;
 int postgame_hotkey=VK_F7,postgame_binding_release=0;bool postgame_binding=false;
-bool postgame_history_pending=false,postgame_saved=false;unsigned postgame_history_revision=0;std::wstring postgame_history_error;
+bool postgame_history_pending=false,postgame_history_shortcut=false,postgame_saved=false;unsigned postgame_history_revision=0;std::wstring postgame_history_error;
 nlohmann::json postgame_analysis;std::string postgame_analysis_match,postgame_analysis_status,postgame_analysis_message,postgame_score_token;uint64_t postgame_score_started=0;
 int postgame_graph_metric=0,postgame_graph_cached_metric=-1;unsigned postgame_graph_revision=~0u;std::string postgame_graph_match;
 float postgame_mouse_x=-1,postgame_mouse_y=-1;
@@ -369,7 +369,7 @@ void activate(int id) {
     if(id>=1120&&id<=1124){postgame_detail=id-1120;dirty=true;return;}
     if(id==1113){
         if(presence_supported&&rpc_preview.phase==1&&!ssc_review_history::busy.load()){
-            show_manager(29);postgame_imported=false;opened=true;postgame_tab=0;postgame_history_error.clear();postgame_history_pending=true;
+            show_manager(29);postgame_imported=false;opened=true;postgame_tab=0;postgame_history_error.clear();postgame_history_pending=true;postgame_history_shortcut=false;
             postgame_history_revision=ssc_postgame_live::state.revision;ssc_review_history::load(state_dir/L"recordings");dirty=true;
         }return;
     }
@@ -627,6 +627,39 @@ template<class S,class Accept> bool edit_input(S& value,UINT message,WPARAM wp,s
  if(message==WM_CHAR){unsigned c=unsigned(wp);if(c==8)edit_cursor.backspace(value);else if(!ctrl&&accept(c))edit_cursor.insert(value,S(1,typename S::value_type(c)),limit);dirty=true;return true;}
  return false;
 }
+bool postgame_shortcut_available(){
+    return postgame_visible()||(ssc_postgame_live::state.eligible&&!ssc_postgame_live::state.rounds.empty())||(presence_supported&&rpc_preview.phase==1);
+}
+void toggle_postgame_shortcut(){
+    if(postgame_visible()){close_menu(true);return;}
+    if(presence_supported&&rpc_preview.phase==1&&ssc_postgame_live::state.rounds.empty()){
+        // Load off-thread; keep the existing menu when there is no saved round.
+        if(ssc_review_history::busy.load())return;
+        postgame_history_pending=postgame_history_shortcut=true;postgame_history_revision=ssc_postgame_live::state.revision;
+        ssc_review_history::load(state_dir/L"recordings");return;
+    }
+    postgame_history_pending=postgame_history_shortcut=false;postgame_imported=false;postgame_history_error.clear();
+    if(ssc_postgame_live::state.eligible)postgame_saved=false;
+    show_manager(29);opened=true;visibility=1;postgame_tab=0;postgame_round=std::max(0,int(ssc_postgame_live::state.rounds.size())-1);postgame_skill_page=0;postgame_build_step=-1;
+}
+void refresh_postgame_history(){
+    if(!postgame_history_pending||ssc_review_history::busy.load())return;
+    postgame_history_pending=false;bool shortcut=postgame_history_shortcut;postgame_history_shortcut=false;
+    auto saved=std::atomic_load(&ssc_review_history::result);
+    if((!postgame_visible()&&!shortcut)||!presence_supported||rpc_preview.phase!=1||postgame_history_revision!=ssc_postgame_live::state.revision)return;
+    if(shortcut){
+        if(!saved||!saved->error.empty()||saved->rounds.empty())return;
+        show_manager(29);opened=true;visibility=1;postgame_tab=0;postgame_imported=false;postgame_skill_page=0;
+    }
+    postgame_history_error=saved?ssc_chat::widen(saved->error):L"Could not load saved match.";
+    if(saved&&saved->error.empty()){
+        ssc_postgame_art::images=saved->icons;ssc_postgame_art::states.clear();
+        ssc_postgame_live::state.rounds.clear();ssc_postgame_live::state.bytes=0;
+        for(const auto& round:saved->rounds)ssc_postgame_live::state.capture(round);
+        postgame_round=std::max(0,int(saved->rounds.size())-1);postgame_build_step=-1;
+        postgame_saved=true;if(ssc_review_online::requested)ssc_review_online::client().load(ssc_postgame_live::state.match_id);
+    }dirty=true;
+}
 LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     const int report_key=physical_menu_key(wp,lp);
     const bool report_down=message==WM_KEYDOWN||message==WM_SYSKEYDOWN;
@@ -643,8 +676,8 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         }return 0;
     }
     if(report_up&&report_key==postgame_hotkey&&postgame_tab_up){postgame_tab_up=false;return 0;}
-    if(report_down&&report_key==postgame_hotkey&&!menu_binding&&!ssc_hud::editing&&(!opened||postgame_visible())&&(ssc_postgame_live::state.eligible||postgame_visible())){
-        postgame_imported=false;postgame_saved=false;postgame_history_error.clear();postgame_tab_up=true;if(!(lp&(1LL<<30))){if(postgame_visible())close_menu(true);else{show_manager(29);opened=true;visibility=1;postgame_tab=0;postgame_round=std::max(0,int(ssc_postgame_live::state.rounds.size())-1);postgame_skill_page=0;postgame_build_step=-1;}}return 0;
+    if(report_down&&report_key==postgame_hotkey&&!menu_binding&&!ssc_hud::editing&&postgame_shortcut_available()){
+        postgame_tab_up=true;if(!(lp&(1LL<<30)))toggle_postgame_shortcut();return 0;
     }
 
     if(message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wp))ssc_freecam::suspend_focus();
