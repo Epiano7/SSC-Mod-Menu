@@ -353,7 +353,7 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     ssc_diagnostics::initialize(state_dir);ssc_auth::service().configure(state_dir);ssc_shared::service().configure(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
     ssc_dark_flash::diagnostic=log;
-    log("SSC Mod Menu 0.1.32 startup");log_game_build();
+    log("SSC Mod Menu 0.1.33 startup");log_game_build();
     // Updates must remain available when native gameplay guards reject a build.
     ssc_update::check(state_dir);
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
