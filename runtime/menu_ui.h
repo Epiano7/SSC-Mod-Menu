@@ -1378,9 +1378,9 @@ void paint_panel() {
             text(282,294,L"Analysis runs on your PC using the public game API.",muted,false,14);
             button(1003,282,338,330,44,L"OPEN POST-GAME REPORT",false,presence_supported&&rpc_preview.phase==1&&!ssc_postgame::busy.load());
             button(1113,630,338,330,44,L"LAST SAVED MATCH",false,presence_supported&&rpc_preview.phase==1&&!ssc_review_history::busy.load());
+            text(282,412,L"MATCH ANALYSIS",ink,false,16);toggle(1125,978,402,ssc_review_online::requested);
+            text(282,452,L"Scores on your PC using the game API; shares round data for research.",muted,false,13);
             if(ssc_advisor::private_access()){
-                text(282,412,L"MATCH ANALYSIS",ink,false,16);toggle(1125,978,402,ssc_review_online::requested);
-                text(282,452,L"Scores on your PC using the game API; shares round data for research.",muted,false,13);
                 text(282,492,L"SHARE EXTENDED DRAFT RESEARCH",muted,false,13);toggle(1002,978,480,ssc_training::enabled);
             }
             button(1107,282,550,540,40,postgame_binding?L"PRESS KEY (ESC CANCEL)":(L"SUMMARY KEY: "+key_label(postgame_hotkey)).c_str());button(1108,838,550,202,40,L"RESET KEY");
@@ -1572,7 +1572,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.32",cyan);
+            text(266,157,L"0.1.33",cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
