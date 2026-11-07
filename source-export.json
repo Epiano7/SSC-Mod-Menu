@@ -18,14 +18,14 @@
       "runtime/draft_training_native.h": "372b045ce6962dee3759a51186fb55aa51c845e350761b66fb518df4dc6e4152",
       "runtime/draft_training_source.h": "5f2d484ee81bd38903d6735ecc352c543f8877f5eb0016934a9ac8acdb21fb61",
       "runtime/postgame_assessment.h": "cff1def435ff718cb50a94e89e93e080ada039a0b28d4e0f5b3c93ffbcf9ba74",
-      "runtime/postgame_client.h": "c498936b64985ad7c9384511de7d0e9f422f5c91ecf90a4385f12581088e270c",
+      "runtime/postgame_client.h": "2cd1d78afb17081d233107c3cd0a5defa39575d599fe27c138a983f1b68b4b91",
       "runtime/postgame_context.h": "ece7dbe69de88823e2fdd979d5b47cf1587af1fe2a09c899cc746b86b3193a38",
       "runtime/postgame_fit_data.h": "c987728f12290661c1b34b648a89cd542e4c11091bea9b97d7cb785e1147b4e6",
       "runtime/postgame_graph.h": "b94fef7e279814bf8c359d1192037f28be67b423bb45203f4074c72ca504e9af",
       "runtime/postgame_graph_menu.h": "d26071c2bab5f68868a0441510344cce02d942190bd5aed62919fa4b6929b454",
       "runtime/postgame_history.h": "8d0549fc10063aef46008eacfb21fbb48901d49e517e724c36160e9d41ae7d32",
       "runtime/postgame_history_core.h": "9d081adab911e2e6de8cbec95969f3f29718ab107f14181e8b75eb57fb4d036d",
-      "runtime/postgame_http.h": "373c73f0173ee4e550521e5fb37cc10f5fb99710da3d9bd4048db463336f0aee",
+      "runtime/postgame_http.h": "e3236b016ca3b21489cc6dc84ad6258706314e6c0a85a517a2c63dbd40dbd80d",
       "runtime/postgame_icons.h": "c74108535c47e1a92cb776b137161691066bf0524de4a9147f3a76b776a92f76",
       "runtime/postgame_icon_codec.h": "61649e41b0de8d4e664d876ad80c4b26bc5bd57e501b57b4acf20818fa694d2e",
       "runtime/postgame_local.h": "a2ed6b0cb49b9f79ffd96e26c84338f1a76ee9fa8334721515f2db70f0920ae8",
@@ -36,7 +36,7 @@
       "runtime/postgame_share.h": "1290d96128bbdc677380e15adeedd0055b31ccc5d68f27ea02f8166c39e96e1f",
       "runtime/postgame_state.h": "c5e1538ca4d4c9c8a1822f167feb53dc9610df4d4227d571a8d8bd8b01b78d81"
     },
-    "sha256": "79112887b29239576727dde471d4597d38cbd3dfbd4c8cb09632e6a6333fc892"
+    "sha256": "06843de072a8903c8d2388ede1837e66489bf7103df33a44f398bd1c2b7eb08b"
   },
   "public_files": {
     ".gitattributes": "23302dd90b8bb74b44d365fafef8df20f809b61cb347023951ecf60a88a29651",
@@ -143,7 +143,7 @@
     "scripts/Build-AudioCodec.ps1": "3ee5e929943f2d31d174ad256852f85d5331c84bf5ebbc562fb5dfcc8e2c610f",
     "scripts/Build-AuthCrypto.ps1": "65bed304aa930e788c6c6727477257134bc9e358b4988da5174cb2b6aa61faa4",
     "scripts/Build-CompatibilityProbe.ps1": "13d001f6c637949804e794e8513a7b281114a3191fa48adfffe99b3c3be2bbdd",
-    "scripts/Build-Installer.ps1": "888991acc817158e14f853f81820b2e849371dc6d4d43d78135d1ade6c085b08",
+    "scripts/Build-Installer.ps1": "c67a258f1954abc7596be3c30e2a2c119addb7e724a8d5002302c68dd8fa2a4b",
     "scripts/Build-Linux-Launcher.ps1": "4a03586bb0ee6ede15a741e349d2c47571b237ccf48c5461ec556107139f1dfc",
     "scripts/Build-Linux.py": "1932f17db7d1ec82866503063a563269340cf4eaf7f40172a4ead80d7ccf9640",
     "scripts/Build-Release.ps1": "7d29c1e6932be33acd2fb7c9dd7c33bd5239030e03791479315d4113d14a9ccc",
