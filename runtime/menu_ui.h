@@ -642,8 +642,9 @@ bool postgame_shortcut_available(){
 void toggle_postgame_shortcut(){
     if(postgame_visible()){close_menu(true);return;}
     if(presence_supported&&rpc_preview.phase==1&&ssc_postgame_live::state.rounds.empty()){
-        // Load off-thread; keep the existing menu when there is no saved round.
-        if(ssc_review_history::busy.load())return;
+        // Open immediately; disk history and API results never gate the window.
+        show_manager(29);opened=true;visibility=1;postgame_tab=0;postgame_imported=false;postgame_history_error.clear();postgame_history_revision=ssc_postgame_live::state.revision;
+        if(ssc_review_history::busy.load()){postgame_history_pending=true;dirty=true;return;}
         postgame_history_pending=postgame_history_shortcut=true;postgame_history_revision=ssc_postgame_live::state.revision;
         ssc_review_history::load(state_dir/L"recordings");return;
     }
