@@ -1,4 +1,5 @@
 #pragma once
+#include "privacy.h"
 #include "presence_source.h"
 #include "wheel_images.h"
 #include <array>
@@ -55,6 +56,7 @@ using Sender=void(*)(uintptr_t,unsigned char,uintptr_t,const void*);
 inline Sender original_send=nullptr;
 inline void send_message(uintptr_t world,unsigned char team,uintptr_t actor,const void* message){
  int id=pending_slot;uintptr_t owner=pending_actor;clear_pending();
+ if(ssc_privacy::blocked()&&id>=0&&actor==owner)return; // Never send an already-customized wheel entry.
  try{if(enabled&&actor==owner&&id>=0&&id<9&&local_actor(actor)){
   const auto& slot=slots[id];if(valid_slot(slot)&&!slot.variants.empty()&&ssc_rpc::native_string(reinterpret_cast<uintptr_t>(message))==slot.text){
    const auto& text=choose_message(slot);NativeString chosen{reinterpret_cast<uintptr_t>(text.data()),0,text.size(),std::max(size_t(16),text.size())};original_send(world,team,actor,&chosen);return;
@@ -64,7 +66,7 @@ inline void send_message(uintptr_t world,unsigned char team,uintptr_t actor,cons
 }
 inline bool apply(uintptr_t actor){
  mapped_actor=mapped_first=0;mapped_slots.clear();clear_pending();
- uintptr_t first=0,last=0;if(!enabled||!assign||!ssc_names::read(actor+0x2688,first)||!ssc_names::read(actor+0x2690,last)||!first||last<first||(last-first)%0x48||last-first>9*0x48)return false;
+ uintptr_t first=0,last=0;if(ssc_privacy::blocked()||!enabled||!assign||!ssc_names::read(actor+0x2688,first)||!ssc_names::read(actor+0x2690,last)||!first||last<first||(last-first)%0x48||last-first>9*0x48)return false;
  struct Entry{int id;std::string text;};std::vector<Entry> entries;
  for(auto at=first;at<last;at+=0x48){int id=-1;if(!ssc_names::read(at+0x24,id)||id<0||id>8)return false;auto text=ssc_rpc::native_string(at);if(text.empty())return false;entries.push_back({id,text});}
  std::vector<Entry> ordered;for(int id:order){auto it=std::find_if(entries.begin(),entries.end(),[&](const Entry& e){return e.id==id;});if(it!=entries.end())ordered.push_back(*it);}
@@ -73,7 +75,7 @@ inline bool apply(uintptr_t actor){
  mapped_actor=actor;mapped_first=first;for(const auto& entry:ordered)mapped_slots.push_back(entry.id);
  return true;
 }
-inline void build(uintptr_t actor){mapped_actor=mapped_first=0;mapped_slots.clear();clear_pending();original(actor);if(enabled&&local_actor(actor)){try{apply(actor);}catch(...){enabled=false;status=L"Custom wheel paused after a data error";}}}
+inline void build(uintptr_t actor){mapped_actor=mapped_first=0;mapped_slots.clear();clear_pending();original(actor);if(enabled&&!ssc_privacy::blocked()&&local_actor(actor)){try{apply(actor);}catch(...){enabled=false;status=L"Custom wheel paused after a data error";}}}
 // Bound only the wheel's center label; the outbound message stays untouched.
 using LabelDraw=uintptr_t(*)(uintptr_t,float,float,float,float,uintptr_t,float,float,float,float,float,int,int,uintptr_t,uintptr_t,uintptr_t,float,float,uintptr_t);
 inline LabelDraw original_label=nullptr;

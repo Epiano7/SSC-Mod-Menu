@@ -78,6 +78,10 @@ def create_window(folder):
         if busy:
             return
         game = selected.get()
+        if action == 'repair' and not messagebox.askyesno('Back up and repair', 'Back up the existing loader and mod files, then install the current version? This can recover older/manual installs. Settings and other files are preserved', parent=window):
+            return
+        if action == 'access' and not messagebox.askyesno('Import previous access', 'Only needed if private access worked with an older Linux release. This may ask you to unlock the old keyring once. Future launches will use local storage', parent=window):
+            return
         if action == 'remove' and not messagebox.askyesno('Uninstall', 'Remove the mod and its Steam launch integration? Your settings and custom sounds will stay saved', parent=window):
             return
         output = None
@@ -97,6 +101,8 @@ def create_window(folder):
                     result = desktop.export_logs(game, output)
                 elif action == 'remove':
                     result = desktop.uninstall_desktop(game)
+                elif action == 'access':
+                    result = desktop.import_previous_access()
                 else:
                     result = desktop.install_desktop(folder, game, repair=action == 'repair')
                 events.put((True, result))
@@ -110,6 +116,7 @@ def create_window(folder):
     button('CLOSE', 432, 246, 184, lambda: window.destroy() if not busy else None)
     button('REPAIR', 24, 305, 134, lambda: work('repair'))
     button('EXPORT LOGS', 170, 305, 176, lambda: work('logs'))
+    button('IMPORT OLD ACCESS', 364, 305, 252, lambda: work('access'))
     window.protocol('WM_DELETE_WINDOW', lambda: None if busy else window.destroy())
     def poll():
         nonlocal busy

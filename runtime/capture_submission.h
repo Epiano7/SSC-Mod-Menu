@@ -1,4 +1,5 @@
 #pragma once
+#include "privacy.h"
 #include <windows.h>
 #include <winhttp.h>
 #include <wincrypt.h>
@@ -23,7 +24,7 @@ inline bool connect(std::string code){
 }
 inline std::string token(){std::lock_guard<std::mutex> lock(credential_mutex);return credential;}
 inline void disconnect(){enabled=false;std::lock_guard<std::mutex> lock(credential_mutex);std::fill(credential.begin(),credential.end(),'\0');credential.clear();status=0;}
-inline const wchar_t* message(){switch(status.load()){case 1:return L"Upload code loaded for this session.";case 2:return L"Sending capture in background...";case 3:return L"Sent to review queue. Not added to the map pool yet.";case -1:return L"Upload failed. Local capture kept; check connection/code.";default:return L"Get an upload code from the website, then paste it here.";}}
+inline const wchar_t* message(){if(!ssc_privacy::uploads_allowed())return L"Uploads paused by privacy protection. Local captures are kept.";switch(status.load()){case 1:return L"Upload code loaded for this session.";case 2:return L"Sending capture in background...";case 3:return L"Sent to review queue. Not added to the map pool yet.";case -1:return L"Upload failed. Local capture kept; check connection/code.";default:return L"Get an upload code from the website, then paste it here.";}}
 template<class T>struct Com {T* p=nullptr;~Com(){if(p)p->Release();}T** put(){return &p;}T* operator->()const{return p;}};
 struct Jpeg {std::vector<unsigned char> bytes;int width=0,height=0;};
 inline Jpeg jpeg(int width,int height,const std::vector<unsigned char>& rgb,bool face){
@@ -48,7 +49,7 @@ inline Jpeg jpeg(int width,int height,const std::vector<unsigned char>& rgb,bool
 inline std::string base64(const std::vector<unsigned char>& data){DWORD size=0;if(!CryptBinaryToStringA(data.data(),DWORD(data.size()),CRYPT_STRING_BASE64|CRYPT_STRING_NOCRLF,nullptr,&size))return {};std::string out(size,'\0');if(!CryptBinaryToStringA(data.data(),DWORD(data.size()),CRYPT_STRING_BASE64|CRYPT_STRING_NOCRLF,out.data(),&size))return {};out.resize(size);while(!out.empty()&&out.back()=='\0')out.pop_back();return out;}
 struct Internet {HINTERNET p=nullptr;~Internet(){if(p)WinHttpCloseHandle(p);}};
 inline bool send(const std::string& body,const std::string& code){
- if(!enabled.load()||body.empty()||body.size()>12*1024*1024||code.empty())return false;
+ if(!ssc_privacy::uploads_allowed()||!enabled.load()||body.empty()||body.size()>12*1024*1024||code.empty())return false;
  status=2;
  Internet session{WinHttpOpen(L"SSC-Capture/1",WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,nullptr,nullptr,0)};
  if(!session.p){status=-1;return false;}WinHttpSetTimeouts(session.p,10000,10000,90000,90000);
@@ -57,7 +58,7 @@ inline bool send(const std::string& body,const std::string& code){
  if(!request.p){status=-1;return false;}
  DWORD disabled=WINHTTP_DISABLE_COOKIES|WINHTTP_DISABLE_AUTHENTICATION;WinHttpSetOption(request.p,WINHTTP_OPTION_DISABLE_FEATURE,&disabled,sizeof disabled);DWORD redirects=WINHTTP_OPTION_REDIRECT_POLICY_NEVER;if(!WinHttpSetOption(request.p,WINHTTP_OPTION_REDIRECT_POLICY,&redirects,sizeof redirects)){status=-1;return false;}
  std::wstring headers=L"Content-Type: application/json\r\nOrigin: https://ssg.epiano7.dev\r\nAuthorization: Bearer "+std::wstring(code.begin(),code.end())+L"\r\n";
- bool ok=WinHttpSendRequest(request.p,headers.c_str(),DWORD(-1),const_cast<char*>(body.data()),DWORD(body.size()),DWORD(body.size()),0)&&WinHttpReceiveResponse(request.p,nullptr);
+ bool ok=ssc_privacy::uploads_allowed()&&WinHttpSendRequest(request.p,headers.c_str(),DWORD(-1),const_cast<char*>(body.data()),DWORD(body.size()),DWORD(body.size()),0)&&WinHttpReceiveResponse(request.p,nullptr);
  DWORD result=0,size=sizeof result;ok=ok&&WinHttpQueryHeaders(request.p,WINHTTP_QUERY_STATUS_CODE|WINHTTP_QUERY_FLAG_NUMBER,WINHTTP_HEADER_NAME_BY_INDEX,&result,&size,WINHTTP_NO_HEADER_INDEX)&&result==201;
  status=ok?3:-1;return ok;
 }

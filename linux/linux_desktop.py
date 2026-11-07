@@ -161,6 +161,14 @@ def integration_dir(game):
     return Path(os.environ.get('XDG_DATA_HOME', str(Path.home() / '.local/share'))) / 'ssc-mod-menu' / key
 
 
+def import_previous_access():
+    from private_storage import DeviceStore
+    config=steam_config()
+    account=str(76561197960265728+int(config.parent.parent.name))
+    DeviceStore().import_keyring(account)
+    return 'Previous access imported. Future launches do not need the keyring'
+
+
 def checked_record(game):
     path = integration_dir(game) / 'integration.json'
     if not path.exists():
@@ -361,7 +369,7 @@ def launch(args):
     bridge = Bridge(relay.name, log=log) if relay else None
     if relay:
         env['SSC_DISCORD_RELAY'] = 'Z:' + relay.name.replace('/', '\\')
-    # Capability file is private; device keys stay in keyring / process memory.
+    # The relay capability is per-launch; device keys use owner-only local files.
     private_relay = tempfile.TemporaryDirectory(prefix='.ssc-private-', dir=Path(record['game']) / 'SSCMods') if record else None
     private_helper = None
     env.pop('SSC_PRIVATE_RELAY', None)

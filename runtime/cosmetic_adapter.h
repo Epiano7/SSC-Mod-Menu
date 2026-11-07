@@ -1,4 +1,5 @@
 #pragma once
+#include "privacy.h"
 #include "compatibility.h"
 #include "performance_metrics.h"
 #include "private_auth.h"
@@ -14,6 +15,8 @@ inline Predicate native_predicate=nullptr;
 inline Overhead native_overhead=nullptr;
 inline Draw native_draw=nullptr;
 inline std::atomic<bool> cosmetics{false};
+// Local rendering does not publish the selected palette or identify the user to peers.
+inline bool local_cosmetics(){return cosmetics.load();}
 inline bool rainbow=true;inline unsigned solid_rgb=0x55d78f;
 inline bool gradient=false;inline int gradient_count=3;
 inline std::array<unsigned,3> gradient_colors{5623039,16737996,16759620};
@@ -32,7 +35,7 @@ struct ColorScope {
  ssc_shared::Style previous_style=shared_style;
  explicit ColorScope(bool local,bool attributed=true):previous(color_scope),previous_identity(identity_scope){
   if(attributed)identity_scope=local?1:0;
-  color_scope=local&&cosmetics.load()?(gradient?2:(!rainbow?1:0)):0;
+  color_scope=local&&local_cosmetics()?(gradient?2:(!rainbow?1:0)):0;
  }
  void remote(const ssc_shared::Style& value){shared_style=value;identity_scope=2;color_scope=value.mode==ssc_shared::Mode::solid?3:value.mode==ssc_shared::Mode::gradient?4:0;}
  void inherit_remote(){if(previous_identity==2){identity_scope=2;color_scope=previous;shared_style=previous_style;}}
@@ -41,7 +44,7 @@ struct ColorScope {
 using Palette=float*(*)(uintptr_t,float*,float,float,unsigned char,unsigned char);
 inline Palette native_palette=nullptr;
 inline float* palette(uintptr_t context,float* output,float position,float lift,unsigned char gray,unsigned char balance){
- if(!color_scope)return native_palette(context,output,position,lift,gray,balance);
+ if(!color_scope||(color_scope>=3&&ssc_privacy::blocked()))return native_palette(context,output,position,lift,gray,balance);
  auto color=gradient_rgb(position/255.f);
  if(color_scope==1)for(int k=0;k<3;++k)color[k]=float((solid_rgb>>(16-8*k))&255)/255;
  if(color_scope==3||color_scope==4){
@@ -113,7 +116,7 @@ inline bool render_access=false;
 inline uint64_t render_access_at=0;
 inline bool render_private_active(){auto now=GetTickCount64();return attached&&bot_layout&&render_access_at&&now>=render_access_at&&now-render_access_at<100&&render_access;}
 
-inline bool appearance_enabled(){return cosmetics.load()||receive_colors||render_private_active();}
+inline bool appearance_enabled(){return local_cosmetics()||receive_colors||render_private_active();}
 
 struct Identity {bool local=false,bot=false;std::string account;};
 // Native MSVC account string, not actor+0x798 (the editable display name).
@@ -160,7 +163,7 @@ inline void begin_render_frame(bool receive){
  frame_styles.clear();render_access=private_active();render_access_at=GetTickCount64();
 }
 inline bool frame_shared(const std::string& key,ssc_shared::Style& style){
- if(!receive_colors)return false;
+ if(ssc_privacy::blocked()||!receive_colors)return false;
  ssc_perf::Scope timing(ssc_perf::sharing);
  auto found=frame_styles.find(key);
  if(found==frame_styles.end()){
@@ -184,18 +187,37 @@ inline void shared_actor_tint(ColorScope& scope,const Identity& identity,float& 
 // no owner pointer. Resolve complete labels to exactly one active actor; never
 // strip prefixes or accept substrings, and reject duplicate display names.
 inline std::map<std::string,uintptr_t> shared_label_index;
+inline uintptr_t shared_label_world=0;
+inline uint64_t shared_label_refresh=0,shared_label_scans=0;
 struct FormattedLabel {uintptr_t actor=0,world=0;std::string account,display;};
 inline std::map<std::string,FormattedLabel> formatted_labels;
+inline void remember_formatted_label(const std::string& label,const FormattedLabel& identity){
+ auto add=[&](const std::string& key){if(formatted_labels.size()>=2048)return;auto [it,added]=formatted_labels.emplace(key,identity);if(!added&&it->second.actor!=identity.actor)it->second.actor=0;};
+ add(label);
+ // Chat adds its separator to the complete native-formatted sender label.
+ // Index those exact labels too; never strip prefixes from arbitrary text.
+ if(!label.empty()&&label.back()!=':'){add(label+":");add(label+": ");}
+}
 using NameFormatter=uintptr_t(*)(uintptr_t,uintptr_t,unsigned char);
 inline NameFormatter native_name_formatter=nullptr;
-inline uintptr_t list_name_formatter(uintptr_t actor,uintptr_t output,unsigned char flags){
- auto result=native_name_formatter(actor,output,flags);
- if(!receive_colors&&!render_private_active())return result;
+inline NameFormatter native_sender_formatter=nullptr;
+inline void remember_native_name(uintptr_t actor,uintptr_t result){
+ if(!local_cosmetics()&&!receive_colors&&!render_private_active())return;
  std::string label,account,display;uintptr_t world=0;
  account_string(actor+0x6f0,account); // Bots need not have a human account key.
  if(read(image_base+ssc_compat::resolve(0xde95d0),world)&&world&&account_string(result,label)&&account_string(actor+0x798,display)){
-  if(formatted_labels.size()<2048){auto [it,added]=formatted_labels.emplace(label,FormattedLabel{actor,world,account,display});if(!added&&it->second.actor!=actor)it->second.actor=0;}
+  const auto identity=identify(actor,true);
+  if(!identity.local&&!identity.bot&&identity.account.empty())return;
+  if(world!=shared_label_world){formatted_labels.clear();shared_label_index.clear();shared_label_world=world;shared_label_refresh=0;}
+  remember_formatted_label(label,FormattedLabel{actor,world,account,display});
  }
+}
+inline uintptr_t list_name_formatter(uintptr_t actor,uintptr_t output,unsigned char flags){
+ auto result=native_name_formatter(actor,output,flags);remember_native_name(actor,result);
+ return result;
+}
+inline uintptr_t sender_name_formatter(uintptr_t actor,uintptr_t output,unsigned char flags){
+ auto result=native_sender_formatter(actor,output,flags);remember_native_name(actor,result);
  return result;
 }
 inline uintptr_t label_actor(const std::string& label){
@@ -206,10 +228,12 @@ inline uintptr_t label_actor(const std::string& label){
  if(!read(image_base+ssc_compat::resolve(0xde95d0),world)||world!=entry.world||account!=entry.account||!account_string(entry.actor+0x798,display)||display!=entry.display)return 0;
  return entry.actor;
 }
-inline uintptr_t shared_label_world=0;
-inline uint64_t shared_label_refresh=0,shared_label_scans=0;
+inline Identity generated_label_identity(uintptr_t text){
+ std::string label;if(!attached||!account_string(text,label))return {};
+ auto actor=label_actor(label);return actor?identify(actor,true):Identity{};
+}
 inline void refresh_shared_labels(uint64_t now,bool receive){
- if(!attached||!receive){shared_label_index.clear();formatted_labels.clear();shared_label_world=0;shared_label_refresh=0;return;}
+ if(!attached||(!receive&&!local_cosmetics())){shared_label_index.clear();formatted_labels.clear();shared_label_world=0;shared_label_refresh=0;return;}
  uintptr_t world=0,first=0,last=0;
  if(!read(image_base+ssc_compat::resolve(0xde95d0),world)||!world){shared_label_index.clear();shared_label_world=0;return;}
  if(world==shared_label_world&&shared_label_refresh&&now>=shared_label_refresh&&now-shared_label_refresh<250)return;
@@ -275,7 +299,7 @@ inline unsigned char native_pass_probe(void* context,int id,void* owned_string){
 }
 inline unsigned char __cdecl predicate(void* context,int id,void* owned_string){
     const bool own=local_account(reinterpret_cast<uintptr_t>(owned_string));
-    ssc_shared::Style remote;bool apply=(cosmetics.load()&&own)||shared_account(reinterpret_cast<uintptr_t>(owned_string),remote)||bot_narrow_text(reinterpret_cast<uintptr_t>(owned_string));
+    ssc_shared::Style remote;bool apply=(local_cosmetics()&&own)||shared_account(reinterpret_cast<uintptr_t>(owned_string),remote)||bot_narrow_text(reinterpret_cast<uintptr_t>(owned_string));
     unsigned char result=native_predicate(context,id,owned_string); // original consumes this copy
     observe_native_pass(own,result);
     if(apply)++cosmetic_draws;
@@ -305,7 +329,7 @@ struct EventAppearance {bool own=false,bot=false,remote=false;ssc_shared::Style 
 inline thread_local EventAppearance event_appearance;
 inline unsigned char __cdecl event_predicate(void* context,int id,void* owned_string){
  event_appearance={};auto text=reinterpret_cast<uintptr_t>(owned_string);
- event_appearance.own=cosmetics.load()&&unambiguous_event_account(text);
+ event_appearance.own=local_cosmetics()&&unambiguous_event_account(text);
  event_appearance.bot=!event_appearance.own&&bot_narrow_text(text);
  event_appearance.remote=!event_appearance.own&&!event_appearance.bot&&shared_account(text,event_appearance.style);
  // Do not ask native code to persist rainbow RGB into the event record.
@@ -315,7 +339,7 @@ inline float __cdecl event_draw(void* renderer,float x,float y,void* name,float 
  const auto appearance=event_appearance;event_appearance={};ColorScope scope(appearance.own);
  if(appearance.remote)shared_tint(scope,appearance.style,r,g,b,phase);
  if(appearance.bot&&render_private_active())bot_tint(r,g,b,alpha,phase);
- if(appearance.own&&cosmetics.load()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
+ if(appearance.own&&local_cosmetics()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
  return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 inline void __cdecl local_widget(uintptr_t widget,float p2,void* p3,void* p4,char p5,float p6,float p7,float p8,float p9,void* p10,float p11,void* p12,void* p13){
@@ -325,7 +349,7 @@ inline void __cdecl local_widget(uintptr_t widget,float p2,void* p3,void* p4,cha
 inline float __cdecl widget_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
  if(!appearance_enabled())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
     const bool own=drawing_local_widget&&local_account(reinterpret_cast<uintptr_t>(name));ColorScope scope(own,drawing_local_widget);
-    if(own&&cosmetics.load()){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
+    if(own&&local_cosmetics()){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 inline void __cdecl overhead(uintptr_t actor,float alpha,unsigned char p3,uintptr_t p4,unsigned char p5,unsigned char p6){
@@ -337,7 +361,7 @@ inline float __cdecl draw(void* renderer,float x,float y,void* name,float size,f
     auto identity=identify(drawing_actor);ColorScope scope(identity.local);
     shared_actor_tint(scope,identity,r,g,b,phase);
     if(identity.bot&&render_private_active())bot_tint(r,g,b,alpha,phase);
-    if(cosmetics.load()&&identity.local){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
+    if(local_cosmetics()&&identity.local){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 extern "C" float __cdecl ssc_score_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase,uintptr_t row){
@@ -348,15 +372,15 @@ extern "C" float __cdecl ssc_score_draw(void* renderer,float x,float y,void* nam
     ColorScope scope(identity.local);
     shared_actor_tint(scope,identity,r,g,b,phase);
     if(identity.bot&&render_private_active())bot_tint(r,g,b,alpha,phase);
-    if(cosmetics.load()&&identity.local){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
+    if(local_cosmetics()&&identity.local){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 inline float __cdecl account_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
  if(!appearance_enabled())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
-    const bool own=local_account(reinterpret_cast<uintptr_t>(name));ColorScope scope(own);
+    const auto text=reinterpret_cast<uintptr_t>(name);const bool own=local_account(text)||generated_label_identity(text).local;ColorScope scope(own);
     if(!own&&bot_narrow_text(reinterpret_cast<uintptr_t>(name)))bot_tint(r,g,b,alpha,phase);
     ssc_shared::Style remote;if(!own&&shared_narrow_text(reinterpret_cast<uintptr_t>(name),remote))shared_tint(scope,remote,r,g,b,phase);
-    if(cosmetics.load()&&own){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
+    if(local_cosmetics()&&own){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 // These call sites pass the canonical account string from a leaderboard row,
@@ -365,7 +389,7 @@ inline float canonical_account_draw(void* renderer,float x,float y,void* name,fl
  if(!appearance_enabled())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
  const auto account=reinterpret_cast<uintptr_t>(name);const bool own=local_account(account);ColorScope scope(own);
  ssc_shared::Style remote;if(!own&&shared_account(account,remote))shared_tint(scope,remote,r,g,b,phase);
- if(own&&cosmetics.load()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
+ if(own&&local_cosmetics()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 extern "C" void ssc_vehicle_name_bridge();
@@ -376,7 +400,7 @@ extern "C" float ssc_vehicle_name_draw(void* renderer,float x,float y,void* name
  const auto identity=identify(actor,true);ColorScope scope(identity.local);
  shared_actor_tint(scope,identity,r,g,b,phase);
  if(identity.bot&&render_private_active())bot_tint(r,g,b,alpha,phase);
- if(identity.local&&cosmetics.load()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
+ if(identity.local&&local_cosmetics()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 // Chat labels are formatted (for example "Name:"). R13 still points to
@@ -386,9 +410,9 @@ extern "C" void ssc_chat_name_bridge();
 extern "C" void ssc_actor_name_bridge();
 extern "C" float ssc_chat_name_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase,uintptr_t sender){
  if(!appearance_enabled())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
- const bool own=local_account(sender);ColorScope scope(own);
+ const bool own=local_account(sender)||generated_label_identity(sender).local;ColorScope scope(own);
  ssc_shared::Style remote;if(!own&&shared_account(sender,remote))shared_tint(scope,remote,r,g,b,phase);
- if(own&&cosmetics.load()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
+ if(own&&local_cosmetics()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 // Actor-attached name labels have a separate render path from overhead names.
@@ -397,7 +421,7 @@ extern "C" float ssc_actor_name_draw(void* renderer,float x,float y,void* name,f
  const auto identity=identify(actor);const bool own=identity.local;ColorScope scope(own);
  shared_actor_tint(scope,identity,r,g,b,phase);
  if(identity.bot&&render_private_active())bot_tint(r,g,b,alpha,phase);
- if(own&&cosmetics.load()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
+ if(own&&local_cosmetics()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 // Showdown retains eliminated actors in its list; validate the registry and
@@ -407,7 +431,7 @@ extern "C" float ssc_showdown_name_draw(void* renderer,float x,float y,void* nam
  const auto identity=identify(actor,true);const bool own=identity.local;ColorScope scope(own);
  shared_actor_tint(scope,identity,r,g,b,phase);
  if(identity.bot&&render_private_active())bot_tint(r,g,b,alpha,phase);
- if(own&&cosmetics.load()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
+ if(own&&local_cosmetics()){if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
 // Main-menu account widget uses its stored wrapped label (+0xa8), not
@@ -417,7 +441,7 @@ inline Wrapped native_wrapped=nullptr;
 inline int widget_wrapped(uintptr_t renderer,float x,float y,float width,float height,void* name,float size,float r,float g,float b,float alpha,int align,int vertical,int first,unsigned char flags,int limit,float start,float end,float phase){
  if(!appearance_enabled())return native_wrapped(renderer,x,y,width,height,name,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
  const bool own=drawing_local_widget&&local_account(reinterpret_cast<uintptr_t>(name));ColorScope scope(own,drawing_local_widget);
- if(own&&cosmetics.load()){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
+ if(own&&local_cosmetics()){++cosmetic_draws;if(rainbow||gradient){if(!native_phase(phase))phase=0;}solid(r,g,b,phase);}
  return native_wrapped(renderer,x,y,width,height,name,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
 }
 // Shared native text adapters cover cached list/profile/leaderboard widgets as
@@ -440,7 +464,7 @@ inline bool local_wide_label(uintptr_t object){
  return true;
 }
 inline bool shared_label_local(void* text){
- if(!cosmetics.load())return false;
+ if(!local_cosmetics())return false;
  if(identity_scope>=0)return identity_scope==1;
  std::string label;if(wide_label(reinterpret_cast<uintptr_t>(text),label)){auto actor=label_actor(label);if(actor)return identify(actor,true).local;}
  return local_wide_label(reinterpret_cast<uintptr_t>(text));
@@ -483,6 +507,9 @@ extern "C" void ssc_showdown_name_bridge();
 inline bool account_surfaces_supported(){
  struct Guard{uint32_t rva,size;const char* hash;};
  const Guard guards[]={
+  // Native auto-message/quick-react sender formatter and its reviewed caller.
+  {0x7db980,544,"276dc385efb6a7a3ec87926c3adba3474ef0ea10ce103ff5ca8abdd983b7ac6e"},
+  {0x222ba0,819,"51d5e892fe9484783ce279db8792fe120b4eb58e35846b5cfd10afb379d61b16"},
   {0x3ab9e0,0x3c4,"e8ebb1da3aa2deaf35ffffbfd1cf50c4d5d73ff4e168cfed0f28b9fabe8025f2"},
   {0x607b50,0x17ac,"f0b70916b2524284d9757ebacb6423b6ebfb7aedf86c8fe720a752878fad6956"},
   {0x609930,0x20fb,"ef622fccff2edeeb932067993f80383317a7e77c12615540837ac4b9cee8a92d"},
@@ -513,11 +540,13 @@ inline bool attach(){
     native_wide_wrapped=reinterpret_cast<Wrapped>(image_base+ssc_compat::resolve(0x480b60));
     native_palette=reinterpret_cast<Palette>(image_base+ssc_compat::resolve(0x154d40));
     native_name_formatter=reinterpret_cast<NameFormatter>(image_base+0x7dbba0);
+    native_sender_formatter=reinterpret_cast<NameFormatter>(image_base+0x7db980);
     native_widget=reinterpret_cast<Widget>(image_base+ssc_compat::resolve(0x99d000));
     struct Site{uint32_t call,target;uintptr_t hook;bool exact=false;};
     // Whitelist presentation calls only. Do not hook the predicate globally:
     // 5fb3b0/5fd316/6834a3/6b6db7 also service pass-related UI/cache logic.
     Site sites[]={
+        {0x222beb,0x7db980,reinterpret_cast<uintptr_t>(sender_name_formatter),true},
         {0x6087af,0x3ab9e0,reinterpret_cast<uintptr_t>(native_pass_probe),true},
         {0x60a716,0x3ab9e0,reinterpret_cast<uintptr_t>(native_pass_probe),true},
         // Native formatter constructs the cached participant label from RBX actor.

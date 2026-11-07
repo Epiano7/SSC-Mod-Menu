@@ -56,6 +56,9 @@ inline bool edit_error=false,allow_reload=true;
 inline int damage_percent=100,reload_percent=100;
 inline Trial trials[2];
 inline unsigned miss_percent[2]={20,20},seed=1;
+inline unsigned pellet_hit_percent[2]={75,75};
+inline bool shotgun(const Weapon& w){return w.category==4;}
+inline bool shotgun_column(int col){auto index=col?right:left;return index<weapons.size()&&shotgun(weapons[index]);}
 inline bool miss_enabled[2]={false,false},duel_shown=false;
 inline Duel duel_result,duel_complete;
 inline bool duel_playing=false;
@@ -74,7 +77,8 @@ inline const wchar_t* exclusion(const Weapon& w){
     if(!valid(w)||w.rpm<=0||w.magazine<=0||w.hit<=0)return L"No damage model";
     if(w.extra_dps>0)return L"Damage-over-time effects not modeled";
     if(w.burst_size>0&&w.burst_delay>0)return L"Burst timing not modeled";
-    if(w.projectiles!=1&&!(w.name=="Minigun"&&w.projectiles==3))return L"Multiple impacts not modeled";
+    if(w.projectiles<1||w.projectiles>10000)return L"Invalid projectile count";
+    if(w.projectiles!=1&&!shotgun(w)&&!(w.name=="Minigun"&&w.projectiles==3))return L"Multiple impacts not modeled";
     if(w.reload==0)return L"Melee / explosives not modeled";
     if(target.shield>0&&!shield_rules.ready)return L"Shield rules unavailable";
     if(guards&&target.shield>0)return L"Set shield to zero for guards";
@@ -84,7 +88,8 @@ inline void recompute(){
     history_page=0;duel_shown=false;duel_playing=false;
     for(int col=0;col<2;++col){trials[col]={};shot_cursor[col]=0;auto index=col?right:left;
         if(index<weapons.size()&&!exclusion(weapons[index])){const auto& w=weapons[index];
-            trials[col]=simulate(target,w.hit*(guards?w.guard:1.f)*(damage_percent/100.f),w.rpm,w.magazine,w.reload*(reload_percent/100.f),allow_reload,shield_rules,miss_enabled[col]?miss_percent[col]:0,seed+unsigned(col)*1234567,w.projectiles);}}
+            const bool spread=shotgun(w);
+            trials[col]=simulate(target,w.hit*(guards?w.guard:1.f)*(damage_percent/100.f),w.rpm,w.magazine,w.reload*(reload_percent/100.f),allow_reload,shield_rules,!spread&&miss_enabled[col]?miss_percent[col]:0,seed+unsigned(col)*1234567,w.projectiles,spread?pellet_hit_percent[col]:100);}}
 }
 inline void start_duel(){recompute();duel_complete=duel(trials[0],trials[1],target);duel_elapsed=duel_visual_time=0;duel_shown=true;duel_playing=true;advance_duel(0);}
 inline void begin_edit(int field){editing=field;edit_error=false;int value=field==0?int(target.max_health):field==1?int(std::lround(100*target.shield/target.max_health)):field==2?int(target.health):field==3?damage_percent:reload_percent;edit_buffer=std::to_wstring(value);}

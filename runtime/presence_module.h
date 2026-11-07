@@ -1,4 +1,5 @@
 #pragma once
+#include "privacy.h"
 #include <windows.h>
 #include <string>
 #include <vector>
@@ -113,7 +114,7 @@ inline DWORD relay_worker(Shared& s,const std::filesystem::path& root){
     for(;;){
         bool enabled,timer,stop;std::string id;Snapshot snapshot;ULONGLONG sampled;
         {std::lock_guard<std::mutex> lock(s.mutex);enabled=s.enabled;timer=s.timer;stop=s.stop;id=s.id;snapshot=s.snapshot;sampled=s.sampled;}
-        auto now=GetTickCount64();enabled=enabled&&!stop&&valid_id(id)&&sampled&&now-sampled<=10000;
+        auto now=GetTickCount64();enabled=enabled&&!ssc_privacy::blocked()&&!stop&&valid_id(id)&&sampled&&now-sampled<=10000;
         if(phase!=snapshot.phase){phase=snapshot.phase;start=std::time(nullptr);}
         try{
             Json request={{"revision",++revision},{"enabled",enabled}};
@@ -141,7 +142,7 @@ inline DWORD WINAPI worker(void* context){
     for(;;){
         bool enabled,timer,stop;std::string requested;Snapshot snapshot;ULONGLONG sampled;
         {std::lock_guard<std::mutex> lock(s.mutex);enabled=s.enabled;timer=s.timer;stop=s.stop;requested=s.id;snapshot=s.snapshot;sampled=s.sampled;}
-        auto now=GetTickCount64();bool stale=!sampled||now-sampled>10000;
+        enabled=enabled&&!ssc_privacy::blocked();auto now=GetTickCount64();bool stale=!sampled||now-sampled>10000;
         if(stop||!enabled||!valid_id(requested)||requested!=id||stale){
             if(channel.connected()){
                 if(ready)channel.send(1,Json{{"cmd","SET_ACTIVITY"},{"args",{{"pid",GetCurrentProcessId()},{"activity",nullptr}}},{"nonce",std::to_string(++nonce)}}.dump());
@@ -175,7 +176,7 @@ inline DWORD WINAPI worker(void* context){
                 if(ready&&pending.empty()){
                     if(phase!=snapshot.phase){phase=snapshot.phase;start=std::time(nullptr);}
                     auto a=activity(snapshot,start,timer);auto serialized=a.dump();
-                    if(serialized!=last_activity&&(!last_send||now-last_send>=15000)){
+                    if(!ssc_privacy::blocked()&&serialized!=last_activity&&(!last_send||now-last_send>=15000)){
                         pending=std::to_string(++nonce);
                         if(!channel.send(1,Json{{"cmd","SET_ACTIVITY"},{"args",{{"pid",GetCurrentProcessId()},{"activity",a}}},{"nonce",pending}}.dump()))throw std::runtime_error("Write failed");
                         last_activity=serialized;last_send=now;deadline=now+5000;

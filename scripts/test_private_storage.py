@@ -1,7 +1,8 @@
 import sys,unittest,tempfile,threading,json,http.client,os
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'linux'))
-from private_storage import Keyring,Server,validate_request,StorageUnavailable
+from private_storage import Keyring,DeviceStore,Server,validate_request,StorageUnavailable
+from unittest import mock
 A='76561198025298853';B='76561198029717676'
 class Tests(unittest.TestCase):
  def test_request_rejections(self):
@@ -33,4 +34,40 @@ class Tests(unittest.TestCase):
  def test_native_keyring_persistence_and_account_separation(self):
   ring=Keyring();a=ring.seed(A,True);self.assertRegex(a,'^[0-9a-f]{64}$');self.assertEqual(Keyring().seed(A,False),a)
   b=ring.seed(B,True);self.assertNotEqual(a,b);self.assertEqual(Keyring().seed(B,False),b)
+@unittest.skipUnless(os.name=='posix','native Linux ownership and file locking')
+class LocalStorageTests(unittest.TestCase):
+ def setUp(self):
+  self.tmp=tempfile.TemporaryDirectory();self.folder=Path(self.tmp.name)/'access';self.store=DeviceStore(self.folder)
+ def tearDown(self):self.tmp.cleanup()
+ def test_keyring_free_persistence_and_account_separation(self):
+  with mock.patch('private_storage.Keyring',side_effect=AssertionError('keyring must not be needed')):
+   self.assertIsNone(self.store.seed(A,False));a=self.store.seed(A,True);self.assertRegex(a,'^[0-9a-f]{64}$');self.assertEqual(DeviceStore(self.folder).seed(A,False),a);self.assertNotEqual(self.store.seed(B,True),a)
+  self.assertEqual(self.folder.stat().st_mode&0o777,0o700);self.assertEqual((self.folder/(A+'.json')).stat().st_mode&0o777,0o600)
+ def test_concurrent_creation(self):
+  import concurrent.futures
+  with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:values=list(pool.map(lambda _:DeviceStore(self.folder).seed(A,True),range(16)))
+  self.assertEqual(len(set(values)),1)
+ def test_bad_account_and_corruption_preserved(self):
+  with self.assertRaises(StorageUnavailable):self.store.seed('../escape',True)
+  self.store.seed(A,True);p=self.folder/(A+'.json');p.write_text('broken')
+  with self.assertRaises(Exception):self.store.seed(A,True)
+  self.assertEqual(p.read_text(),'broken')
+ def test_permissions_and_links_refused(self):
+  self.store.seed(A,True);p=self.folder/(A+'.json');p.chmod(0o644)
+  with self.assertRaises(StorageUnavailable):self.store.seed(A,False)
+  p.chmod(0o600);p.unlink();outside=Path(self.tmp.name)/'outside';outside.write_text('keep');p.symlink_to(outside)
+  with self.assertRaises((StorageUnavailable,OSError)):self.store.seed(A,True)
+  self.assertEqual(outside.read_text(),'keep')
+ def test_unsafe_directory_refused(self):
+  self.folder.mkdir(mode=0o755)
+  with self.assertRaises(StorageUnavailable):self.store.seed(A,True)
+ def test_optional_migration_keeps_existing_identity(self):
+  class Old:
+   def seed(self,account,create):return 'a'*64
+  self.store.import_keyring(A,Old());self.assertEqual(self.store.seed(A,False),'a'*64)
+  self.store.import_keyring(A,Old());self.assertEqual(self.store.seed(A,False),'a'*64)
+  class Different:
+   def seed(self,account,create):return 'b'*64
+  with self.assertRaises(StorageUnavailable):self.store.import_keyring(A,Different())
+  self.assertEqual(self.store.seed(A,False),'a'*64)
 if __name__=='__main__':unittest.main()

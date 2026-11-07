@@ -1,4 +1,5 @@
 #pragma once
+#include "privacy.h"
 #include <filesystem>
 #include "shared_cosmetics_public.h"
 #include "beta_auth.h" // Reuse only HTTPS transport and read-only Steam identity.
@@ -66,7 +67,7 @@ public:
  void update(const std::string& own,const std::vector<std::string>& peers,const Style& style,bool receive,bool share){
   std::lock_guard<std::mutex> l(mutex_);if(stopping_||directory_.empty())return;
   if(!started_){if(!steam_.attach())return;try{worker_=std::thread([this]{work();});started_=true;}catch(...){status_=Status::unavailable;return;}}
-  auto id=steam_.read();const auto encoded_style=encode(style).dump();
+  auto id=steam_.read();const auto encoded_style=encode(style).dump();if(ssc_privacy::blocked()){share=false;receive=false;}
   const bool account_change=id!=account_||own!=own_;
   if(account_change||!receive){observed_.clear();urgent_.clear();lookup_failures_=0;}
   const bool changed=account_change||receive!=receive_||share!=share_||encoded_style!=appearance_;

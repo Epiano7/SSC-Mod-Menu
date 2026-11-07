@@ -102,6 +102,7 @@ inline void begin(Scope& scope,const Hook& hook){
  if(scope.skills_root){skill_pulse=0;skill_icon=-1;}
  if(hook.fade||hook.item<=-3)return;
  active_item=hook.item;
+ if(editing&&capture_frame&&available(hook.item))last_drawn[hook.item]=capture_at;
  if(hook.item>=0&&capture_frame&&(!measured[hook.item]||editing||enabled))scope.capture=start_capture();
  if(!enabled)return;
  const bool modified=hook.item>=0&&changed(items[hook.item]);

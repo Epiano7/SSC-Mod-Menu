@@ -51,7 +51,7 @@ inline bool format(const std::string& text,const Values& values,std::string& out
  for(size_t i=0;i<text.size();){char c=text[i++];if(c=='{'||c=='['){char close=c=='{'?'}':']';auto end=text.find(close,i);if(end==std::string::npos){error="Unclosed variable";return false;}auto key=text.substr(i,end-i);if(key=="currentLevel")key="level";bool known=false;for(auto name:variables)if(key==name)known=true;if(!known){error="Unknown variable: "+key;return false;}auto it=values.find(key);if(it==values.end()){error="Unavailable: "+key;return false;}out+=it->second;i=end+1;}else if(c=='}'||c==']'){error="Unmatched bracket";return false;}else out+=c;}
  if(!printable(out)){error="Completed message exceeds 100 characters or contains unsupported text";return false;}return true;
 }
-inline Values examples(){return {{"roundNumber","3"},{"level","8"},{"healthRemaining","42"},{"maxHealth","150"},{"className","Example class"},{"shieldRemaining","75"},{"shieldPercent","50"},{"healthPercent","28"},{"weaponName","UZI"},{"weaponCount","2"},{"roundsTotal","4"},{"levelsGained","5"},{"roundTime","120"},{"timeAlive","95"},{"roundDeaths","1"},{"damageTaken","108"},{"healthMissing","108"},{"roundsRemaining","1"},{"deadTime","25"},{"alivePercent","79"},{"weaponTier","1"},{"weaponType","SMG"},{"weaponMagazineSize","30"},{"weaponFireRate","600"},{"weaponReloadSeconds","1.50"},{"weaponProjectilesPerShot","1"},{"weapon1","Knife"},{"weapon2","UZI"},{"weapon3","None"},{"ammoRemaining","18"},{"money","250"},{"syringes","2"},{"shotsFired","25"},{"projectilesFired","30"},{"bulletHits","12"},{"playerHits","10"},{"npcHits","2"},{"impactDamage","108"}};}
+inline Values examples(){return {{"roundNumber","3"},{"level","8"},{"healthRemaining","42"},{"maxHealth","150"},{"className","Example class"},{"shieldRemaining","75"},{"shieldPercent","50"},{"healthPercent","28"},{"weaponName","UZI"},{"weaponCount","2"},{"roundsTotal","4"},{"levelsGained","5"},{"roundTime","120"},{"timeAlive","95"},{"roundDeaths","1"},{"damageTaken","108"},{"healthMissing","108"},{"roundsRemaining","1"},{"deadTime","25"},{"alivePercent","79"},{"weaponTier","1"},{"weaponType","SMG"},{"weaponMagazineSize","30"},{"weaponFireRate","600"},{"weaponReloadSeconds","1.50"},{"weaponProjectilesPerShot","1"},{"weapon1","AK47"},{"weapon2","UZI"},{"weapon3","Knife"},{"ammoRemaining","18"},{"money","250"},{"syringes","2"},{"shotsFired","25"},{"projectilesFired","30"},{"bulletHits","12"},{"playerHits","10"},{"npcHits","2"},{"impactDamage","108"}};}
 inline bool valid(const Rule& r){if(r.name.empty()||r.name.size()>32||!printable(r.name)||r.repeats<1||r.repeats>5||r.conditions.size()+size_t(r.min_level>0)>3)return false;for(auto& c:r.conditions)if(c.stat<0||c.stat>=condition_count||c.comparison<0||c.comparison>2||c.value<0||c.value>10000)return false;std::string out,error;return r.hold_seconds>=0&&r.hold_seconds<=60&&r.delay_seconds>=0&&r.delay_seconds<=60&&r.event>=0&&r.event<6&&r.threshold>=1&&r.threshold<=1000&&r.min_level>=0&&r.min_level<=1000&&format(r.message,examples(),out,error);}
 inline Json pack(const Rule& r){Json conditions=Json::array();for(auto& c:r.conditions)conditions.push_back(Json::array({c.stat,c.comparison,c.value}));return Json::array({r.event,r.threshold,r.min_level,r.message,r.name,r.repeats,r.any,conditions,r.hold_seconds,r.delay_seconds,r.cancel_on_death});}
 inline Rule unpack(const Json& j){if(!j.is_array()||(j.size()!=4&&j.size()!=8&&j.size()!=11)||!j[0].is_number_integer()||!j[1].is_number_integer()||!j[2].is_number_integer()||!j[3].is_string())throw std::runtime_error("Invalid rule");if(j[0]<0||j[0]>5||j[1]<1||j[1]>1000||j[2]<0||j[2]>1000)throw std::runtime_error("Range");Rule r;r.event=j[0].get<int>();r.threshold=j[1].get<int>();r.min_level=j[2].get<int>();r.message=j[3].get<std::string>();if(j.size()>=8){r.name=j[4].get<std::string>();if(!j[5].is_number_integer()||j[5]<1||j[5]>5)throw std::runtime_error("Repeat range");r.repeats=j[5].get<int>();r.any=j[6].get<bool>();if(!j[7].is_array()||j[7].size()>3)throw std::runtime_error("Conditions");for(auto& c:j[7]){if(!c.is_array()||c.size()!=3||!c[0].is_number_integer()||!c[1].is_number_integer()||!c[2].is_number_integer()||c[0]<0||c[0]>=condition_count||c[1]<0||c[1]>2||c[2]<0||c[2]>10000)throw std::runtime_error("Condition");r.conditions.push_back({c[0].get<int>(),c[1].get<int>(),c[2].get<int>()});}}else r.name=(r.event==0&&(r.message=="GG"||r.message=="GG!"))?"Auto-GG":"Imported rule";if(j.size()==11){if(!j[8].is_number_integer()||!j[9].is_number_integer()||j[8]<0||j[8]>60||j[9]<0||j[9]>60||!j[10].is_boolean())throw std::runtime_error("Timing range");r.hold_seconds=j[8].get<int>();r.delay_seconds=j[9].get<int>();r.cancel_on_death=j[10].get<bool>();}if(!valid(r))throw std::runtime_error("Unsupported rule");return r;}
@@ -97,7 +97,7 @@ struct RoundTracker {
  }
 };
 inline RoundTracker round_tracker;
-struct Pending {std::string text;uint64_t expires=0;size_t rule=0;std::string signature;uint64_t due=0;};
+struct Pending {std::string text;uint64_t expires=0;size_t rule=0;std::string signature;uint64_t due=0;std::string message;Values captured;};
 struct Waiting {std::string signature;uint64_t since=0;bool holding=false;};
 struct Engine {
  uintptr_t session=0,actor=0;int round=0,deaths=-1;bool participated=false,ended=false;Values previous;
@@ -140,7 +140,7 @@ struct Engine {
    fired.insert(i);waiting.erase(it);
    std::string text,error;if(!format(r.message,o.values,text,error)){auto detail=r.name+": "+error;round_error=std::wstring(detail.begin(),detail.end());status=round_error;continue;}
    uint64_t due=now+uint64_t(r.delay_seconds)*1000;
-   for(int repeat=0;repeat<r.repeats&&pending.size()<60;++repeat)pending.push_back({text,due+15000+uint64_t(repeat)*message_interval_ms,i,code(r),due});
+   for(int repeat=0;repeat<r.repeats&&pending.size()<60;++repeat)pending.push_back({text,due+15000+uint64_t(repeat)*message_interval_ms,i,code(r),due,r.message,o.values});
   }
   if(finish)ended=true;
   previous=o.values;
@@ -150,8 +150,21 @@ struct Engine {
   pending.erase(std::remove_if(pending.begin(),pending.end(),[&](const Pending& p){return now>=p.expires||p.rule>=rules.size()||!rules[p.rule].enabled||code(rules[p.rule])!=p.signature;}),pending.end());
   if(last_send&&(now<last_send||now-last_send<message_interval_ms))return;
   auto it=std::find_if(pending.begin(),pending.end(),[&](const Pending& p){return now>=p.due;});
-  if(it!=pending.end()&&send(it->text)){last_send=now;pending.erase(it);status=round_error.empty()?L"Message sent":L"Another rule sent; "+round_error;}
+  if(it!=pending.end()){
+   auto text=it->text;
+   if(!it->message.empty()){
+    auto values=it->captured;
+    // Event measurements retain trigger-time values. Inventory/equipped weapon
+    // variables follow the most recent validated local observation at send time.
+    for(const auto* key:{"weapon1","weapon2","weapon3","weaponName","weaponCount","weaponTier","weaponType","weaponMagazineSize","weaponFireRate","weaponReloadSeconds","weaponProjectilesPerShot","ammoRemaining"}){
+     values.erase(key);auto current=previous.find(key);if(current!=previous.end())values.emplace(key,current->second);
+    }
+    std::string error;if(!format(it->message,values,text,error)){status=L"Waiting for current weapon data";return;}
+   }
+   if(send(text)){last_send=now;pending.erase(it);status=round_error.empty()?L"Message sent":L"Another rule sent; "+round_error;}
+  }
  }
 };
 inline Engine engine;
 }
+

@@ -71,7 +71,7 @@ bool statistics_graph_visible(){return manager&&settings_page==21&&!ssc_hud::edi
 bool auto_guide_visible(){return manager&&settings_page==16&&auto_guide&&!ssc_hud::editing;}
 
 // Advance this ID when publishing a new set of release notes.
-constexpr int release_notes_id=20261018;
+constexpr int release_notes_id=20261106;
 bool update_popup=false,cosmetics_popup=false;
 bool show_update_notes=true;int seen_release_notes=0;
 bool update_notes_due(int phase){return presence_supported&&phase==1&&welcome_seen&&show_update_notes&&seen_release_notes!=release_notes_id&&!opened;}
@@ -149,6 +149,7 @@ void save() {
     out<<"draft_advisor="<<ssc_advisor::enabled<<"\n";
     out<<"draft_advisor_api="<<ssc_advisor::use_api<<"\n";
     out<<"postgame_online_analysis="<<ssc_review_online::requested<<"\n";
+    out<<"lab_pellet_hits_0="<<ssc_lab::pellet_hit_percent[0]<<"\nlab_pellet_hits_1="<<ssc_lab::pellet_hit_percent[1]<<"\n";
     out<<"draft_training_upload="<<ssc_training::enabled<<"\n";
     out<<"geri_mode="<<ssc_geri::enabled.load()<<"\n";
     out<<"cooldown_pulse="<<ssc_cooldown::settings.enabled<<"\ncooldown_duration_ms="<<ssc_cooldown::settings.duration_ms<<"\n";
@@ -156,6 +157,7 @@ void save() {
     out<<"flash_image_mode="<<ssc_flash_image::mode.load()<<"\n";
     out<<"hud_hover_fade="<<ssc_hud::hover_fade<<"\n";out<<"hud_enabled="<<ssc_hud::enabled<<"\n";for(const auto& item:ssc_hud::items){out<<"hud_box_"<<item.key<<"="<<item.home_x<<","<<item.home_y<<","<<item.w<<","<<item.h<<"\n";out<<"hud_"<<item.key<<"="<<item.x<<","<<item.y<<","<<item.scale<<"\n";}
     out<<"shared_defaults_applied=1\n";
+    out<<"respect_anonymous="<<ssc_privacy::respect.load()<<"\nprivacy_uploads_held="<<ssc_privacy::uploads_held.load()<<"\n";
     out<<"shared_receive="<<shared_receive<<"\nshared_publish="<<shared_publish<<"\n";
     out<<"cosmetic_gradient="<<ssc_names::gradient<<"\ncosmetic_gradient_count="<<ssc_names::gradient_count<<"\n";for(int i=0;i<3;++i)out<<"cosmetic_gradient_"<<i<<"="<<ssc_names::gradient_colors[i]<<"\n";
     out<<"cosmetic_rainbow="<<ssc_names::rainbow<<"\ncosmetic_rgb="<<ssc_names::solid_rgb<<"\n";out<<"welcome_seen="<<welcome_seen<<"\n";out<<"schema=2\nclock="<<clock_enabled
@@ -233,6 +235,9 @@ void load_settings() {
         else if(key=="cooldown_duration_ms"&&(number==1000||number==1500||number==2500))ssc_cooldown::settings.duration_ms=unsigned(number);
         else if(key=="cosmetic_gradient")ssc_names::gradient=number==1;
         else if(key=="shared_defaults_applied")shared_defaults_applied=number==1;
+        else if(key=="respect_anonymous")ssc_privacy::respect=number==1;
+        else if(key=="privacy_manual")ssc_privacy::manual=false; // Retired private-test control.
+        else if(key=="privacy_uploads_held")ssc_privacy::uploads_held=number==1;
         else if(key=="shared_receive")shared_receive=number==1;
         else if(key=="shared_publish")shared_publish=number==1;
         else if(key=="cosmetic_gradient_count"&&number>=2&&number<=3)ssc_names::gradient_count=number;
@@ -251,6 +256,8 @@ void load_settings() {
         else if(key=="recording_enabled")recording_requested=number==1;
         else if(key=="animations")animations=number!=0;
         else if(key=="postgame_online_analysis")ssc_review_online::requested=number!=0;
+        else if(key=="lab_pellet_hits_0"&&number>=5&&number<=100)ssc_lab::pellet_hit_percent[0]=unsigned(number);
+        else if(key=="lab_pellet_hits_1"&&number>=5&&number<=100)ssc_lab::pellet_hit_percent[1]=unsigned(number);
         else if(key=="postgame_hotkey")postgame_hotkey=valid_menu_key(number)&&number!=VK_ESCAPE?number:VK_F7;
         else if(key=="menu_hotkey")menu_hotkey=valid_menu_key(number)?number:VK_RSHIFT;
         else if(key=="ui_scale"&&number>=50&&number<=200)ui_scale=number;
@@ -420,6 +427,8 @@ void activate(int id) {
     else if(id==583){ssc_auto::current().cancel_on_death=!ssc_auto::current().cancel_on_death;save();}
     else if(id==1600){show_cosmetics_notice();}
     else if(id==560){shared_notice.clear();show_manager(22);}
+    else if(id==3400){ssc_privacy::respect=!ssc_privacy::respect.load();ssc_privacy::blocked();save();}
+    else if(id==3402){ssc_privacy::resume_uploads();save();dirty=true;}
     else if(id==561){shared_receive=!shared_receive;save();}
     else if(id==562){shared_publish=!shared_publish;save();}
     else if(id==566&&ssc_names::private_visible()){private_label_buffer=private_label;private_label_editing=true;edit_cursor.begin(private_label_buffer.size());dirty=true;}
@@ -570,8 +579,8 @@ void activate(int id) {
     else if(id==260){if(ssc_lab::duel_playing)ssc_lab::duel_playing=false;else ssc_lab::start_duel();dirty=true;}
     else if(id==276){ShellExecuteW(nullptr,L"open",L"https://discord.gg/skillshotcity",nullptr,nullptr,SW_SHOWNORMAL);}
     else if(id==261){++ssc_lab::seed;ssc_lab::recompute();dirty=true;}
-    else if(id==262||id==263){ssc_lab::miss_enabled[id-262]=!ssc_lab::miss_enabled[id-262];ssc_lab::recompute();dirty=true;}
-    else if(id==264||id==265){auto& value=ssc_lab::miss_percent[id-264];value=value>=100?0:value+10;ssc_lab::recompute();dirty=true;}
+    else if(id==262||id==263){if(!ssc_lab::shotgun_column(id-262))ssc_lab::miss_enabled[id-262]=!ssc_lab::miss_enabled[id-262];ssc_lab::recompute();dirty=true;}
+    else if(id==264||id==265){int col=id-264;if(ssc_lab::shotgun_column(col)){auto& value=ssc_lab::pellet_hit_percent[col];value=value>=100?5:std::min(100u,value+5);save();}else{auto& value=ssc_lab::miss_percent[col];value=value>=100?0:value+10;}ssc_lab::recompute();dirty=true;}
     else if(id==16){show_manager(13);}
     else if(id==272){ssc_lab::comparison_count=std::min(4,ssc_lab::comparison_count+1);dirty=true;}
     else if(id==273){ssc_lab::comparison_count=std::max(2,ssc_lab::comparison_count-1);dirty=true;}
@@ -1185,8 +1194,12 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"v0.1.25",cyan);
-        bullet(201,L"Updated compatibility for the latest game build" );
+        text(50,153,L"v0.1.34",cyan);
+        bullet(201,L"Anonymous-mode safeguards for shared colors and messages");
+        bullet(247,L"Match Summary API toggle and early rating capture fixes");
+        bullet(293,L"Shotgun pellet-hit estimates in Weapon Lab");
+        bullet(339,L"Chat colors and queued weapon-name fixes");
+        bullet(385,L"Linux HUD fallback, backed-up Repair and simpler access");
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
@@ -1388,12 +1401,14 @@ void paint_panel() {
             button(161,266,308,340,48,ssc_update::action_label(),true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
             button(1,630,308,180,48,L"LATER");
         } else if(settings_page==9){
-            text(266,111,L"MISC",ink,true);int first=option_list(4,3);
+            text(266,111,L"MISC",ink,true);int first=option_list(6,3);
             for(int visible=0;visible<3;++visible){int item=first+visible,y=168+visible*150;rectangle(266,y,820,138,RGB(16,37,62));
              if(item==0){text(282,y+18,L"HUD HOVER FADE");toggle(192,978,y+9,ssc_hud::hover_fade);text(282,y+68,L"Fade HUD elements near your cursor.",muted,false,14);}
              else if(item==1){text(282,y+18,L"READY SKILL PULSE");toggle(193,978,y+9,ssc_cooldown::settings.enabled);text(282,y+58,L"Restore the health / skill HUD when a cooldown ends.",muted,false,14);button(197,282,y+88,210,38,L"1 SECOND",ssc_cooldown::settings.duration_ms==1000);button(198,508,y+88,210,38,L"1.5 SECONDS",ssc_cooldown::settings.duration_ms==1500);button(199,734,y+88,210,38,L"2.5 SECONDS",ssc_cooldown::settings.duration_ms==2500);}
              else if(item==2){text(282,y+18,L"GERI CHALLENGE");toggle(570,978,y+9,ssc_geri::enabled.load());text(282,y+68,ssc_geri::attached?L"Hide the skill draft and syringe selection panel.":L"Unavailable for this game build.",muted,false,14);text(282,y+102,L"UI only; challenge rules are not enforced.",muted,false,12);}
              else if(item==3){text(282,y+18,L"HIDE CROSSHAIR");toggle(586,978,y+9,ssc_creator::hide_crosshair.load());text(282,y+68,L"Hide your crosshair for captures.",muted,false,14);}
+             else if(item==4){text(282,y+18,L"RESPECT ANONYMOUS MODE");toggle(3400,978,y+9,ssc_privacy::respect.load());text(282,y+60,L"Pause identifying mod features when the game hides your name.",muted,false,14);text(282,y+96,ssc_privacy::status(),cyan,false,12);}
+             else if(item==5){text(282,y+18,L"CAPTURE UPLOADS");text(282,y+58,L"Capture uploads stay held after anonymity until resumed.",muted,false,14);button(3402,282,y+88,320,36,L"RESUME HELD UPLOADS",false,!ssc_privacy::blocked()&&ssc_privacy::uploads_held.load());}
             }
         } else if(settings_page==30){
             text(266,111,L"FLASHBANG",ink,true);
@@ -1411,8 +1426,8 @@ void paint_panel() {
             text(282,294,L"Analysis runs on your PC using the public game API.",muted,false,14);
             button(1003,282,338,330,44,L"OPEN POST-GAME REPORT",false,presence_supported&&rpc_preview.phase==1&&!ssc_postgame::busy.load());
             button(1113,630,338,330,44,L"LAST SAVED MATCH",false,presence_supported&&rpc_preview.phase==1&&!ssc_review_history::busy.load());
-            text(282,412,L"MATCH ANALYSIS",ink,false,16);toggle(1125,978,402,ssc_review_online::requested);
-            text(282,452,L"Scores on your PC using the game API; shares round data for research.",muted,false,13);
+            text(282,412,L"USE GAME API",ink,false,16);toggle(1125,978,402,ssc_review_online::requested);
+            text(282,452,L"Scores locally using API results, including in anonymous mode.",muted,false,13);
             if(ssc_advisor::private_access()){
                 text(282,492,L"SHARE EXTENDED DRAFT RESEARCH",muted,false,13);toggle(1002,978,480,ssc_training::enabled);
             }
@@ -1581,7 +1596,7 @@ void paint_panel() {
                             if(cursor&&!ssc_lab::duel_shown){auto& shot=trial.shots[cursor-1];text(x+10,483,(L"Last hit: "+number(shot.hp_damage)+L" HP / "+number(shot.shield_damage)+L" shield").c_str(),muted,false,11);}
                         }
                         button(240+col,x+10,521,176,36,col?L"FIRE AT A":L"FIRE AT B",false,!ssc_lab::duel_shown&&cursor<trial.shots.size());button(242+col,x+202,521,188,36,L"RESET SHOTS",false,cursor>0);
-                        button(244+col,x+10,568,180,36,L"SHOW RESULT",false,!ssc_lab::duel_shown&&!trial.shots.empty());button(262+col,x+202,568,100,36,L"MISS",ssc_lab::miss_enabled[col]);button(264+col,x+310,568,80,36,(std::to_wstring(ssc_lab::miss_percent[col])+L"%").c_str());
+                        bool spread=ssc_lab::shotgun(w);button(244+col,x+10,568,180,36,L"SHOW RESULT",false,!ssc_lab::duel_shown&&!trial.shots.empty());button(262+col,x+202,568,100,36,spread?L"PELLETS":L"MISS",!spread&&ssc_lab::miss_enabled[col],!spread);button(264+col,x+310,568,80,36,(std::to_wstring(spread?ssc_lab::pellet_hit_percent[col]:ssc_lab::miss_percent[col])+L"%").c_str());
                     }
                     button(260,266,614,236,34,ssc_lab::duel_playing?L"STOP DUEL":L"PLAY DUEL",false,!ssc_lab::trials[0].shots.empty()&&!ssc_lab::trials[1].shots.empty());if(ssc_lab::miss_enabled[0]||ssc_lab::miss_enabled[1])button(261,514,614,220,34,L"REROLL MISSES");text(748,625,ssc_lab::duel_playing?L"DUEL IN PROGRESS":ssc_lab::duel_shown&&ssc_lab::duel_elapsed<ssc_lab::duel_complete.time?L"DUEL STOPPED":ssc_lab::duel_shown?(ssc_lab::duel_result.winner==2?L"EST. DRAW":ssc_lab::duel_result.winner==0?L"PLAYER A WINS":ssc_lab::duel_result.winner==1?L"PLAYER B WINS":L"NO WINNER / LIMIT"):L"",cyan,false,11);
                 }
