@@ -29,6 +29,14 @@ The in-game **Update and Restart** handoff is implemented but untested on Proton
 
 The installer keeps its launch helper under `~/.local/share/ssc-mod-menu` (or `XDG_DATA_HOME`), so removing the downloaded folder does not break launching. Keep or redownload the installer for repair or removal. Uninstall restores the previous launch option while preserving unrelated edits.
 
+If an older/manual installation has mod files but no Linux ownership metadata, choose **Repair** and confirm the backup. It backs up the existing loader and replacement targets before installing. Settings and unrelated files stay in place. After Repair, normal updating and uninstallation work again. Symbolic-link destinations and invalid ownership manifests are still refused.
+
+## Private access
+
+Private access no longer requires a desktop keyring. The launcher stores an account-specific device key under `~/.local/share/ssc-mod-menu/private-access` (or `XDG_DATA_HOME`), with an owner-only directory and files. Activation-code validation, device/account checks and revocation remain unchanged. This is local file protection, not keyring encryption; do not share the private-access folder.
+
+If private access already worked in an older Linux version, use **Import Old Access** once before activating again. It imports the existing device identity for the selected Steam account, and may ask you to unlock your old keyring for that import only. New users do not need this button or a keyring. An existing different local approval is not overwritten.
+
 Discord Presence now connects to the native Linux Discord app, including regular and Flatpak socket locations. Discord must be running. Actual activity display across these installations still needs broader testing.
 
 ## Troubleshooting and logs

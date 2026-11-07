@@ -4,7 +4,7 @@
 struct Bounds {float left=10,top=10,right=-10,bottom=-10;unsigned points=0;};
 inline std::array<Bounds,9> measured_frame{},queued_frame{};
 inline std::array<bool,9> measured{};
-inline std::array<ULONGLONG,9> last_seen{};
+inline std::array<ULONGLONG,9> last_seen{},last_drawn{};
 inline bool editing=false,freeze_bounds=false,capture_frame=false;
 inline int active_item=-1,view_w=0,view_h=0,capture_depth=0;
 inline ULONGLONG capture_at=0;
@@ -153,4 +153,9 @@ inline bool finish_frame(int width,int height,ULONGLONG now){
  if(capture_frame)capture_at=now;
  return changed_bounds;
 }
-inline bool visible(int index,ULONGLONG now){return available(index)&&measured[index]&&last_seen[index]&&now-last_seen[index]<2000;}
+// An invoked native group can still be positioned when Proton supplies no
+// measurable geometry. Fallback boxes are editor-only; never invent groups in
+// menus or keep them alive after their native draw stops.
+inline bool recent(ULONGLONG stamp,ULONGLONG now){return stamp&&now>=stamp&&now-stamp<2000;}
+inline bool fallback_bounds(int index,ULONGLONG now){return available(index)&&editing&&!(measured[index]&&recent(last_seen[index],now))&&recent(last_drawn[index],now);}
+inline bool visible(int index,ULONGLONG now){return available(index)&&((measured[index]&&recent(last_seen[index],now))||fallback_bounds(index,now));}

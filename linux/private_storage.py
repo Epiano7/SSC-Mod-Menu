@@ -1,5 +1,5 @@
-"""Per-launch loopback bridge to the native Secret Service keyring.
-No activation codes or grants are handled here. Device seeds never go to disk.
+"""Per-launch loopback bridge to per-user private-access device storage.
+No activation codes or grants are handled here. Keyring import is optional.
 """
 import ctypes as C
 import hmac
@@ -16,6 +16,70 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 class StorageUnavailable(Exception):
     pass
+
+class DeviceStore:
+    """Small, account-separated local files; no desktop keyring dependency."""
+    def __init__(self, folder=None):
+        base=Path(os.environ.get('XDG_DATA_HOME',str(Path.home()/'.local/share')))
+        self.folder=Path(folder) if folder is not None else base/'ssc-mod-menu/private-access'
+        if not self.folder.is_absolute(): raise StorageUnavailable()
+    @contextlib.contextmanager
+    def locked(self):
+        import fcntl
+        try: self.folder.mkdir(parents=True,mode=0o700)
+        except FileExistsError: pass
+        self.check(self.folder.lstat(),directory=True)
+        fd=os.open(self.folder/'lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW|os.O_NONBLOCK,0o600)
+        try:
+            self.check(os.fstat(fd));fcntl.flock(fd,fcntl.LOCK_EX)
+            yield
+        finally: os.close(fd)
+    @staticmethod
+    def check(st,directory=False):
+        valid=stat.S_ISDIR(st.st_mode) if directory else stat.S_ISREG(st.st_mode) and st.st_nlink==1
+        if not valid or st.st_uid!=os.getuid() or st.st_mode&0o077: raise StorageUnavailable()
+    @staticmethod
+    def account(value):
+        if not isinstance(value,str) or not re.fullmatch('7656119[0-9]{10}',value): raise StorageUnavailable()
+        return value
+    def read(self,account):
+        path=self.folder/(account+'.json')
+        try: fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        except FileNotFoundError: return None
+        try:
+            st=os.fstat(fd);self.check(st)
+            if st.st_size>512: raise StorageUnavailable()
+            data=json.loads(os.read(fd,513))
+            if not isinstance(data,dict) or set(data)!={'schema','account','seed'} or type(data['schema']) is not int or data['schema']!=1 or data['account']!=account or not isinstance(data['seed'],str) or not re.fullmatch('[0-9a-f]{64}',data['seed']): raise StorageUnavailable()
+            return data['seed']
+        finally: os.close(fd)
+    def write(self,account,seed):
+        fd,tmp=tempfile.mkstemp(prefix='.device-',dir=self.folder)
+        try:
+            with os.fdopen(fd,'w') as f:
+                json.dump({'schema':1,'account':account,'seed':seed},f);f.flush();os.fsync(f.fileno())
+            os.replace(tmp,self.folder/(account+'.json'))
+        finally:
+            if os.path.exists(tmp): os.unlink(tmp)
+    def seed(self,account,create):
+        account=self.account(account)
+        with self.locked():
+            result=self.read(account)
+            if result is not None or not create: return result
+            result=secrets.token_hex(32);self.write(account,result)
+            if self.read(account)!=result: raise StorageUnavailable()
+            return result
+    def import_keyring(self,account,keyring=None):
+        account=self.account(account)
+        # Called only by the explicit migration action, never on game startup.
+        result=(keyring or Keyring()).seed(account,False)
+        if result is None: raise StorageUnavailable('No previous keyring approval was found for the selected Steam account')
+        if not re.fullmatch('[0-9a-f]{64}',result): raise StorageUnavailable()
+        with self.locked():
+            existing=self.read(account)
+            if existing is not None and existing!=result: raise StorageUnavailable('A different local approval already exists; it has not been overwritten')
+            if existing is None: self.write(account,result)
+        return True
 
 class Attribute(C.Structure):
     _fields_ = [('name', C.c_char_p), ('type', C.c_int)]
@@ -123,12 +187,7 @@ def serve(folder):
     if not stat.S_ISDIR(st.st_mode) or st.st_uid!=os.getuid() or st.st_mode&0o077: raise StorageUnavailable()
     # Only a random launch capability is written here, never a device seed.
     token=secrets.token_hex(32)
-    class LazyKeyring:
-        instance=None
-        def seed(self,account,create):
-            if self.instance is None: self.instance=Keyring()
-            return self.instance.seed(account,create)
-    with Server(token,LazyKeyring()) as server:
+    with Server(token,DeviceStore()) as server:
         fd=os.open(folder/'endpoint.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
         with os.fdopen(fd,'w') as f: json.dump({'port':server.server_port,'token':token},f)
         server.serve_forever(poll_interval=.25)

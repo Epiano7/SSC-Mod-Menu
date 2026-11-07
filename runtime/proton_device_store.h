@@ -1,5 +1,5 @@
 #pragma once
-// Native Linux launcher owns keyring storage; Proton only receives the key in memory.
+// Native Linux launcher owns per-user storage; Proton only receives the key in memory.
 namespace ssc_auth { namespace license {
 inline bool proton(){return GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"wine_get_version")!=nullptr;}
 inline int proton_seed(uint64_t account,bool create,std::array<unsigned char,32>& seed){

@@ -38,7 +38,7 @@ inline bool misses(unsigned seed,unsigned shot,unsigned percentage){
     uint32_t x=seed+0x9e3779b9u*(shot+1);x^=x>>16;x*=0x7feb352du;x^=x>>15;x*=0x846ca68bu;x^=x>>16;
     return x%100<std::min(percentage,100u);
 }
-inline Trial simulate(Target target,float damage,int rpm,int magazine,float reload,bool allow_reload,const ShieldRules& rules,unsigned miss_percent=0,unsigned seed=1,int projectiles=1){
+inline Trial simulate(Target target,float damage,int rpm,int magazine,float reload,bool allow_reload,const ShieldRules& rules,unsigned miss_percent=0,unsigned seed=1,int projectiles=1,unsigned pellet_hit_percent=100){
     Trial result;
     if(projectiles<1||projectiles>10000||!valid_target(target)||!std::isfinite(damage)||damage<=0||rpm<=0||magazine<=0
        ||!std::isfinite(reload)||reload<0||(target.shield>0&&!rules.ready))return result;
@@ -46,8 +46,11 @@ inline Trial simulate(Target target,float damage,int rpm,int magazine,float relo
     for(unsigned n=0;n<10000;++n){
         if(n){if(n%unsigned(magazine)==0){if(!allow_reload||reload==0)break;time+=std::max(interval,double(reload));++reloads;}else time+=interval;}
         bool missed=true;Impact hit;
-        for(int pellet=0;pellet<projectiles&&target.health>0;++pellet){if(misses(seed,n*unsigned(projectiles)+unsigned(pellet),miss_percent))continue;
-            missed=false;auto part=impact(target,damage/float(projectiles),rules);hit.health+=part.health;hit.shield+=part.shield;}
+        // A shotgun uses a fixed expected pellet count per trigger pull. Keep
+        // full pellet impacts (and one fractional pellet) for shield handling.
+        const double expected=double(projectiles)*std::min(pellet_hit_percent,100u)/100.;
+        for(int pellet=0;pellet<projectiles&&pellet<expected&&target.health>0;++pellet){if(misses(seed,n*unsigned(projectiles)+unsigned(pellet),miss_percent))continue;
+            missed=false;auto part=impact(target,damage/float(projectiles)*float(std::min(1.,expected-pellet)),rules);hit.health+=part.health;hit.shield+=part.shield;}
         result.shots.push_back({n+1,reloads,time,target.health,target.shield,hit.health,hit.shield,missed});
         if(target.health<=0){result.killed=true;break;}
         if(!missed&&hit.health==0&&hit.shield==0)break;

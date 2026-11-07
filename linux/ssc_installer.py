@@ -152,16 +152,17 @@ def _install(folder, path, repair=False):
         raise ValueError('This game update needs a newer mod package; nothing was changed')
     previous = installed(root)
     targets = {name: destination(root, name) for name in (*OWNED, MANIFEST)}
-    if not previous and any((root / name).exists() or (root / name).is_symlink()
-                            for name in ('opengl32.dll', 'SSCMods')):
-        raise ValueError('An existing mod was found without Linux ownership metadata; it will not be overwritten')
+    recovering = not previous and any((root / name).exists() or (root / name).is_symlink()
+                                     for name in ('opengl32.dll', 'SSCMods'))
+    if recovering and not repair:
+        raise ValueError('Existing mod files have no Linux ownership metadata. Use Repair to back up the loader and replace the mod files; settings and other files will be preserved')
     if previous and not repair:
         for name, expected in previous['files'].items():
             if not targets[name].is_file() or digest(targets[name]) != expected:
                 raise ValueError('An installed file changed or is missing; use Repair to restore it')
     # Preserve originals for recovery, including altered files when repairing.
     backup = None
-    if previous:
+    if previous or recovering:
         backup_root = Path(os.environ.get('XDG_STATE_HOME', str(Path.home() / '.local/state'))) / 'ssc-mod-menu/backups'
         backup_root.mkdir(parents=True, exist_ok=True)
         backup = Path(tempfile.mkdtemp(prefix='update-', dir=backup_root))
@@ -202,7 +203,7 @@ def _uninstall(path):
     require_closed()
     data = installed(root)
     if not data:
-        raise ValueError('No installation owned by this Linux installer was found')
+        raise ValueError('No Linux ownership metadata was found. Use Repair first to back up and recover the installation, then Uninstall')
     targets = {name: destination(root, name) for name in (*OWNED, MANIFEST)}
     for name, expected in data['files'].items():
         if targets[name].exists() and digest(targets[name]) != expected:

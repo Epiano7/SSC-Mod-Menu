@@ -1,4 +1,5 @@
 #pragma once
+#include "privacy.h"
 #include "quick_chat.h"
 #include "auto_messages.h"
 #include "combat_stats.h"
@@ -109,7 +110,7 @@ inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
 }
 using NativeSender=void(*)(uintptr_t,unsigned char,uintptr_t,const void*);
 inline bool send_native(uintptr_t base,uintptr_t world,uintptr_t actor,const std::string& text,NativeSender sender=nullptr){
- if(!supported()||!printable(text)||!actor||!world)return false;
+ if(ssc_privacy::blocked()||!supported()||!printable(text)||!actor||!world)return false;
  float cooldown=0;unsigned char wheel=0;
  if(!ssc_names::read(actor+0x26ec,cooldown)||!std::isfinite(cooldown)||cooldown>0||!ssc_names::read(actor+0x26a2,wheel)||wheel)return false;
  // The native client chat-input path calls this with flag=0. It deep-copies the
@@ -126,6 +127,7 @@ inline void diagnose(const Observation& o,uint64_t now){
  if(diagnostic_dir.empty())return;
  try{
   Json state={{"connected",o.connected},{"valid",o.valid},{"round",o.round},{"active",o.active},{"ending",o.ending},{"preparing",o.preparing},{"tracker_running",round_tracker.running},{"tracker_prepared",round_tracker.prepared},{"timing_complete",round_tracker.complete},{"damage_baseline_available",round_tracker.start_damage>=0},{"damage_available",o.values.count("damageTaken")!=0},{"pending",engine.pending.size()},{"status",std::string(status.begin(),status.end())}};
+  for(const auto* key:{"weapon1","weapon2","weapon3","weaponName"}){auto it=o.values.find(key);if(it!=o.values.end())state[key]=it->second;}
   auto signature=state.dump();if(signature==previous)return;previous=signature;
   state["tick"]=now;state["damage_counter"]=o.damage_total;state["damage_baseline"]=round_tracker.start_damage;
   auto path=diagnostic_dir/L"auto-message-diagnostics.jsonl";
@@ -145,7 +147,7 @@ inline Observation tracking_observation;
 inline uint64_t tracking_at=0;
 inline bool tracking_enabled=false;
 inline void tick(uint64_t now,bool recording=false){
- static uint64_t last=0;const bool requested=enabled||recording;
+ static uint64_t last=0;const bool messaging=enabled&&!ssc_privacy::blocked();if(!messaging)engine.reset();const bool requested=messaging||recording;
  if(requested!=tracking_enabled){last=0;tracking_enabled=requested;round_tracker.reset();tracking_observation={};tracking_at=0;std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();}
  if(last&&now>=last&&now-last<100)return;
  if(last&&(now<last||now-last>2000)){std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();}
@@ -155,7 +157,7 @@ inline void tick(uint64_t now,bool recording=false){
  try{auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t actor=0,world=0;auto o=sample(base,actor,world);round_tracker.observe(o,now);
  if(ssc_combat::attached){std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::Context c;c.valid=o.valid;c.active=o.active;c.ending=o.ending;c.preparing=o.preparing;c.session=o.session;c.actor=actor;c.round=o.round;ssc_combat::counter.observe(c);if(o.valid)append_combat_values(o.values,ssc_combat::counter);}
  tracking_observation=o;tracking_at=now;
- if(enabled){engine.observe(o,now);if(o.valid)engine.dispatch(now,[&](const std::string& text){return send_native(base,world,actor,text);});diagnose(o,now);}else engine.reset();}
+ if(messaging){engine.observe(o,now);if(o.valid)engine.dispatch(now,[&](const std::string& text){return send_native(base,world,actor,text);});diagnose(o,now);}else engine.reset();}
  catch(...){tracking_observation={};tracking_at=0;enabled=false;ssc_combat::enabled=false;engine.reset();round_tracker.reset();status=L"Auto messages paused after a data error";}
 }
 }

@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <windowsx.h>
 #include "color_picker.h"
+#include "privacy_native.h"
 #include <GL/gl.h>
 #include <bcrypt.h>
 #include <cstdint>
@@ -106,11 +107,14 @@ void render(HDC dc) {
         performance_at=now;performance_frames=slow_frames=0;frame_sum=frame_max=0;ssc_perf::milliseconds.fill(0);ssc_perf::calls.fill(0);
       }
     }
-    ssc_names::begin_render_frame(shared_receive);
+    const bool privacy=ssc_privacy::blocked();
+    static bool prior_privacy=false;if(privacy!=prior_privacy){prior_privacy=privacy;dirty=true;ssc_auto::engine.reset();save();}
+    ssc_names::begin_render_frame(shared_receive&&!privacy);
     static ULONGLONG auth_start_at=0;
     if(now-auth_start_at>=1000){auth_start_at=now;ssc_auth::service().start();}
-    static ULONGLONG shared_at=0;
-    if(now-shared_at>=1000){shared_at=now;
+    static ULONGLONG shared_at=0;static uint64_t shared_privacy=0;
+    const auto privacy_revision=ssc_privacy::generation.load();
+    if(now-shared_at>=1000||shared_privacy!=privacy_revision){shared_at=now;shared_privacy=privacy_revision;
       std::string own;if(ssc_names::attached)ssc_names::account_string(ssc_names::image_base+ssc_compat::resolve(0xe031e8),own);
       ssc_shared::Style appearance;appearance.mode=ssc_names::gradient?ssc_shared::Mode::gradient:ssc_names::rainbow?ssc_shared::Mode::rainbow:ssc_shared::Mode::solid;
       appearance.count=ssc_names::gradient?unsigned(std::clamp(ssc_names::gradient_count,2,3)):ssc_names::rainbow?0:1;
@@ -118,7 +122,7 @@ void render(HDC dc) {
       ssc_cosmetic_access::refresh(own,now);
       ssc_shared::Style permitted;const bool can_share=ssc_cosmetic_access::publication(ssc_cosmetic_access::current,appearance,ssc_names::solid_rgb,permitted);
       if(can_share)appearance=permitted;
-      ssc_shared::service().update(own,shared_receive?ssc_names::shared_accounts():std::vector<std::string>{},appearance,shared_receive&&ssc_names::attached,shared_publish&&ssc_names::cosmetics.load()&&can_share);
+      ssc_shared::service().update(own,shared_receive?ssc_names::shared_accounts():std::vector<std::string>{},appearance,shared_receive&&ssc_names::attached,shared_publish&&!privacy&&ssc_names::cosmetics.load()&&can_share);
       if(settings_page==22||cosmetics_popup)dirty=true;
     }
     ssc_names::refresh_shared_labels(now,shared_receive||ssc_names::render_private_active());
@@ -340,10 +344,11 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     ssc_diagnostics::initialize(state_dir);ssc_auth::service().configure(state_dir);ssc_shared::service().configure(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
     ssc_dark_flash::diagnostic=log;
-    log("SSC Mod Menu 0.1.33 startup");log_game_build();
+    log("SSC Mod Menu 0.1.34 startup");log_game_build();
     // Updates must remain available when native gameplay guards reject a build.
     ssc_update::check(state_dir);
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);
+    log(ssc_privacy::initialize_native(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))?"Anonymous setting detector validated":"Anonymous setting detector unavailable; privacy defaults protected");
     if(!supported){native_supported=false;log("Unsupported executable; runtime inactive");ssc_update::notify_without_overlay();return;}
     presence_supported=(supported&4)!=0;native_supported=true;
     log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");
