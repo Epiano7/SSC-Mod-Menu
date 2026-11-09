@@ -1,7 +1,7 @@
  <a href="https://epiano7.dev" target="_blank" rel="noopener noreferrer"><img src="https://epiano7.dev/assets/buttons/epiano7.png" width="88" height="31" alt="epiano7.dev"></a>
 [![Downloads](https://raw.githubusercontent.com/Epiano7/SSC-Mod-Menu/traffic-data/downloads.svg)](https://github.com/Epiano7/SSC-Mod-Menu/releases)
 ![Traffic](https://raw.githubusercontent.com/Epiano7/SSC-Mod-Menu/traffic-data/badge.svg)
-[![Latest release](https://img.shields.io/github/v/release/Epiano7/SSC-Mod-Menu?style=flat&label=Latest%20release&labelColor=555&color=007ec6)](https://github.com/Epiano7/SSC-Mod-Menu/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/Epiano7/SSC-Mod-Menu?style=flat&label=Latest%20release&labelColor=555&color=f09f43)](https://github.com/Epiano7/SSC-Mod-Menu/releases/latest)
 # SSC Mod Menu
 
 An unofficial client-side mod for Skillshot City, with a Windows installer and an experimental Linux installer for Steam Proton.
@@ -46,7 +46,7 @@ The installer runs natively; the game and mod use Proton. The native Linux game 
 
 - **Weapon Lab:** search weapons by name, tier, or type. Compare up to four weapons with stronger values highlighted; adjust health, shields, and miss chance; and watch a timed duel with reloads. Simulations are estimates and do not account for skills or other round perks like shop purchases 
 - **Match Recording:** optionally save observed Battle Royale rounds together in a local match file, including class, level, XP, cash, health, weapons, selected skills, skill levels and any mutations if applicable.
-- **Personal Statistics:** browse local recordings by class and date, view summary statistics, and inspect larger level, XP and cash graphs with grid options and hover values. Late joins and unavailable fields are distinguished from complete observations.
+- **Personal Statistics:** browse local recordings by class and date, view summary statistics, and inspect level, XP and cash graphs with grid options and hover values. Late joins will also collect some data.
 - **Interface:** adjust UI scale, choose which modules appear in the quick menu, and customize animation and HUD display preferences.
 - **Geri Challenge:** hide the skill-draft and syringe selection panel from **All Modules > Misc**. Disabled by default; switch it off to restore the panel. This hides the UI and does not enforce challenge rules. [Details and testing limits](docs/geri-challenge.md)
 - **Updates:** check for releases through the in-game prompt. Once every game boot, the mod will automatically check and prompt the user to update if any are avaliable
@@ -72,17 +72,16 @@ A custom HUD layout in game:
 
 The menu will install into your Skillshot City Steam folder. Each native module checks its dependencies at startup for compatibility issues. Game updates might break some modules depending on the update, in which a hotfix will be released. Larger game changes may still require a mod update.
 
-If something goes wrong, open **All Modules > About > Open logs**, and dm them to Epiano7 or make an issue here with them included. Startup checks are recorded in `runtime.log`; crash reports are saved under `diagnostics` when Windows allows the crash handler to run. These reports are not automatically uploaded to any servers and stay local. Minidumps can contain process data, so review them before sharing.
+If something goes wrong, open **All Modules > About > Open logs**, and dm them to me (epiano7) or make an issue here with them included. Startup checks are recorded in `runtime.log`, and crash reports are saved under `diagnostics` when Windows allows the crash handler to run. These reports are not automatically uploaded to any servers and stay local.
 
 ## Credits
 - bencelot (dev of SSC) for giving feedback before this released and for making the game!
 - everyone in the [SSC discord](https://discord.gg/skillshotcity) that provided feedback regarding early module dev, thank you!
 - for some more specific names:
-  - yari_check for testing out the Linux build and helping me suffer through an Arch VM install
-  - jyxalag for reviewing and testing early builds
+  - yari_check for requesting/testing the Linux build and helping me install arch on a VM :D
+  - jyxalag for reviewing and testing early builds and beta features (and for popularizing the geri challenge)
   - alsamandal for resisting against the Manga Recruit monopoly!
-  - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk), and for putting up with me 
-  joining his lobbies in the last 2 minutes and winning
+  - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk)
   - chill for being a chill guy (and for giving some great suggestions)
   - geri, founder of the Geri Challenge (fan-made challenge where you aren't allowed to draft skills)
   - mang for answering a ton of questions I had as a new player and for their work on a synergy chart
