@@ -36,7 +36,7 @@ inline void sample_weapon(uintptr_t record,Values& values){
 }
 
 // Fingerprint both producers/consumers of world+6aa0 and the native send route.
-inline constexpr uint32_t native_dependencies[][3]={{0x88f2e0,0x2ad0b0,0},{0x2e9050,0x222ba0,0},{0x830b80,0x802a43,0},{0x22b330,0x898bd0,0}};
+inline constexpr uint32_t native_dependencies[][3]={{0x890b50,0x2adbc0,0},{0x2e9b40,0x2234f0,0},{0x831a00,0x803823,0},{0x22bda0,0x89a440,0}};
 inline bool supported(){return ssc_compat::supports(32)&&ssc_compat::supports(4)&&ssc_compat::supports(8);}
 // HUD survival timer (mode 6): 3b9d69 uses ceil(world+3bc) while positive,
 // then switches to -world+3cc for overtime. The gameplay countdown at +3bc
@@ -44,10 +44,10 @@ inline bool supported(){return ssc_compat::supports(32)&&ssc_compat::supports(4)
 // Guard the HUD selector/formatter as well as the nominal-duration helper.
 inline bool recording_clock_supported(uintptr_t base){
  static uintptr_t checked=0;static bool valid=false;if(checked==base)return valid;checked=base;valid=false;
- struct Span{uint32_t rva,length;uint64_t hash;};const Span spans[]={{0x2417c0,314,0xf803c023d6e2b4b0ULL},{0x2304d0,36,0xd3921ba4f6184c9aULL},{0x3baee4,91,0xf99ebaa215523d05ULL},{0x3bd891,70,0xdf6828d8d085142aULL}};
+ struct Span{uint32_t rva,length;uint64_t hash;};const Span spans[]={{0x242250,314,0x65cea7232d91d3e6ULL},{0x230f68,36,0xfd3bf313945f6275ULL},{0x3bb7b4,91,0xb045881e8b13f8f9ULL},{0x3be161,70,0x610f58fb106b8a5cULL}};
  for(const auto& span:spans){uint64_t hash=14695981039346656037ULL;for(uint32_t i=0;i<span.length;++i){unsigned char byte=0;if(!ssc_names::read(base+span.rva+i,byte))return false;hash=(hash^byte)*1099511628211ULL;}if(hash!=span.hash)return false;}
  float minimum=0,step=0,sign=0;double half=0;
- valid=ssc_names::read(base+0xc7b680,minimum)&&minimum==30&&ssc_names::read(base+0xc7b504,step)&&step==5&&ssc_names::read(base+0xc7aa90,half)&&half==.5&&ssc_names::read(base+0xc7bfdc,sign)&&sign==-1;return valid;
+ valid=ssc_names::read(base+0xc7dbc0,minimum)&&minimum==20&&ssc_names::read(base+0xc7daa4,step)&&step==5&&ssc_names::read(base+0xc7d028,half)&&half==.5&&ssc_names::read(base+0xc7e590,sign)&&sign==-1;return valid;
 }
 inline double recording_hud_countdown(float remaining,float overtime){
  if(!std::isfinite(remaining)||remaining>7200||remaining<-14400)return NAN;
@@ -57,17 +57,17 @@ inline double recording_hud_countdown(float remaining,float overtime){
 }
 inline double recording_round_seconds(float duration,double remaining){
  if(!std::isfinite(duration)||!std::isfinite(remaining)||duration<0||duration>7200)return -1;
- double elapsed=std::floor(std::max(30.f,duration)/5.f+.5)*5-remaining;return elapsed>=0&&elapsed<=14400?elapsed:-1;
+ double elapsed=std::floor(std::max(20.f,duration)/5.f+.5)*5-remaining;return elapsed>=0&&elapsed<=14400?elapsed:-1;
 }
 inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
  Observation o;actor=world=0;if(!supported())return o;using ssc_names::read;
  int session=0,mode=-1,raw_round=0,last=0,local=-1,slot=-1,kind=-1;double joining=0;float countdown=0,ending=0;uintptr_t first=0,end=0,steam=0;unsigned char active=0,survival=0;
- if(!read(base+ssc_compat::resolve(0xfb171c),session)||session!=2||!read(base+ssc_compat::resolve(0xfb1730),joining)||!std::isfinite(joining)||joining>0)return o;
+ if(!read(base+ssc_compat::resolve(0xfb470c),session)||session!=2||!read(base+ssc_compat::resolve(0xfb4720),joining)||!std::isfinite(joining)||joining>0)return o;
  o.connected=true;
- if(!read(base+ssc_compat::resolve(0xde95d0),world)||!world)return o;
+ if(!read(base+ssc_compat::resolve(0xdec5d0),world)||!world)return o;
  if(!read(world+0x128,mode)||mode!=6||!read(world+0x485,survival)||survival||!read(world+0x3e0,raw_round)||raw_round<1||raw_round>100||!read(world+0x46c,last)||last<raw_round-1||last>100||!read(world+0x3c0,countdown)||!std::isfinite(countdown)||!read(world+0x6ae8,ending)||!std::isfinite(ending))return o;
- if(!read(world+0xa650,first)||!read(world+0xa658,end)||!first||end<first||(end-first)%0x34b0||(end-first)/0x34b0>2048||!read(base+ssc_compat::resolve(0xe21140),steam)||first!=steam||!read(base+ssc_compat::resolve(0xe1d688),local)||local<0||uintptr_t(local)>=(end-first)/0x34b0)return o;
- actor=first+uintptr_t(local)*0x34b0;
+ if(!read(world+0xa658,first)||!read(world+0xa660,end)||!first||end<first||(end-first)%0x34b8||(end-first)/0x34b8>2048||!read(base+ssc_compat::resolve(0xe24138),steam)||first!=steam||!read(base+ssc_compat::resolve(0xe20678),local)||local<0||uintptr_t(local)>=(end-first)/0x34b8)return o;
+ actor=first+uintptr_t(local)*0x34b8;
  if(!read(actor+0x78,slot)||slot!=local||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||!active)return o;
  o.actor=actor;o.valid=true;o.active=raw_round>=2&&countdown<=0&&ending<=0;o.ending=raw_round>=2&&(ending>0||countdown>0);o.preparing=countdown>0&&ending<=0;o.session=world;o.round=raw_round-1;o.last_round=last;o.values["roundNumber"]=std::to_string(o.round);
  if(ssc_compat::supports(2)&&o.round>=1&&recording_clock_supported(base)){
@@ -102,21 +102,21 @@ inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
  if(read(actor+0x12a0,weapons)&&read(actor+0x12a8,weapons_end)&&weapons_end>=weapons&&(weapons_end-weapons)%0x748==0&&(weapons_end-weapons)/0x748<=16&&(weapons||!weapons_end)){
   o.values["weaponCount"]=std::to_string((weapons_end-weapons)/0x748);
   sample_inventory_slots(weapons,weapons_end,o.values);
-  if(read(actor+0x2998,equipped)&&equipped>=0)for(auto record=weapons;record<weapons_end;record+=0x748){int id=-1;if(read(record+0x20c,id)&&id==equipped){auto name=ssc_rpc::native_string(record+0x48);if(!name.empty()&&printable(name)){o.values["weaponName"]=name;sample_weapon(record,o.values);}break;}}
+  if(read(actor+0x29a0,equipped)&&equipped>=0)for(auto record=weapons;record<weapons_end;record+=0x748){int id=-1;if(read(record+0x20c,id)&&id==equipped){auto name=ssc_rpc::native_string(record+0x48);if(!name.empty()&&printable(name)){o.values["weaponName"]=name;sample_weapon(record,o.values);}break;}}
  }
  uintptr_t classes=0,classes_end=0;
- if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe16a98),classes)&&read(base+ssc_compat::resolve(0xe16aa0),classes_end)&&classes&&classes_end>=classes&&(classes_end-classes)%0x98==0&&(classes_end-classes)/0x98<=512&&uintptr_t(class_id)<(classes_end-classes)/0x98){auto name=ssc_rpc::native_string(classes+uintptr_t(class_id)*0x98+0x18);if(!name.empty())o.values["className"]=name;}
+ if(read(actor+0x350,class_id)&&class_id>=0&&read(base+ssc_compat::resolve(0xe2a148),classes)&&read(base+ssc_compat::resolve(0xe2a150),classes_end)&&classes&&classes_end>=classes&&(classes_end-classes)%0x98==0&&(classes_end-classes)/0x98<=512&&uintptr_t(class_id)<(classes_end-classes)/0x98){auto name=ssc_rpc::native_string(classes+uintptr_t(class_id)*0x98+0x18);if(!name.empty())o.values["className"]=name;}
  return o;
 }
 using NativeSender=void(*)(uintptr_t,unsigned char,uintptr_t,const void*);
 inline bool send_native(uintptr_t base,uintptr_t world,uintptr_t actor,const std::string& text,NativeSender sender=nullptr){
  if(ssc_privacy::blocked()||!supported()||!printable(text)||!actor||!world)return false;
  float cooldown=0;unsigned char wheel=0;
- if(!ssc_names::read(actor+0x26ec,cooldown)||!std::isfinite(cooldown)||cooldown>0||!ssc_names::read(actor+0x26a2,wheel)||wheel)return false;
+ if(!ssc_names::read(actor+0x26f4,cooldown)||!std::isfinite(cooldown)||cooldown>0||!ssc_names::read(actor+0x26aa,wheel)||wheel)return false;
  // The native client chat-input path calls this with flag=0. It deep-copies the
  // temporary native-layout string into its own outbound queue, then shows it locally.
  ssc_chat::NativeString message{reinterpret_cast<uintptr_t>(text.data()),0,text.size(),std::max(size_t(16),text.size())};
- if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x222ba0));
+ if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x2234f0));
  sender(world,0,actor,&message);
  // Engine::dispatch limits automatic messages. Observe the native wheel's
  // cooldown above, but never impose an additional lockout on manual input.
