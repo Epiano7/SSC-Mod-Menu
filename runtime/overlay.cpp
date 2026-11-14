@@ -115,7 +115,7 @@ void render(HDC dc) {
     static ULONGLONG shared_at=0;static uint64_t shared_privacy=0;
     const auto privacy_revision=ssc_privacy::generation.load();
     if(now-shared_at>=1000||shared_privacy!=privacy_revision){shared_at=now;shared_privacy=privacy_revision;
-      std::string own;if(ssc_names::attached)ssc_names::account_string(ssc_names::image_base+ssc_compat::resolve(0xe031e8),own);
+      std::string own;if(ssc_names::attached)ssc_names::account_string(ssc_names::image_base+ssc_compat::resolve(0xe061e8),own);
       ssc_shared::Style appearance;appearance.mode=ssc_names::gradient?ssc_shared::Mode::gradient:ssc_names::rainbow?ssc_shared::Mode::rainbow:ssc_shared::Mode::solid;
       appearance.count=ssc_names::gradient?unsigned(std::clamp(ssc_names::gradient_count,2,3)):ssc_names::rainbow?0:1;
       appearance.colors=ssc_names::gradient?ssc_names::gradient_colors:std::array<unsigned,3>{ssc_names::solid_rgb,0,0};
@@ -344,7 +344,7 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     ssc_diagnostics::initialize(state_dir);ssc_auth::service().configure(state_dir);ssc_shared::service().configure(state_dir);
     if(std::filesystem::exists(state_dir/L"runtime.log",error)&&std::filesystem::file_size(state_dir/L"runtime.log",error)>2*1024*1024){std::filesystem::remove(state_dir/L"runtime.previous.log",error);std::filesystem::rename(state_dir/L"runtime.log",state_dir/L"runtime.previous.log",error);}
     ssc_dark_flash::diagnostic=log;
-    log("SSC Mod Menu 0.1.34 startup");log_game_build();
+    log("SSC Mod Menu 0.1.35 startup");log_game_build();
     // Updates must remain available when native gameplay guards reject a build.
     ssc_update::check(state_dir);
     auto started=GetTickCount64();auto supported=ssc_compat::initialize(log);

@@ -17,7 +17,7 @@ sec=next(s for s in pe.sections if s.Name.startswith(b'.text'));code=sec.get_dat
 funcs=[e.struct for e in pe.DIRECTORY_ENTRY_EXCEPTION];begins=[e.BeginAddress for e in funcs]
 def function(a):
  # Validated leaf helper has no PE unwind entry. Keep its entire body fingerprinted.
- if 0x3ad230<=a<0x3ad2f8:return SimpleNamespace(BeginAddress=0x3ad230,EndAddress=0x3ad2f8)
+ if 0x3add30<=a<0x3addf8:return SimpleNamespace(BeginAddress=0x3add30,EndAddress=0x3addf8)
  e=funcs[bisect.bisect_right(begins,a)-1]
  assert e.BeginAddress<=a<e.EndAddress,hex(a)
  return e
@@ -30,9 +30,9 @@ for name,group in [('cosmetic_adapter.h',1),('hud_editor.h',2),('hud_geometry.h'
  for a,b in re.findall(r'\{(0x[0-9a-f]+),\s*(0x[0-9a-f]+),(?!\s*")',text):
   if int(a,16)>4096:dependencies[int(a,16)]|=group;dependencies[int(b,16)]|=group
 # Native word wrapping used by the bounded quick-wheel center label.
-for key in [0x480b60,0x3a81c0]:dependencies[key]|=16
+for key in [0x4815d0,0x3a8c30]:dependencies[key]|=16
 # Geri panel delegates its draft and skill/syringe subpanels. Validate their bodies too.
-for key in [0x3ba435,0x3d8e20,0x3e0000,0x3db6c0]:dependencies[key]|=128
+for key in [0x3bad05,0x3d9b30,0x3e0d10,0x3dc3d0]:dependencies[key]|=128
 assert dependencies,'Generate before wrapping native addresses in resolve()'
 refs=collections.defaultdict(list);md.detail=False;md.skipdata=True
 for a,size,mn,op in md.disasm_lite(code,start):
