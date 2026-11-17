@@ -12,8 +12,12 @@ int main(int argc,char** argv){
  HANDLE file=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);assert(file!=INVALID_HANDLE_VALUE);
  HANDLE mapping=CreateFileMappingW(file,nullptr,PAGE_READONLY|SEC_IMAGE_NO_EXECUTE,0,0,nullptr);assert(mapping);
  auto view=static_cast<const unsigned char*>(MapViewOfFile(mapping,FILE_MAP_READ,0,0,0));assert(view);
- assert(ssc_creator::matches(view,0x84a5d8));assert(!ssc_creator::matches(view,0x84a5d7));
- std::vector<unsigned char> changed(view,view+0x84a5d8);changed[0x846940]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));changed[0x846940]^=1;changed[0x3b9487]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));
+ assert(ssc_creator::matches(view,0x84ab98));assert(!ssc_creator::matches(view,0x84ab97));
+ std::vector<unsigned char> changed(view,view+0x84ab98);
+ // Tamper with each actual current guarded body and the guarded call opcode.
+ for(auto at:{0x846ef0,0x3b96c0,0x3b9716}){changed[size_t(at)]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));changed[size_t(at)]^=1;assert(ssc_creator::matches(changed.data(),changed.size()));}
+ // An unrelated old test location is outside this feature guard.
+ changed[0x3b99a7]^=1;assert(ssc_creator::matches(changed.data(),changed.size()));
  UnmapViewOfFile(view);CloseHandle(mapping);CloseHandle(file);
  WNDCLASSW wc{};wc.style=CS_OWNDC;wc.lpfnWndProc=DefWindowProcW;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"SSCCreatorTest";assert(RegisterClassW(&wc));
  HWND window=CreateWindowW(wc.lpszClassName,L"SSC creator test",WS_OVERLAPPEDWINDOW,0,0,64,64,nullptr,nullptr,wc.hInstance,nullptr);assert(window);
