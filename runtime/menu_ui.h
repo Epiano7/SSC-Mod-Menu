@@ -1,3 +1,4 @@
+#include "build_version.h"
 #include "cosmetics_notice.h"
 // Included inside the runtime's private namespace. No game code addresses or bundled assets.
 constexpr bool developer_tools=false;
@@ -33,18 +34,19 @@ bool valid_private_label(const std::string& value){return !value.empty()&&value.
 std::string rpc_id=ssc_rpc::bundled_application_id;std::wstring rpc_buffer;ssc_rpc::Snapshot rpc_preview;
 int sound_wheel_remainder=0;
 bool sound_search_editing=false;std::wstring sound_query;size_t sound_page=0;std::vector<size_t> sound_results;
-void filter_sounds(){sound_results.clear();auto query=sound_query;std::transform(query.begin(),query.end(),query.begin(),towlower);for(size_t i=0;i<ssc_sound::entries.size();++i){auto label=ssc_sound::display_name(ssc_sound::entries[i]);std::transform(label.begin(),label.end(),label.begin(),towlower);if(label.find(query)!=std::wstring::npos)sound_results.push_back(i);}sound_page=0;dirty=true;}
-int settings_page=0,ui_scale=100;
+void filter_sounds(){sound_results=ssc_sound::grouped_entries(sound_query);if(ssc_sound::selection<ssc_sound::entries.size()){auto key=ssc_sound::pool_key(ssc_sound::entries[ssc_sound::selection]);auto same=std::find_if(sound_results.begin(),sound_results.end(),[&](size_t index){return ssc_sound::pool_key(ssc_sound::entries[index])==key;});if(same!=sound_results.end())ssc_sound::selection=*same;}sound_page=0;dirty=true;}
+int settings_page=0,ui_scale=100,module_filter=0;
 int statistics_class=0,statistics_round=0,statistics_metric=0,statistics_intervals=6;
-bool statistics_select_latest=false;
+bool statistics_select_latest=false,statistics_all_runs=false;
 float statistics_mouse_x=-1,statistics_mouse_y=-1;bool recording_requested=false;
 int cosmetic_stop=-1;
 int color_popup=-2,picker_drag=0;unsigned picker_original=0;bool picker_old_gradient=false,picker_old_rainbow=false,picker_editing=false;
 ssc_color::HSV picker_hsv;std::wstring picker_hex;
 void close_color_picker(bool cancel=false);
 unsigned quick_mask=127;
-int quick_count(){int n=0;for(int i=0;i<8;++i)n+=(quick_mask>>i)&1;return n;}
-int quick_height(){return 186+64*quick_count();}
+constexpr int quick_module_count=14;int quick_scroll=0;
+int quick_count(){int n=0;for(int i=0;i<quick_module_count;++i)n+=(quick_mask>>i)&1;return n;}
+int quick_height(){return 186+64*std::min(7,quick_count())+(quick_count()>7?36:0);}
 bool auto_rule_editor=false,auto_guide=false;int auto_list_page=0,auto_guide_page=0;
 int dropdown=-1,dropdown_choice=0,chat_field=0,chat_variant=0;std::vector<std::wstring> dropdown_items;
 bool chat_editing=false,chat_select_all=false,chat_new=false;std::string chat_buffer;
@@ -52,12 +54,14 @@ ssc_edit::Cursor edit_cursor;
 struct EditVisual {std::wstring value;int id=0,x=0,y=0,w=0,size=15;size_t first=0;};
 std::vector<EditVisual> edit_visuals;
 int lab_drag=-1;bool speed_dragging=false,slow_binding=false,photo_binding=false,capture_binding=false;
+int tts_drag=0;
 bool scale_dragging=false;int scale_preview=100;float scale_drag_left=0,scale_drag_width=1;
 bool bot_color_error=false;
 bool manager=false,welcome_seen=false,color_editing=false;std::wstring color_buffer;
 #include "postgame_share.h"
+#include "postgame_summary_share.h"
 #include "postgame_graph.h"
-bool postgame_imported=false;std::vector<nlohmann::json> postgame_import_rounds;std::string postgame_share_status;
+bool postgame_imported=false,postgame_import_full=false;nlohmann::json postgame_import_analysis=nullptr;std::vector<nlohmann::json> postgame_import_rounds;std::string postgame_share_status;
 int postgame_tab=0,postgame_round=0,postgame_skill_page=0,postgame_build_step=-1,postgame_detail=4;bool postgame_tab_up=false;
 int postgame_hotkey=VK_F7,postgame_binding_release=0;bool postgame_binding=false;
 bool postgame_history_pending=false,postgame_history_shortcut=false,postgame_saved=false;unsigned postgame_history_revision=0;std::wstring postgame_history_error;
@@ -116,7 +120,8 @@ void log(const char* message) {
 }
 void activate(int id);
 void commit_text(){if(color_editing&&settings_page==4&&color_buffer.size()==6)activate(189);if(chat_editing)activate(321);if(color_editing&&settings_page==18&&ssc_names::private_visible()){unsigned rgb,alpha;if(ssc_names::parse_bot_color(color_buffer,rgb,alpha))activate(537);}}
-void cancel_edit(){postgame_binding=false;capture_binding=false;photo_binding=false;slow_binding=false;speed_dragging=false;close_color_picker();private_editing=false;private_label_editing=false;credits_popup=false;commit_text();dropdown=-1;chat_editing=false;sound_search_editing=false;color_editing=false;rpc_editing=false;rpc_error=false;dirty=true;}
+std::string kos_handle;bool kos_handle_editing=false;bool command_sender_editing=false;std::string command_sender_buffer;
+void cancel_edit(){kos_handle_editing=false;command_sender_editing=false;postgame_binding=false;capture_binding=false;photo_binding=false;slow_binding=false;speed_dragging=false;close_color_picker();private_editing=false;private_label_editing=false;credits_popup=false;commit_text();dropdown=-1;chat_editing=false;sound_search_editing=false;color_editing=false;rpc_editing=false;rpc_error=false;dirty=true;}
 void save() {
     ssc_names::cosmetics=cosmetic_requested&&ssc_compat::supports(1);
     ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);
@@ -159,6 +164,7 @@ void save() {
     out<<"shared_defaults_applied=1\n";
     out<<"respect_anonymous="<<ssc_privacy::respect.load()<<"\nprivacy_uploads_held="<<ssc_privacy::uploads_held.load()<<"\n";
     out<<"shared_receive="<<shared_receive<<"\nshared_publish="<<shared_publish<<"\n";
+    out<<"cosmetic_motion="<<int(ssc_names::animation.motion)<<"\ncosmetic_animation_speed="<<ssc_names::animation.speed_percent<<"\ncosmetic_breathing="<<ssc_names::animation.breathing<<"\ncosmetic_breath_min="<<ssc_names::animation.minimum_percent<<"\ncosmetic_breath_period="<<ssc_names::animation.period_seconds<<"\n";
     out<<"cosmetic_gradient="<<ssc_names::gradient<<"\ncosmetic_gradient_count="<<ssc_names::gradient_count<<"\n";for(int i=0;i<3;++i)out<<"cosmetic_gradient_"<<i<<"="<<ssc_names::gradient_colors[i]<<"\n";
     out<<"cosmetic_rainbow="<<ssc_names::rainbow<<"\ncosmetic_rgb="<<ssc_names::solid_rgb<<"\n";out<<"welcome_seen="<<welcome_seen<<"\n";out<<"schema=2\nclock="<<clock_enabled
        <<"\nsound_requested="<<sound_requested<<"\ncosmetic_requested="<<cosmetic_requested<<"\nmatch_sound_level="<<match_sound_level
@@ -166,7 +172,8 @@ void save() {
        <<"\npostgame_hotkey="<<postgame_hotkey<<"\nmenu_hotkey="<<menu_hotkey<<"\nrecording_enabled="<<recording_requested<<"\nanimations="<<animations<<"\nui_scale="<<ui_scale<<"\n";out.close();
     // Attempt every independent save, even if another settings file failed.
     bool menu_saved=out&&MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);
-    save_failed=!auto_saved||!chat_saved||!menu_saved;dirty=true;
+    bool planned_saved=ssc_planned::save(state_dir);
+    save_failed=!auto_saved||!chat_saved||!menu_saved||!planned_saved;dirty=true;
 }
 constexpr float hud_view_x=266,hud_view_y=188,hud_view_w=820,hud_view_h=461;
 int hud_drag=-1;bool hud_resize=false;float hud_start_x=0,hud_start_y=0,hud_item_x=0,hud_item_y=0,hud_item_scale=1;
@@ -186,7 +193,7 @@ void move_hud(float x,float y){
 }
 void load_settings() {
     ssc_flash_image::load(state_dir);
-    ssc_chat::load(state_dir);ssc_auto::load(state_dir);
+    ssc_chat::load(state_dir);ssc_auto::load(state_dir);ssc_planned::load(state_dir);
     std::ifstream in(state_dir/L"menu.ini");std::string line;const bool had_settings=in.good();bool notice_known=false;bool version2=false,quick_freecam_known=false;
     // Defaults are inert. Only v2 carries the test clock forward.
     while(std::getline(in,line)) {
@@ -206,7 +213,7 @@ void load_settings() {
         if(key=="cosmetics_notice_accounts"){cosmetics_policy.parse(value);continue;}
         if(key=="cosmetics_policy_seen"){if(ssc_shared::account_valid(value))cosmetics_notice_account=value;continue;}
         try {size_t used=0;number=std::stoi(value,&used);if(used!=value.size())continue;}catch(...){continue;}
-        if(key=="quick_modules"&&number>=0&&number<256)quick_mask=unsigned(number);
+        if(key=="quick_modules"&&number>=0&&number<(1<<quick_module_count))quick_mask=unsigned(number);
         else if(key=="quick_freecam_known")quick_freecam_known=number==1;
         else if(key=="show_update_notes")show_update_notes=number!=0;
         else if(key=="seen_release_notes")seen_release_notes=number;
@@ -233,6 +240,11 @@ void load_settings() {
         else if(key=="geri_mode")ssc_geri::enabled=number!=0;
         else if(key=="cooldown_pulse")ssc_cooldown::settings.enabled=number!=0;
         else if(key=="cooldown_duration_ms"&&(number==1000||number==1500||number==2500))ssc_cooldown::settings.duration_ms=unsigned(number);
+        else if(key=="cosmetic_motion"&&number>=0&&number<=2)ssc_names::animation.motion=ssc_cosmetic_animation::Motion(number);
+        else if(key=="cosmetic_animation_speed"&&number>=25&&number<=200)ssc_names::animation.speed_percent=number;
+        else if(key=="cosmetic_breathing")ssc_names::animation.breathing=number==1;
+        else if(key=="cosmetic_breath_min"&&number>=25&&number<=100)ssc_names::animation.minimum_percent=number;
+        else if(key=="cosmetic_breath_period"&&number>=2&&number<=12)ssc_names::animation.period_seconds=number;
         else if(key=="cosmetic_gradient")ssc_names::gradient=number==1;
         else if(key=="shared_defaults_applied")shared_defaults_applied=number==1;
         else if(key=="respect_anonymous")ssc_privacy::respect=number==1;
@@ -264,6 +276,7 @@ void load_settings() {
     }
     // Windows readers do not grant delete sharing: close before atomic replacement.
     in.close();
+    if(ssc_challenge::random.enabled)ssc_geri::enabled=false;
     if(!notice_known)cosmetics_policy.migrate(had_settings,welcome_seen,!cosmetics_notice_account.empty());
     bool migrate_sharing=!shared_defaults_applied;
     if(migrate_sharing){shared_receive=shared_publish=true;shared_defaults_applied=true;}
@@ -275,6 +288,9 @@ void load_settings() {
 }
 void finish_lab_slider(){if(lab_drag>=0){lab_drag=-1;ssc_lab::recompute();dirty=true;}}
 void move_lab_slider(int x){float fraction=std::clamp(((x-panel_x)/draw_scale-580)/248.f,0.f,1.f);int lo=lab_drag==1?0:1,hi=lab_drag==0?1000:lab_drag==1?200:int(ssc_lab::target.max_health);ssc_lab::editing=lab_drag;ssc_lab::edit_buffer=std::to_wstring(int(std::lround(lo+(hi-lo)*fraction)));ssc_lab::commit_edit(false);dirty=true;}
+void finish_tts_slider(){if(tts_drag){tts_drag=0;save();}}
+void set_tts_percent(int id,int value){if(id==1804)ssc_chat_tts::volume=std::clamp(value,0,200);else ssc_chat_tts::speed_percent=std::clamp(value,50,200);ssc_chat_tts::speech().configure(ssc_chat_tts::settings);dirty=true;}
+void move_tts_slider(int x){const int low=tts_drag==1804?0:50;const float fraction=std::clamp(((x-panel_x)/draw_scale-560)/350.f,0.f,1.f);set_tts_percent(tts_drag,int(std::lround(low+(200-low)*fraction)));}
 void finish_scale(){if(scale_dragging){ui_scale=scale_preview;scale_dragging=false;save();}}
 void move_scale(int x){scale_preview=std::clamp(int(std::lround(50+150*(x-scale_drag_left)/std::max(1.f,scale_drag_width))),50,200);dirty=true;}
 float ease(float t) {return 1.f-(1.f-t)*(1.f-t)*(1.f-t);}
@@ -286,14 +302,16 @@ void advance_animation(float seconds) {
 void refresh_dynamic_panel(ULONGLONG now,bool presence_tick=false) {
     if(opened&&cosmetics_popup){static ULONGLONG notice_at=0;if(now-notice_at>=50){notice_at=now;dirty=true;}return;}
     if(!opened||!manager||ssc_hud::editing)return;
+    if(settings_page==34||settings_page==35){static uint64_t assets_revision=0,speech_revision=0;auto asset=ssc_piper::assets().snapshot();auto voice=ssc_chat_tts::speech().revision();if(asset.revision!=assets_revision||voice!=speech_revision){assets_revision=asset.revision;speech_revision=voice;dirty=true;}}
+    if(settings_page==34){static uint64_t source_revision=0;if(source_revision!=ssc_chat_tts::source_revision){source_revision=ssc_chat_tts::source_revision;dirty=true;}static size_t count=0;auto next=ssc_chat_tts::speech().voices().size();if(next!=count){count=next;dirty=true;}}
     static bool freecam_notice=false;bool notice=now<ssc_freecam::notice_until;if(notice!=freecam_notice){freecam_notice=notice;dirty=true;}
     static unsigned statistics_revision=0;auto revision=ssc_stats::reader().revision.load();if(statistics_revision!=revision){statistics_revision=revision;if(statistics_select_latest){statistics_round=0;statistics_select_latest=false;}if(settings_page==20||settings_page==21)dirty=true;}
     if(presence_tick&&(settings_page==5||settings_page==16))dirty=true;
     static ULONGLONG caret_at=0;if((picker_editing||private_editing||chat_editing||sound_search_editing||color_editing||rpc_editing||(settings_page==11&&(ssc_lab::picker>=0||ssc_lab::editing>=0)))&&now/500!=caret_at){caret_at=now/500;dirty=true;}
     static ULONGLONG rainbow_at=0;
-    if(((settings_page==4&&(ssc_names::rainbow||ssc_names::gradient))||(settings_page==13&&credits_popup&&credits_page==0))&&now-rainbow_at>=50){rainbow_at=now;dirty=true;}
+    if((((settings_page==4||settings_page==31)&&(ssc_names::rainbow||ssc_names::gradient||ssc_names::animation.breathing))||(settings_page==13&&credits_popup&&credits_page==0))&&now-rainbow_at>=50){rainbow_at=now;dirty=true;}
 }
-void close_menu(bool immediate=false) {if(cosmetics_popup&&ssc_cosmetic_access::tier(ssc_cosmetic_access::current)!=ssc_cosmetic_access::Tier::checking){cosmetics_notice_account=ssc_cosmetic_access::account_key;save();}if(update_popup||cosmetics_popup)immediate=true;update_popup=false;cosmetics_popup=false;finish_scale();finish_lab_slider();if(manager&&settings_page==8){welcome_seen=true;seen_release_notes=release_notes_id;save();}if(manager&&settings_page==14){seen_release_notes=release_notes_id;save();}if(ssc_hud::editing){ssc_hud::editing=false;save();}finish_hud_drag();opened=false;dirty=true;pressed=0;keyboard_focus=0;cancel_edit();if(immediate){visibility=0;modal_visibility=0;}ReleaseCapture();log("Menu closed");}
+void close_menu(bool immediate=false) {ssc_sound::stop_preview();if(cosmetics_popup&&ssc_cosmetic_access::tier(ssc_cosmetic_access::current)!=ssc_cosmetic_access::Tier::checking){cosmetics_notice_account=ssc_cosmetic_access::account_key;save();}if(update_popup||cosmetics_popup)immediate=true;update_popup=false;cosmetics_popup=false;finish_scale();finish_lab_slider();finish_tts_slider();if(manager&&settings_page==8){welcome_seen=true;seen_release_notes=release_notes_id;save();}if(manager&&settings_page==14){seen_release_notes=release_notes_id;save();}if(ssc_hud::editing){ssc_hud::editing=false;save();}finish_hud_drag();opened=false;dirty=true;pressed=0;keyboard_focus=0;cancel_edit();if(immediate){visibility=0;modal_visibility=0;}ReleaseCapture();log("Menu closed");}
 void finish_freecam_entry(){
     if(previous_proc&&game_window){
         for(int key=8;key<256;++key)CallWindowProcW(previous_proc,game_window,WM_KEYUP,key,(1LL<<31)|(1LL<<30)|1);
@@ -303,10 +321,11 @@ void finish_freecam_entry(){
     close_menu(true);
 }
 void show_manager(int page=-1) {
+    if(page!=3&&page!=36)ssc_sound::stop_preview();
     if(page!=29)postgame_imported=false;
     if(page==18&&!ssc_names::private_visible())page=-1;
     update_popup=false;cosmetics_popup=false;
-    finish_scale();finish_lab_slider();if(page!=11){ssc_lab::picker=-1;ssc_lab::editing=-1;}
+    finish_scale();finish_lab_slider();finish_tts_slider();if(page!=11){ssc_lab::picker=-1;ssc_lab::editing=-1;}
     // Navigation inside the full window is not a new opening transition.
     const bool already_visible=manager&&opened&&visibility>0.f;
     finish_hud_drag();ReleaseCapture();cancel_edit();manager=true;settings_page=page;if(page==15){chat_variant=0;chat_new=false;}
@@ -340,24 +359,106 @@ void poll_live_hud_drag(HWND window){
 }
 void live_hud_wheel(int delta,int hovered_item){if(hud_drag>=0){finish_hud_drag();ReleaseCapture();}if(hovered_item>=0)ssc_hud::selected=hovered_item;auto& a=ssc_hud::items[ssc_hud::selected];a.scale*=std::pow(1.1f,float(delta)/WHEEL_DELTA);ssc_hud::constrain(a);save();}
 bool module_ready(int id){
+    if(id==1950)return ssc_loading_tips::attached;
+    if(id==1945||id==1946)return ssc_challenge::view_supported;
+    if(id==1948)return ssc_challenge::input_supported;
+    if(id==1947)return ssc_render::dispatch.pixel_supported();
     if(id==998||id==1001||id==1002)return ssc_advisor::private_access();
     if(id==510||id==511||(id>=530&&id<=537))return ssc_names::private_visible();
     if(!ssc_compat::initialized)return true;
-    return id==981?ssc_vehicle::attached:id==586?ssc_creator::attached:id==570?ssc_geri::attached:id==330?ssc_auto::supported():id==80?ssc_sound::attached:id==81?ssc_names::attached:id==83?presence_supported:(id==86||id==193)?ssc_hud::attached:true;
+    if(id==1903)return ssc_challenge::attached&&ssc_challenge::render_supported&&ssc_challenge::blind_supported;
+    return (id==1900)?ssc_challenge::attached:(id==1910)?ssc_hud::attached:id==981?ssc_vehicle::attached:id==586?ssc_creator::attached:id==570?ssc_geri::attached:id==330?ssc_auto::supported():id==80?ssc_sound::attached:id==81?ssc_names::attached:id==83?presence_supported:(id==86||id==193)?ssc_hud::attached:true;
 }
 bool wheel_round_ended=false;
+int chaos_options_page=0;
 void open_dropdown(int id,std::vector<std::wstring> labels,int choice){dropdown=dropdown==id?-1:id;dropdown_items=std::move(labels);dropdown_choice=choice;dirty=true;}
-void select_dropdown(int value){int id=dropdown;dropdown=-1;dirty=true;if(id==602){statistics_class=std::clamp(value,0,8);statistics_round=0;return;}if(id==610){statistics_round=std::max(0,value);return;}if(id==611){statistics_intervals=4+2*std::clamp(value,0,2);return;}auto& r=ssc_auto::current();if(id==500){chat_variant=std::clamp(value,0,int(ssc_chat::message_count(ssc_chat::slots[ssc_chat::order[ssc_chat::selected]]))-1);chat_editing=false;}else if(id==488){const int levels[]={0,50,75,100,125,150,200,250,300};if(value>=0&&value<9)ssc_sound::set_volume(levels[value]);}else if(id==462){wheel_round_ended=value==1;auto visible=ssc_chat::visible_order(wheel_round_ended);if(std::find(visible.begin(),visible.end(),ssc_chat::selected)==visible.end())ssc_chat::selected=visible.back();chat_variant=0;chat_editing=false;}else if(id==324){auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];slot.icon=value;slot.custom=false;}else if(id==581)r.hold_seconds=value;else if(id==582)r.delay_seconds=value;else if(id==326)r.event=ssc_auto::choice_event(value);else if(id==344)ssc_auto::variable=value;else if(id==405)r.any=value==1;else if(id==406)r.repeats=value+1;else if(id==208){ssc_lab::sort_mode=value;ssc_lab::picker_page=0;}else if(id>=410&&id<413)r.conditions[id-410].stat=value;else if(id>=420&&id<423)r.conditions[id-420].comparison=value;save();}
-unsigned& picker_value(){return color_popup<0?ssc_names::solid_rgb:ssc_names::gradient_colors[color_popup];}
+int parent_page(int page){switch(page){case 31:return 4;case 35:return 34;case 36:return 3;case 39:return 38;default:return -1;}}
+std::vector<ssc_kos::NativeTarget> kos_choices;
+std::wstring kos_status;
+
+struct SpeechChoice {int backend=0,index=0;std::string model;};
+std::vector<SpeechChoice> speech_choices;
+std::vector<std::wstring> speech_options(const std::vector<ssc_chat_tts::InstalledVoice>& voices,const std::vector<ssc_piper::Model>& models){
+ speech_choices.clear();std::vector<std::wstring> labels;for(size_t i=0;i<voices.size()&&i<64;++i){speech_choices.push_back({0,int(i),{}});labels.push_back(voices[i].label);}for(const auto& model:models){if(!ssc_piper::identifier(model.id))continue;speech_choices.push_back({1,0,model.id});labels.push_back(ssc_piper::wide(model.label));}return labels;
+}
+std::wstring command_example(const std::string& action){auto it=std::find_if(ssc_commands::router.bindings.begin(),ssc_commands::router.bindings.end(),[&](const ssc_commands::Binding& item){return item.action==action;});return it==ssc_commands::router.bindings.end()?L"(unassigned)":std::wstring(L"/")+ssc_chat::widen(it->name);}
+void select_dropdown(int value){int id=dropdown;dropdown=-1;dirty=true;
+ if(id==1602){if(value>=0&&size_t(value)<kos_choices.size()){ssc_kos::NativeTarget next;if(ssc_kos::resolve_choice(kos_choices[size_t(value)],next)){ssc_kos::selected=std::move(next);kos_status.clear();}else{ssc_kos::selected={};kos_status=L"Player is no longer publicly available";}}return;}
+ if(id==1802){if(value>=0&&size_t(value)<speech_choices.size()){const auto& choice=speech_choices[size_t(value)];ssc_chat_tts::backend=choice.backend;if(choice.backend==0)ssc_chat_tts::voice_choice=choice.index;else{if(ssc_chat_tts::piper_voice!=choice.model)ssc_chat_tts::piper_speaker=0;ssc_chat_tts::piper_voice=choice.model;}ssc_chat_tts::speech().configure(ssc_chat_tts::settings);save();}return;}if(id==602){statistics_class=std::clamp(value,0,8);statistics_round=0;return;}if(id==610){statistics_round=std::max(0,value);return;}if(id==611){statistics_intervals=4+2*std::clamp(value,0,2);return;}auto& r=ssc_auto::current();if(id==500){chat_variant=std::clamp(value,0,int(ssc_chat::message_count(ssc_chat::slots[ssc_chat::order[ssc_chat::selected]]))-1);chat_editing=false;}else if(id==488){const int levels[]={0,50,75,100,125,150,200,250,300};if(value>=0&&value<9)ssc_sound::set_volume(levels[value]);}else if(id==462){wheel_round_ended=value==1;auto visible=ssc_chat::visible_order(wheel_round_ended);if(std::find(visible.begin(),visible.end(),ssc_chat::selected)==visible.end())ssc_chat::selected=visible.back();chat_variant=0;chat_editing=false;}else if(id==324){auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];slot.icon=value;slot.custom=false;}else if(id==581)r.hold_seconds=value;else if(id==582)r.delay_seconds=value;else if(id==326)r.event=ssc_auto::choice_event(value);else if(id==344)ssc_auto::variable=value;else if(id==405)r.any=value==1;else if(id==406)r.repeats=value+1;else if(id==208){ssc_lab::sort_mode=value;ssc_lab::picker_page=0;}else if(id>=410&&id<413)r.conditions[id-410].stat=value;else if(id>=420&&id<423)r.conditions[id-420].comparison=value;save();}
+unsigned& picker_value(){return color_popup==-3?ssc_kos::color_rgb:color_popup<0?ssc_names::solid_rgb:ssc_names::gradient_colors[color_popup];}
 void picker_refresh_hex(){wchar_t buffer[8];swprintf(buffer,8,L"%06X",picker_value());picker_hex=buffer;}
-void picker_apply(){picker_value()=picker_hsv.rgb();ssc_names::gradient=color_popup>=0;if(color_popup<0)ssc_names::rainbow=false;picker_refresh_hex();dirty=true;}
-void close_color_picker(bool cancel){if(color_popup==-2)return;if(cancel){picker_value()=picker_original;ssc_names::gradient=picker_old_gradient;ssc_names::rainbow=picker_old_rainbow;}color_popup=-2;picker_drag=0;picker_editing=false;pressed=keyboard_focus=hovered=0;ReleaseCapture();save();}
+void picker_apply(){picker_value()=picker_hsv.rgb();if(color_popup>=-1){ssc_names::gradient=color_popup>=0;if(color_popup<0)ssc_names::rainbow=false;}picker_refresh_hex();dirty=true;}
+void close_color_picker(bool cancel){if(color_popup==-2)return;if(cancel){picker_value()=picker_original;if(color_popup>=-1){ssc_names::gradient=picker_old_gradient;ssc_names::rainbow=picker_old_rainbow;}}color_popup=-2;picker_drag=0;picker_editing=false;pressed=keyboard_focus=hovered=0;ReleaseCapture();save();}
 void open_color_picker(int slot){color_popup=slot;picker_original=picker_value();picker_old_gradient=ssc_names::gradient;picker_old_rainbow=ssc_names::rainbow;picker_hsv.set(picker_original);picker_refresh_hex();picker_drag=0;picker_editing=false;color_editing=false;pressed=keyboard_focus=hovered=0;dirty=true;}
 void move_color_picker(int x,int y){float px=(x-panel_x)/draw_scale,py=(y-panel_y)/draw_scale;
  if(picker_drag==1){picker_hsv.s=unit((px-420)/275);picker_hsv.v=1-unit((py-244)/189);}else if(picker_drag==2)picker_hsv.h=unit((px-420)/275);
  picker_apply();
 }
 void activate(int id) {
+    if(id==1901){show_manager(37);return;}
+    if(id==1960){show_manager(39);return;}
+
+    if(id==1930||id==1931){chaos_options_page=id-1930;dirty=true;return;}
+    if(id==1950){ssc_loading_tips::enabled=!ssc_loading_tips::enabled.load();save();return;}
+    if(id==1911){show_manager(38);return;}
+    if(id==1900){if(ssc_challenge::attached){ssc_challenge::draft_settings_changed();ssc_challenge::random.enabled=!ssc_challenge::random.enabled;ssc_challenge::picker.reset();ssc_challenge::reroller.reset();ssc_challenge::commit={};ssc_challenge::prepared={};ssc_challenge::status=ssc_challenge::random.enabled?L"Waiting for a round":L"Off";if(ssc_challenge::random.enabled)ssc_geri::enabled=false;}save();return;}
+    if(id==1903){if(!ssc_challenge::blind_supported)return;ssc_challenge::draft_settings_changed();ssc_challenge::random.blind=!ssc_challenge::random.blind;save();dirty=true;return;}
+    if(id==1902){ssc_challenge::draft_settings_changed();ssc_challenge::random.stims=!ssc_challenge::random.stims;save();return;}
+    if(id==1910){if(ssc_hud::attached){if(!ssc_challenge::chaos.enabled){show_manager(38);ssc_challenge::status=L"Read the warning and confirm below";}else ssc_challenge::chaos.enabled=false;}save();return;}
+    if(id>=1940&&id<1949){size_t effect=size_t(id-1940);if((effect==5||effect==6)&&!ssc_challenge::view_supported)return;if(effect==7&&!ssc_render::dispatch.pixel_supported())return;if(effect==8&&!ssc_challenge::input_supported)return;ssc_challenge::chaos.effects[effect]=!ssc_challenge::chaos.effects[effect];ssc_challenge::chaos.enabled=false;ssc_challenge::chaos.visual_confirmed=false;save();return;}
+    if(id==1917){if(ssc_hud::attached){ssc_challenge::chaos.visual_confirmed=true;ssc_challenge::chaos.enabled=true;}dirty=true;return;}
+    if(id>=2100&&id<2100+quick_module_count){quick_mask^=1u<<(id-2100);quick_scroll=0;save();return;}
+    if(id==2120||id==2121){quick_scroll=std::clamp(quick_scroll+(id==2120?-1:1),0,std::max(0,quick_count()-7));dirty=true;return;}
+
+    if(id==1890){show_manager(parent_page(settings_page));return;}
+    if(id==1608){open_color_picker(-3);return;}
+    if(id==1600){if(ssc_planned_native::kos)ssc_kos::enabled=!ssc_kos::enabled;save();return;}
+    if(id==1601){show_manager(32);return;}
+    if(id==1602){kos_choices=ssc_kos::choices();std::vector<std::wstring> names;int current=0;for(size_t i=0;i<kos_choices.size();++i){names.push_back(ssc_chat::widen(kos_choices[i].target.player.handle)+(kos_choices[i].historical?L" (recent)":L""));if(kos_choices[i].actor==ssc_kos::selected.actor)current=int(i);}if(names.empty()){kos_status=L"No public players available";dirty=true;}else open_dropdown(id,names,current);return;}
+    if(id==1603){bool ok=ssc_kos::commit();kos_status=ok?L"KOS list updated":L"Player changed or is anonymous; no change made";ssc_commands::reply(ok?"KOS list updated":"Player changed or is anonymous; no change made");dirty=true;return;}
+    if(id==1605){kos_handle_editing=true;edit_cursor.begin(kos_handle.size());dirty=true;return;}
+    if(id==1606||id==1607){kos_status=ssc_chat::widen(ssc_kos::manage_handle(kos_handle,id==1606?"add":"remove"));kos_handle_editing=false;dirty=true;return;}
+    if(id==1604){if(!ssc_kos::list.entries().empty()){auto account=ssc_kos::list.entries().back().account;ssc_kos::list.remove(account);ssc_kos::save();}dirty=true;return;}
+    if(id>=1620&&id<1625){size_t index=size_t(option_scroll[32]+id-1620);if(index<ssc_kos::list.entries().size()){auto account=ssc_kos::list.entries()[index].account;ssc_kos::list.remove(account);ssc_kos::save();}dirty=true;return;}
+    if(id==1705){command_sender_buffer=ssc_commands::sender_name;command_sender_editing=true;edit_cursor.begin(command_sender_buffer.size());dirty=true;return;}
+    if(id==1700){if(ssc_commands::attached)ssc_commands::router.enabled=!ssc_commands::router.enabled;ssc_commands::router.channel=ssc_commands::Channel::unchanged;save();return;}
+    if(id==1701){show_manager(33);return;}
+    if(id==1702){auto& p=ssc_commands::router.prefix;p=p=='!'?'/':p=='/'?'.':'!';save();return;}
+    if(id==1703){ssc_auto::copy_clipboard(game_window,ssc_planned::command_config());ssc_commands::reply("Command settings copied; edit aliases and paste to import");dirty=true;return;}
+    if(id==1704){bool ok=ssc_planned::import_commands(ssc_auto::read_clipboard(game_window,8192));ssc_commands::reply(ok?"Command settings imported":"Invalid command configuration");if(ok)save();dirty=true;return;}
+    if(id==1850){ssc_sound::pool_choice=ssc_sound::pool_page=0;show_manager(36);return;}
+    if(id==1851){ssc_sound::import_pool(game_window,match_sound_level);dirty=true;return;}
+    if(id==1852||id==1853){ssc_sound::remove_pool_clip(id==1853);dirty=true;return;}
+    if(id==1854){if(ssc_sound::preview_active)ssc_sound::stop_preview();else ssc_sound::preview_pool_clip();dirty=true;return;}
+    if(id==1855){show_manager(3);return;}
+    if(id==1858){if(ssc_sound::selection<ssc_sound::entries.size())ssc_sound::use_saved_pool(ssc_sound::entries[ssc_sound::selection]);dirty=true;return;}
+    if(id==1856||id==1857){if(id==1856){if(ssc_sound::pool_page)--ssc_sound::pool_page;}else if(ssc_sound::selection<ssc_sound::entries.size()&&(ssc_sound::pool_page+1)*6<ssc_sound::pool_count(ssc_sound::entries[ssc_sound::selection]))++ssc_sound::pool_page;ssc_sound::pool_choice=ssc_sound::pool_page*6;dirty=true;return;}
+    if(id>=1860&&id<1866){ssc_sound::pool_choice=ssc_sound::pool_page*6+size_t(id-1860);dirty=true;return;}
+    if(id==1800){if(ssc_planned_native::tts)ssc_chat_tts::settings.enabled=!ssc_chat_tts::settings.enabled;ssc_chat_tts::speech().configure(ssc_chat_tts::settings);save();return;}
+    if(id==1801){ssc_chat_tts::speech().start();show_manager(34);return;}
+    if(id==1802){ssc_chat_tts::speech().start();auto labels=speech_options(ssc_chat_tts::speech().voices(),ssc_piper::assets().snapshot().models);int current=0;for(size_t i=0;i<speech_choices.size();++i){const auto& choice=speech_choices[i];if(choice.backend==ssc_chat_tts::backend&&(choice.backend?choice.model==ssc_chat_tts::piper_voice:choice.index==ssc_chat_tts::voice_choice))current=int(i);}if(!labels.empty())open_dropdown(id,labels,current);return;}
+    if(id==1803){ssc_chat_tts::speech().preview();return;}
+    if(id==1804||id==1805){set_tts_percent(id,(id==1804?ssc_chat_tts::volume:ssc_chat_tts::speed_percent)+1);save();return;}
+    if(id==1806){ssc_chat_tts::settings.system=!ssc_chat_tts::settings.system;save();return;}
+    if(id==1807){ssc_chat_tts::settings.own=!ssc_chat_tts::settings.own;save();return;}
+    if(id==1808){ssc_chat_tts::settings.read_names=!ssc_chat_tts::settings.read_names;save();return;}
+    if(id==1810){show_manager(35);return;}
+    if(id==1811){ssc_chat_tts::backend=0;auto voices=ssc_chat_tts::speech().voices();auto it=std::find_if(voices.begin(),voices.end(),[](const auto& voice){return voice.label.find(L"David")!=std::wstring::npos;});if(it!=voices.end())ssc_chat_tts::voice_choice=int(it-voices.begin());ssc_chat_tts::speech().configure(ssc_chat_tts::settings);save();return;}
+    if(id==1812){auto assets=ssc_piper::assets().snapshot();auto model=std::find_if(assets.models.begin(),assets.models.end(),[](const auto& m){return m.id=="norman";});if(model==assets.models.end())ssc_piper::assets().start(1);else{ssc_chat_tts::backend=1;ssc_chat_tts::piper_voice="norman";ssc_chat_tts::piper_speaker=0;ssc_chat_tts::speech().configure(ssc_chat_tts::settings);save();}dirty=true;return;}
+    if(id==1813){ssc_piper::assets().cancel();dirty=true;return;}
+    if(id==1814){
+     if(!ssc_piper::assets().snapshot().ready){ssc_commands::reply("Download the optional engine before importing a Piper model");return;}
+     wchar_t path[32768]{};OPENFILENAMEW dialog{};dialog.lStructSize=sizeof(dialog);dialog.hwndOwner=game_window;dialog.lpstrFilter=L"Piper ONNX models\0*.onnx\0\0";dialog.lpstrFile=path;dialog.nMaxFile=32768;dialog.lpstrTitle=L"Import Piper model (matching .onnx.json required)";dialog.Flags=OFN_FILEMUSTEXIST|OFN_PATHMUSTEXIST|OFN_NOCHANGEDIR;
+     if(GetOpenFileNameW(&dialog))ssc_piper::assets().start(2,std::filesystem::path(path));
+     dirty=true;return;
+    }
+    if(id==1815){auto values=ssc_piper::assets().snapshot().models;if(!values.empty()){auto current=std::find_if(values.begin(),values.end(),[](const auto& v){return v.id==ssc_chat_tts::piper_voice;});size_t index=current==values.end()?0:(size_t(current-values.begin())+1)%values.size();ssc_chat_tts::piper_voice=values[index].id;ssc_chat_tts::piper_speaker=0;save();}dirty=true;return;}
+    if(id==1816){ssc_chat_tts::speech().clear();ssc_piper::assets().start(0);dirty=true;return;}
+    if(id==1817){auto models=ssc_piper::assets().snapshot().models;if(std::any_of(models.begin(),models.end(),[](const auto& v){return v.id==ssc_chat_tts::piper_voice;})){ssc_chat_tts::backend=1;ssc_chat_tts::speech().configure(ssc_chat_tts::settings);save();}return;}
+    if(id==1818){auto values=ssc_piper::assets().snapshot().models;auto model=std::find_if(values.begin(),values.end(),[](const auto& v){return v.id==ssc_chat_tts::piper_voice;});if(model!=values.end()){ssc_chat_tts::piper_speaker=(ssc_chat_tts::piper_speaker+1)%model->speakers;ssc_chat_tts::speech().configure(ssc_chat_tts::settings);save();}return;}
+    if(id==1821){show_manager(34);return;}
+    if(id==1819){ShellExecuteW(nullptr,L"open",ssc_piper::assets().models().c_str(),nullptr,nullptr,SW_SHOWNORMAL);return;}
+    if(id==1809){ssc_chat_tts::speech().clear();return;}
     if(id==3300){ShellExecuteW(nullptr,L"open",L"https://ssg.epiano7.dev/contribute",nullptr,nullptr,SW_SHOWNORMAL);return;}
     if(id==3301){if(!ssc_capture_upload::connect(ssc_auto::read_clipboard(game_window,128)))ssc_capture_upload::status=-1;dirty=true;return;}
     if(id==3302){if(!ssc_capture_upload::enabled.load()&&ssc_capture_upload::token().empty())ssc_capture_upload::status=-1;else ssc_capture_upload::enabled=!ssc_capture_upload::enabled.load();dirty=true;return;}
@@ -369,8 +470,9 @@ void activate(int id) {
     if(id>=1400&&id<1500&&size_t(id-1400)<postgame_graph_events.size()&&!postgame_imported){auto [round,step]=postgame_graph_events[size_t(id-1400)];postgame_round=round;postgame_build_step=step;postgame_skill_page=0;postgame_tab=1;dirty=true;return;}
 
     if(id==1125){ssc_review_online::requested=!ssc_review_online::requested;save();return;}
-    if(id==1300){const auto& rounds=postgame_imported?postgame_import_rounds:ssc_postgame_live::state.rounds;if(!rounds.empty()){int ri=std::clamp(postgame_round,0,int(rounds.size())-1);std::vector<nlohmann::json> builds;for(const auto& e:rounds[size_t(ri)]["events"])if(e.value("type",-1)==0)builds.push_back(e["build"]);if(!builds.empty()){int bi=postgame_build_step<0?int(builds.size())-1:std::clamp(postgame_build_step,0,int(builds.size())-1);auto code=ssc_review_share::encode(builds[size_t(bi)]);postgame_share_status=ssc_auto::copy_clipboard(game_window,code)?"Build code copied":"Could not copy this build";}}dirty=true;return;}
-    if(id==1301){auto build=ssc_review_share::decode(ssc_auto::read_clipboard(game_window,4096));if(build.is_null()){postgame_share_status="Clipboard does not contain a valid build code";dirty=true;return;}postgame_import_rounds={{{"round",1},{"duration_ms",0},{"events",nlohmann::json::array({{{"type",0},{"ms",0},{"build",build}}})}}};show_manager(29);postgame_imported=true;postgame_history_pending=false;postgame_history_error.clear();postgame_saved=false;postgame_tab=1;postgame_round=0;postgame_build_step=-1;postgame_share_status="Shared build / not a recorded match";dirty=true;return;}
+    if(ssc_challenge::blind()&&(id==1300||id==1003||id==1113))return;
+    if(id==1300){const auto& rounds=postgame_imported?postgame_import_rounds:ssc_postgame_live::state.rounds;auto analysis=postgame_imported?postgame_import_analysis:postgame_analysis_match==ssc_postgame_live::state.match_id?postgame_analysis:nlohmann::json(nullptr);auto code=ssc_review_share::encode_summary(rounds,analysis);postgame_share_status=code.empty()?"Could not encode this summary":ssc_auto::copy_clipboard(game_window,code)?"Full summary code copied":"Could not copy summary";dirty=true;return;}
+    if(id==1301){auto code=ssc_auto::read_clipboard(game_window,ssc_review_share::summary_code_limit);auto summary=ssc_review_share::decode_summary(code);auto build=summary.is_null()?ssc_review_share::decode(code):nlohmann::json(nullptr);if(summary.is_null()&&build.is_null()){postgame_share_status="Clipboard does not contain a valid summary/build code";dirty=true;return;}postgame_import_full=!summary.is_null();postgame_import_analysis=postgame_import_full?summary["analysis"]:nlohmann::json(nullptr);postgame_import_rounds=postgame_import_full?summary["rounds"].get<std::vector<nlohmann::json>>():std::vector<nlohmann::json>{{{"round",1},{"duration_ms",0},{"events",nlohmann::json::array({{{"type",0},{"ms",0},{"build",build}}})}}};show_manager(29);postgame_imported=true;postgame_history_pending=false;postgame_history_error.clear();postgame_saved=false;postgame_tab=postgame_import_full?0:1;postgame_round=0;postgame_build_step=-1;postgame_graph_revision=~0u;postgame_share_status=postgame_import_full?"Shared summary / supplied data":"Legacy build snapshot";dirty=true;return;}
     if(id==1290||id==1291){option_scroll[settings_page]=std::clamp(option_scroll[settings_page]+(id==1290?-1:1),0,option_limits[settings_page]);keyboard_focus=hovered=pressed=0;dirty=true;return;}
     if(id==1127){if(ssc_review_online::requested)ssc_review_online::client().submit(ssc_postgame_live::state.rounds);dirty=true;return;}
     if(id>=1120&&id<=1124){postgame_detail=id-1120;dirty=true;return;}
@@ -383,7 +485,7 @@ void activate(int id) {
     if(id==1110||id==1111){postgame_build_step=std::max(0,postgame_build_step+(id==1110?-1:1));postgame_skill_page=0;dirty=true;return;}
     if(id==1109&&!postgame_imported){postgame_tab=3;dirty=true;return;}
     if(id>=1100&&id<=1102&&(!postgame_imported||id==1101)){postgame_tab=id-1100;dirty=true;return;}
-    if(id==1103||id==1104){postgame_round=std::clamp(postgame_round+(id==1103?-1:1),0,std::max(0,int(ssc_postgame_live::state.rounds.size())-1));postgame_skill_page=0;postgame_build_step=-1;dirty=true;return;}
+    if(id==1103||id==1104){postgame_round=std::clamp(postgame_round+(id==1103?-1:1),0,std::max(0,int((postgame_imported?postgame_import_rounds:ssc_postgame_live::state.rounds).size())-1));postgame_skill_page=0;postgame_build_step=-1;dirty=true;return;}
     if(id==1105||id==1106){postgame_skill_page=std::clamp(postgame_skill_page+(id==1105?-1:1),0,8);dirty=true;return;}
     if(id==1107){postgame_binding=!postgame_binding;dirty=true;return;}
     if(id==1108){postgame_binding=false;postgame_hotkey=VK_F7;save();return;}
@@ -425,7 +527,7 @@ void activate(int id) {
     else if(id==584){auto_rule_editor=true;show_manager(16);}
     else if(id==581||id==582){std::vector<std::wstring> labels;for(int seconds=0;seconds<=60;++seconds)labels.push_back(seconds?std::to_wstring(seconds)+L" seconds":L"Off / immediate");open_dropdown(id,labels,id==581?ssc_auto::current().hold_seconds:ssc_auto::current().delay_seconds);}
     else if(id==583){ssc_auto::current().cancel_on_death=!ssc_auto::current().cancel_on_death;save();}
-    else if(id==1600){show_cosmetics_notice();}
+    else if(id==1971){show_cosmetics_notice();}
     else if(id==560){shared_notice.clear();show_manager(22);}
     else if(id==3400){ssc_privacy::respect=!ssc_privacy::respect.load();ssc_privacy::blocked();save();}
     else if(id==3402){ssc_privacy::resume_uploads();save();dirty=true;}
@@ -438,7 +540,7 @@ void activate(int id) {
     else if(id==1001){ssc_advisor::use_api=!ssc_advisor::use_api;save();}
     else if(id==1002){ssc_training::enabled=!ssc_training::enabled;save();}
     else if(id==998){if(ssc_advisor::attached){ssc_advisor::enabled=!ssc_advisor::enabled;save();}}
-    else if(id==1601){credits_popup=true;credits_page=0;dirty=true;}
+    else if(id==1970){credits_popup=true;credits_page=0;dirty=true;}
     else if(id==571){credits_popup=false;dirty=true;}
     else if(id==572){credits_page=std::max(0,credits_page-1);dirty=true;}
     else if(id==573){credits_page=std::min(2,credits_page+1);dirty=true;}
@@ -454,7 +556,7 @@ void activate(int id) {
     else if(id==490){edit_cursor.begin(ssc_lab::query.size());dirty=true;}
     else if(id==487){ssc_sound::toggle_variants();dirty=true;}
     else if(id==488){if(ssc_sound::selection<ssc_sound::entries.size()){auto v=ssc_sound::clip_volume(ssc_sound::entries[ssc_sound::selection]);open_dropdown(id,{L"0%",L"50%",L"75%",L"100%",L"125%",L"150%",L"200%",L"250%",L"300%"},v==0?0:v==50?1:v==75?2:v==100?3:v==125?4:v==150?5:v==200?6:v==250?7:8);}}
-    else if(id==489){ssc_sound::preview_custom(game_window);dirty=true;}
+    else if(id==489){if(ssc_sound::preview_active)ssc_sound::stop_preview();else ssc_sound::preview_custom(game_window);dirty=true;}
     else if(id==480){show_manager(17);}
     else if(id==967){ssc_freecam::hide_shadows=!ssc_freecam::hide_shadows;save();}
     else if(id==966){ssc_freecam::hide_diagnostics=!ssc_freecam::hide_diagnostics;save();}
@@ -514,6 +616,13 @@ void activate(int id) {
     else if(id==160){if(!presence_supported||rpc_preview.phase!=2)ssc_update::check(state_dir);dirty=true;}
     else if(id==161){if(!presence_supported||rpc_preview.phase==1)ssc_update::apply();dirty=true;}
     else if(id==283){if(ssc_update::valid_version(ssc_update::version)){ssc_update::ignored_version=ssc_update::version;save();}close_menu();}
+    else if(id==1500){show_manager(31);}
+    else if(id==1501){ssc_names::animation.motion=ssc_cosmetic_animation::Motion((int(ssc_names::animation.motion)+1)%3);save();}
+    else if(id==1502){auto& speed=ssc_names::animation.speed_percent;speed=speed>=200?50:std::min(200,((speed/50)+1)*50);save();}
+    else if(id==1503){ssc_names::animation.breathing=!ssc_names::animation.breathing;save();}
+    else if(id==1504){auto& value=ssc_names::animation.minimum_percent;value=value<55?55:value<80?80:25;save();}
+    else if(id==1505){auto& value=ssc_names::animation.period_seconds;value=value<4?4:value<6?6:2;save();}
+    else if(id==1506){ssc_names::animation={};save();}
     else if(id==540){ssc_names::gradient=true;color_editing=false;save();}
     else if(id==541||id==542){ssc_names::gradient_count=id==541?2:3;color_editing=false;save();}
     else if(id>=546&&id<=548){if(color_editing)activate(189);cosmetic_stop=id-546;wchar_t value[8];swprintf(value,8,L"%06X",ssc_names::gradient_colors[cosmetic_stop]);color_buffer=value;color_editing=true;edit_cursor.begin(color_buffer.size());dirty=true;}
@@ -533,14 +642,14 @@ void activate(int id) {
     else if(id==105){ssc_sound::preview_original();dirty=true;}
     else if(id==1)close_menu();
     else if(id==3)show_manager();
-    else if(id==4){ssc_capture_upload::enabled=false;ssc_dark_flash::enabled=false;ssc_vehicle::enabled=false;ssc_freecam::stop();ssc_creator::hide_crosshair=false;ssc_geri::enabled=false;ssc_auth::service().enable(false);ssc_auto::enabled=false;ssc_auto::engine.reset();ssc_chat::enabled=false;ssc_hud::enabled=false;sound_requested=false;cosmetic_requested=false;rpc_requested=false;clock_enabled=false;save();}
+    else if(id==4){ssc_challenge::stop();ssc_kos::enabled=false;ssc_commands::router.enabled=false;ssc_commands::router.channel=ssc_commands::Channel::unchanged;ssc_chat_tts::settings.enabled=false;ssc_chat_tts::speech().configure(ssc_chat_tts::settings);ssc_capture_upload::enabled=false;ssc_dark_flash::enabled=false;ssc_vehicle::enabled=false;ssc_freecam::stop();ssc_creator::hide_crosshair=false;ssc_geri::enabled=false;ssc_auth::service().enable(false);ssc_auto::enabled=false;ssc_auto::engine.reset();ssc_chat::enabled=false;ssc_hud::enabled=false;sound_requested=false;ssc_sound::set_enabled(false);cosmetic_requested=false;rpc_requested=false;clock_enabled=false;save();}
     else if(id==5)show_quick();
     else if(id>=10&&id<=12){show_manager(id==10?-1:id-10);}
     else if(id==40){animations=!animations;visibility=opened?1.f:0.f;modal_visibility=opened&&manager?1.f:0.f;save();}
     else if(id==41&&developer_tools){clock_enabled=!clock_enabled;save();}
     else if(id>=50&&id<=52){ui_scale=id==50?85:id==51?100:115;save();}
     else if(id==54){ui_scale=100;save();}
-    else if(id==80){sound_requested=!sound_requested;save();}
+    else if(id==80){sound_requested=!sound_requested;ssc_sound::set_enabled(sound_requested);ssc_sound::status=sound_requested?L"Sound replacements enabled; restart if newly configured":L"Sound replacements off";save();}
     else if(id==81){cosmetic_requested=!cosmetic_requested;save();}
     else if(id==82){match_sound_level=!match_sound_level;save();}
     else if(id==86){ssc_hud::enabled=!ssc_hud::enabled;save();}
@@ -553,7 +662,7 @@ void activate(int id) {
     else if(id==191){show_manager(6);}
     else if(id==997){settings_page=28;}
     else if(id==998){if(ssc_advisor::attached){ssc_advisor::enabled=!ssc_advisor::enabled;save();}}
-    else if(id==570){if(ssc_geri::attached){ssc_geri::enabled=!ssc_geri::enabled.load();save();}}
+    else if(id==570){if(ssc_geri::attached){ssc_geri::enabled=!ssc_geri::enabled.load();if(ssc_geri::enabled){ssc_challenge::random.enabled=false;ssc_challenge::picker.reset();}save();}}
     else if(id==193){ssc_cooldown::settings.enabled=!ssc_cooldown::settings.enabled;ssc_cooldown::tracker.clear();save();}
     else if(id>=197&&id<=199){ssc_cooldown::settings.duration_ms=id==197?1000:id==198?1500:2500;save();}
     else if(id==1201){show_manager(30);}
@@ -567,6 +676,7 @@ void activate(int id) {
     else if(id==270){recording_requested=!recording_requested;if(recording_requested)ssc_record::start(state_dir/L"recordings");else ssc_record::stop();save();}
     else if(id==271){ShellExecuteW(nullptr,L"open",(state_dir/L"recordings").c_str(),nullptr,nullptr,SW_SHOWNORMAL);}
     else if(id==1003){postgame_imported=false;if(presence_supported&&rpc_preview.phase==1&&ssc_postgame_live::state.rounds.empty()){activate(1113);}else if((presence_supported&&rpc_preview.phase==1)||ssc_postgame_live::state.eligible){show_manager(29);opened=true;postgame_history_error.clear();postgame_round=std::max(0,int(ssc_postgame_live::state.rounds.size())-1);}}
+    else if(id>=1870&&id<=1872){module_filter=id-1870;option_scroll[-1]=0;dirty=true;}
     else if(id==600){statistics_round=0;statistics_select_latest=true;show_manager(20);ssc_stats::refresh(state_dir/L"recordings");}
     else if(id==601){statistics_round=0;statistics_select_latest=true;ssc_stats::refresh(state_dir/L"recordings");dirty=true;}
     else if(id==602){std::vector<std::wstring> choices;for(auto name:ssc_stats::classes)choices.push_back(ssc_chat::widen(name));open_dropdown(602,choices,statistics_class);}
@@ -574,6 +684,7 @@ void activate(int id) {
     else if(id==608){show_manager(21);}
     else if(id==609){show_manager(20);}
     else if(id==610){auto report=ssc_stats::snapshot();auto runs=ssc_stats::runs(*report,statistics_class);std::vector<std::wstring> names;for(size_t i=0;i<runs.size();++i)names.push_back(L"Run "+std::to_wstring(i+1)+(i==0?L" (latest) - ":L" - ")+ssc_stats::local_date(runs[i].started_utc_ms));if(!names.empty())open_dropdown(610,names,statistics_round);}
+    else if(id==612){statistics_all_runs=!statistics_all_runs;dirty=true;}
     else if(id==611){open_dropdown(611,{L"Light grid",L"Standard grid",L"Detailed grid"},(statistics_intervals-4)/2);}
     else if(id>=605&&id<=607){statistics_metric=id-605;dirty=true;}
     else if(id==260){if(ssc_lab::duel_playing)ssc_lab::duel_playing=false;else ssc_lab::start_duel();dirty=true;}
@@ -609,8 +720,8 @@ void activate(int id) {
     else if(id>=91&&id<=93){int page=id==91?3:id==92?4:5;show_manager(page);}
     else if(id==100){if(sound_page>=5)sound_page-=5;dirty=true;}
     else if(id==101){if(sound_page+5<sound_results.size())sound_page+=5;dirty=true;}
-    else if(id==102){ssc_sound::import_selected(game_window,match_sound_level);if(IsWindow(game_window)&&GetForegroundWindow()==game_window){opened=true;manager=true;settings_page=3;visibility=1.f;modal_visibility=1.f;}dirty=true;}
-    else if(id==103){ssc_sound::remove_selected();dirty=true;}
+    else if(id==102){if(ssc_sound::selection<ssc_sound::entries.size()&&(ssc_sound::shared_category(ssc_sound::entries[ssc_sound::selection])||ssc_sound::pool_count(ssc_sound::entries[ssc_sound::selection])))ssc_sound::import_pool(game_window,match_sound_level);else ssc_sound::import_selected(game_window,match_sound_level);if(IsWindow(game_window)&&GetForegroundWindow()==game_window){opened=true;manager=true;settings_page=3;visibility=1.f;modal_visibility=1.f;}dirty=true;}
+    else if(id==103){if(ssc_sound::selection<ssc_sound::entries.size()&&(ssc_sound::shared_category(ssc_sound::entries[ssc_sound::selection])||(ssc_sound::entries[ssc_sound::selection].music&&ssc_sound::pool_count(ssc_sound::entries[ssc_sound::selection]))))ssc_sound::restore_category();else ssc_sound::remove_selected();dirty=true;}
     else if(id==104){sound_search_editing=true;edit_cursor.begin(sound_query.size());dirty=true;}
     else if(id>=110&&id<115){size_t index=sound_page+id-110;if(index<sound_results.size())ssc_sound::selection=sound_results[index];dirty=true;}
 
@@ -637,9 +748,11 @@ template<class S,class Accept> bool edit_input(S& value,UINT message,WPARAM wp,s
  return false;
 }
 bool postgame_shortcut_available(){
+    if(ssc_challenge::blind())return false;
     return postgame_visible()||(ssc_postgame_live::state.eligible&&!ssc_postgame_live::state.rounds.empty())||(presence_supported&&rpc_preview.phase==1);
 }
 void toggle_postgame_shortcut(){
+    if(ssc_challenge::blind())return;
     if(postgame_visible()){close_menu(true);return;}
     if(presence_supported&&rpc_preview.phase==1&&ssc_postgame_live::state.rounds.empty()){
         // Open immediately; disk history and API results never gate the window.
@@ -670,7 +783,27 @@ void refresh_postgame_history(){
         postgame_saved=true;if(ssc_review_online::requested)ssc_review_online::client().load(ssc_postgame_live::state.match_id);
     }dirty=true;
 }
+bool kos_context_tab_release=false;
+std::string local_command(const std::string& action,const std::string& argument){
+ if(action=="summary"){toggle_postgame_shortcut();return "Match summary";}
+ if(action=="record")return recording_requested?"Recording is on":"Recording is off";
+ if(action=="tts"){
+  auto split=argument.find(' ');auto verb=ssc_kos::canonical(argument.substr(0,split));auto rest=split==std::string::npos?std::string{}:argument.substr(split+1);auto first=rest.find_first_not_of(" \t");rest=first==std::string::npos?std::string{}:rest.substr(first);
+  if(verb=="mute"||verb=="unmute"||verb=="volume")return local_command(verb,rest);
+  if(verb=="mutelist"){auto names=ssc_chat_tts::speech().muted();std::string out="Muted for TTS:";if(names.empty())return "No speakers muted for TTS";for(const auto& name:names)out+="\n"+name;return out;}
+  if(verb=="on"&&ssc_planned_native::tts)ssc_chat_tts::settings.enabled=true;else if(verb=="off")ssc_chat_tts::settings.enabled=false;else return "Use /tts on|off|mute NAME|unmute NAME|mutelist|volume 0-200";
+  ssc_chat_tts::speech().configure(ssc_chat_tts::settings);save();return ssc_chat_tts::settings.enabled?"Chat speech on":"Chat speech off";
+ }
+ if(action=="volume"){if(argument.empty()||argument.size()>3||argument.find_first_not_of("0123456789")!=std::string::npos)return "Use /tts volume 0 to 200";int n=std::stoi(argument);if(n>200)return "Use volume 0 to 200";ssc_chat_tts::volume=n;save();return "Speech volume "+std::to_string(n);}
+ if(action=="mute"||action=="unmute"){if(!ssc_kos::valid_text(argument,128))return "Use /tts mute NAME or /tts unmute NAME";ssc_chat_tts::speech().mute(argument,action=="mute");return action=="mute"?"Muted for local chat speech":"Unmuted for local chat speech";}
+ if(action=="kos"){if(argument.empty()){opened=true;show_manager(32);return "KOS list";}if(argument=="list"){std::string out="KOS list:";for(const auto& e:ssc_kos::list.entries())out+="\n"+e.handle;return out;}auto split=argument.find(' ');auto verb=ssc_kos::canonical(argument.substr(0,split));if(verb=="add"||verb=="remove"){if(split==std::string::npos)return "Use /kos add HANDLE or /kos remove HANDLE";return ssc_kos::manage_handle(argument.substr(split+1),verb);}return ssc_kos::manage_handle(argument);}
+ return "Unknown local action";
+}
 LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
+    if(ssc_commands::slash_input(message,wp,lp,opened||visibility>0.f||ssc_hud::editing||ssc_freecam::state.active||((message==WM_KEYDOWN||message==WM_KEYUP)&&int(wp)==menu_hotkey)))return 0;
+
+
+    if(message==WM_KEYUP&&wp==VK_TAB&&kos_context_tab_release){kos_context_tab_release=false;return CallWindowProcW(previous_proc,window,message,wp,lp);}
     const int report_key=physical_menu_key(wp,lp);
     const bool report_down=message==WM_KEYDOWN||message==WM_SYSKEYDOWN;
     const bool report_up=message==WM_KEYUP||message==WM_SYSKEYUP;
@@ -694,7 +827,8 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     if(message==WM_SETFOCUS||(message==WM_ACTIVATEAPP&&wp))ssc_freecam::resume_focus();
     if(message==WM_DESTROY)ssc_freecam::lose_focus();
     if(message==WM_POWERBROADCAST&&(wp==PBT_APMSUSPEND||wp==PBT_APMRESUMEAUTOMATIC||wp==PBT_APMRESUMESUSPEND||wp==PBT_APMRESUMECRITICAL)){ssc_freecam::lose_focus();ssc_beta::service().invalidate();ssc_auth::service().invalidate();dirty=true;}
-    if(message==WM_DESTROY){ssc_beta::service().stop();ssc_auth::service().stop();}
+    if(message==WM_DESTROY){ssc_chat_tts::speech().stop();ssc_piper::assets().stop();ssc_beta::service().stop();ssc_auth::service().stop();}
+    if(opened&&!manager&&quick_count()>7&&message==WM_MOUSEWHEEL){quick_scroll=std::clamp(quick_scroll-GET_WHEEL_DELTA_WPARAM(wp)/WHEEL_DELTA,0,quick_count()-7);dirty=true;return 0;}
     if(opened&&manager&&option_limits.count(settings_page)&&message==WM_MOUSEWHEEL){POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(window,&p);float x=(p.x-panel_x)/draw_scale,y=(p.y-panel_y)/draw_scale;if(x>=260&&x<=1100&&y>=155&&y<=640){option_scroll[settings_page]=std::clamp(option_scroll[settings_page]-GET_WHEEL_DELTA_WPARAM(wp)/WHEEL_DELTA,0,option_limits[settings_page]);keyboard_focus=hovered=pressed=0;dirty=true;return 0;}}
     if(opened&&dropdown>=0){if(message==WM_MOUSEWHEEL){dropdown_choice=std::clamp(dropdown_choice-GET_WHEEL_DELTA_WPARAM(wp)/WHEEL_DELTA,0,int(dropdown_items.size())-1);dirty=true;return 0;}if(message==WM_KEYDOWN){if(wp==VK_ESCAPE){dropdown=-1;dirty=true;suppress_escape_up=true;return 0;}if(wp==VK_UP||wp==VK_DOWN||wp==VK_TAB){dropdown_choice=std::clamp(dropdown_choice+(wp==VK_UP?-1:1),0,int(dropdown_items.size())-1);dirty=true;return 0;}if(wp==VK_RETURN){select_dropdown(dropdown_choice);return 0;}}if(message==WM_LBUTTONDOWN&&hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp))==0){dropdown=-1;pressed=0;dirty=true;return 0;}}
 
@@ -740,7 +874,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     if(message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wp)){
         // Keep the current panel and unfinished text edits across Alt+Tab,
         // but release gestures whose mouse/key-up may go to another app.
-        finish_scale();finish_lab_slider();finish_hud_drag();if(picker_drag){picker_drag=0;save();}ReleaseCapture();pressed=hovered=0;
+        finish_scale();finish_lab_slider();finish_tts_slider();finish_hud_drag();if(picker_drag){picker_drag=0;save();}ReleaseCapture();pressed=hovered=0;
         suppress_escape_up=false;dirty=true;
         return CallWindowProcW(previous_proc,window,message,wp,lp);
     }
@@ -750,7 +884,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         if(message==WM_KEYDOWN&&wp==VK_ESCAPE){close_color_picker(true);suppress_escape_up=true;return 0;}
         if(message==WM_KEYDOWN&&wp==VK_RETURN){close_color_picker();return 0;}
         if(message==WM_KEYDOWN&&wp==VK_TAB){picker_editing=false;keyboard_focus=keyboard_focus==557?558:keyboard_focus==558?556:keyboard_focus==556?553:keyboard_focus==553?554:557;if(keyboard_focus==556){picker_editing=true;edit_cursor.begin(picker_hex.size());}dirty=true;return 0;}
-        if(picker_editing&&edit_input(picker_hex,message,wp,7,[](unsigned c){return c=='#'||(c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F');},window)){unsigned value;if(ssc_color::parse(picker_hex,value)){picker_value()=value;picker_hsv.set(value);ssc_names::gradient=color_popup>=0;if(color_popup<0)ssc_names::rainbow=false;}return 0;}
+        if(picker_editing&&edit_input(picker_hex,message,wp,7,[](unsigned c){return c=='#'||(c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F');},window)){unsigned value;if(ssc_color::parse(picker_hex,value)){picker_value()=value;picker_hsv.set(value);if(color_popup>=-1){ssc_names::gradient=color_popup>=0;if(color_popup<0)ssc_names::rainbow=false;}}return 0;}
         if(message==WM_KEYDOWN&&(keyboard_focus==557||keyboard_focus==558)&&(wp==VK_LEFT||wp==VK_RIGHT||wp==VK_UP||wp==VK_DOWN)){float step=(wp==VK_LEFT||wp==VK_DOWN)?-.01f:.01f;if(keyboard_focus==558)picker_hsv.h=unit(picker_hsv.h+step);else if(wp==VK_UP||wp==VK_DOWN)picker_hsv.v=unit(picker_hsv.v+step);else picker_hsv.s=unit(picker_hsv.s+step);picker_apply();return 0;}
         if(message==WM_KEYDOWN&&wp==VK_SPACE){if(keyboard_focus==553||keyboard_focus==554)activate(keyboard_focus);return 0;}
         if(message==WM_LBUTTONDOWN){int id=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));pressed=id;keyboard_focus=id;picker_editing=id==556;if(id==557||id==558){picker_drag=id==557?1:2;move_color_picker(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));SetCapture(window);}else if(id==556){edit_cursor.begin(picker_hex.size());place_caret(id,GET_X_LPARAM(lp));}dirty=true;return 0;}
@@ -775,6 +909,16 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         if((message>=WM_KEYFIRST&&message<=WM_KEYLAST)||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;
         if(message==WM_INPUT){ssc_freecam::raw_motion(lp);return DefWindowProcW(window,message,wp,lp);}
     }
+    if(opened&&manager&&settings_page==33&&command_sender_editing){
+        if(message==WM_KEYDOWN&&(wp==VK_ESCAPE||wp==VK_RETURN||wp==VK_TAB)){if(wp!=VK_ESCAPE&&ssc_kos::valid_text(command_sender_buffer,32))ssc_commands::sender_name=command_sender_buffer;command_sender_editing=false;save();dirty=true;if(wp==VK_ESCAPE)suppress_escape_up=true;return 0;}
+        if(edit_input(command_sender_buffer,message,wp,32,[](unsigned c){return c>=32&&c<127;},window))return 0;
+    }
+    if(opened&&manager&&settings_page==32&&kos_handle_editing){
+        if(message==WM_KEYDOWN&&wp==VK_ESCAPE){kos_handle_editing=false;suppress_escape_up=true;dirty=true;return 0;}
+        if(message==WM_KEYDOWN&&wp==VK_RETURN){activate(1606);return 0;}
+        if(message==WM_KEYDOWN&&wp==VK_TAB){kos_handle_editing=false;keyboard_focus=1606;dirty=true;return 0;}
+        if(edit_input(kos_handle,message,wp,64,[](unsigned c){return c>=32&&c<127;},window))return 0;
+    }
     if(opened||visibility>0.f) {
         if(opened&&credits_popup&&message==WM_KEYDOWN&&wp==VK_ESCAPE){credits_popup=false;dirty=true;suppress_escape_up=true;return 0;}
         if(opened&&manager&&settings_page==18&&private_label_editing&&ssc_names::private_visible()){
@@ -795,7 +939,14 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         if(opened&&manager&&(settings_page==15||settings_page==16)&&chat_editing){
             if(message==WM_KEYDOWN&&wp==VK_ESCAPE){chat_editing=false;dirty=true;suppress_escape_up=true;return 0;}
             if(message==WM_KEYDOWN&&wp==VK_RETURN){activate(321);return 0;}
-            if(edit_input(chat_buffer,message,wp,chat_field==1&&settings_page==16?32:100,[](unsigned c){return c>=32&&c<=126;},window))return 0;
+            if(edit_input(chat_buffer,message,wp,settings_page==15?ssc_chat::max_custom_send_length:chat_field==1?32:100,[](unsigned c){return c>=32&&c<=126;},window))return 0;
+        }
+        if(opened&&manager&&settings_page==34){
+            if(message==WM_LBUTTONDOWN){int id=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));if(id==1804||id==1805){keyboard_focus=id;tts_drag=id;move_tts_slider(GET_X_LPARAM(lp));SetCapture(window);return 0;}}
+            if(message==WM_MOUSEMOVE&&tts_drag){move_tts_slider(GET_X_LPARAM(lp));return 0;}
+            if(message==WM_LBUTTONUP&&tts_drag){move_tts_slider(GET_X_LPARAM(lp));finish_tts_slider();ReleaseCapture();return 0;}
+            if(message==WM_CAPTURECHANGED)finish_tts_slider();
+            if(message==WM_KEYDOWN&&(keyboard_focus==1804||keyboard_focus==1805)&&(wp==VK_LEFT||wp==VK_RIGHT||wp==VK_UP||wp==VK_DOWN||wp==VK_HOME||wp==VK_END)){int id=keyboard_focus,low=id==1804?0:50,current=id==1804?ssc_chat_tts::volume:ssc_chat_tts::speed_percent;set_tts_percent(id,wp==VK_HOME?low:wp==VK_END?200:current+((wp==VK_RIGHT||wp==VK_UP)?1:-1));save();return 0;}
         }
         if(opened&&manager&&settings_page==24){
             auto move_speed=[&](int x){ssc_freecam::selected_speed()=float(std::lround(30+(ssc_freecam::speed_limit()-30)*std::clamp(((x-panel_x)/draw_scale-560)/460.f,0.f,1.f)));dirty=true;};
@@ -830,8 +981,8 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         if(opened&&manager&&settings_page==1){
             if(message==WM_LBUTTONDOWN&&hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp))==53){keyboard_focus=53;scale_dragging=true;scale_drag_left=panel_x+282*draw_scale;scale_drag_width=650*draw_scale;scale_preview=ui_scale;move_scale(GET_X_LPARAM(lp));SetCapture(window);return 0;}
             if(message==WM_MOUSEMOVE&&scale_dragging){move_scale(GET_X_LPARAM(lp));return 0;}
-            if(message==WM_LBUTTONUP&&scale_dragging){move_scale(GET_X_LPARAM(lp));finish_scale();finish_lab_slider();ReleaseCapture();return 0;}
-            if(message==WM_CAPTURECHANGED){finish_scale();finish_lab_slider();}
+            if(message==WM_LBUTTONUP&&scale_dragging){move_scale(GET_X_LPARAM(lp));finish_scale();finish_lab_slider();finish_tts_slider();ReleaseCapture();return 0;}
+            if(message==WM_CAPTURECHANGED){finish_scale();finish_lab_slider();finish_tts_slider();}
             if(message==WM_KEYDOWN&&keyboard_focus==53&&(wp==VK_LEFT||wp==VK_RIGHT||wp==VK_HOME||wp==VK_END)){ui_scale=wp==VK_HOME?50:wp==VK_END?200:std::clamp(ui_scale+(wp==VK_RIGHT?1:-1),50,200);save();return 0;}
         }
         if(opened&&color_editing&&manager&&settings_page==18){
@@ -855,7 +1006,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
             if(edit_input(sound_query,message,wp,48,[](unsigned c){return c>=32&&c<127;},window)){filter_sounds();return 0;}
         }
         if(message==WM_SETCURSOR){SetCursor(LoadCursor(nullptr,IDC_ARROW));return TRUE;}
-        if(message==WM_KEYDOWN&&wp==VK_ESCAPE){finish_hud_drag();ReleaseCapture();suppress_escape_up=true;if(manager&&opened&&(settings_page==8||settings_page==14)){close_menu();}else if(manager&&opened&&settings_page>=0){settings_page=-1;dirty=true;controls.clear();}else if(manager&&opened)show_quick();else close_menu();return 0;}
+        if(message==WM_KEYDOWN&&wp==VK_ESCAPE){finish_hud_drag();ReleaseCapture();suppress_escape_up=true;if(manager&&opened&&(settings_page==8||settings_page==14)){close_menu();}else if(manager&&opened&&settings_page>=0){show_manager(parent_page(settings_page));}else if(manager&&opened)show_quick();else close_menu();return 0;}
         if(opened&&message==WM_KEYDOWN&&wp==VK_TAB&&!(lp&(1LL<<30))) {
             std::vector<int> ids;for(auto& c:controls)if(c.enabled)ids.push_back(c.id);
             auto it=std::find(ids.begin(),ids.end(),keyboard_focus);int n=int(ids.size());
@@ -877,7 +1028,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         if((message>=WM_KEYFIRST&&message<=WM_KEYLAST)||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;
         if(message==WM_INPUT){ssc_freecam::raw_motion(lp);return DefWindowProcW(window,message,wp,lp);}
     }
-    if(message==WM_NCDESTROY){opened=false;visibility=0;game_window=nullptr;}
+    if(message==WM_NCDESTROY){ssc_sound::stop_preview();opened=false;visibility=0;game_window=nullptr;}
     return CallWindowProcW(previous_proc,window,message,wp,lp);
 }
 
@@ -1013,7 +1164,7 @@ void text(int x,int y,const wchar_t* value,COLORREF color=ink,bool title=false,i
     const unsigned char rgb[]={GetBValue(color),GetGValue(color),GetRValue(color)};
     const float n=float(lstrlenW(value));
     for(const auto& g:mask.glyphs){
-        std::array<float,3> left{},right{};if(rainbow_phase>=0){left=!cosmetics_popup&&settings_page==4&&ssc_names::gradient?ssc_names::gradient_rgb(float(g.index)/n+rainbow_phase):rainbow_rgb(float(g.index)/n+rainbow_phase,.2f);right=!cosmetics_popup&&settings_page==4&&ssc_names::gradient?ssc_names::gradient_rgb((float(g.index)+.75f)/n+rainbow_phase):rainbow_rgb((float(g.index)+.75f)/n+rainbow_phase,.1f);}
+        std::array<float,3> left{},right{};if(rainbow_phase>=0){left=!cosmetics_popup&&(settings_page==4||settings_page==31)&&ssc_names::gradient?ssc_names::gradient_rgb(float(g.index)/n+rainbow_phase):rainbow_rgb(float(g.index)/n+rainbow_phase,.2f);right=!cosmetics_popup&&(settings_page==4||settings_page==31)&&ssc_names::gradient?ssc_names::gradient_rgb((float(g.index)+.75f)/n+rainbow_phase):rainbow_rgb((float(g.index)+.75f)/n+rainbow_phase,.1f);if(!cosmetics_popup&&(settings_page==4||settings_page==31)){const float factor=ssc_names::local_brightness();for(auto& c:left)c*=factor;for(auto& c:right)c*=factor;}}
         size_t i=0;
         for(int dy=g.y;dy<g.y+g.h;++dy)for(int dx=g.x;dx<g.x+g.w;++dx){
             const float a=g.alpha[i++];auto pixel=dest+(dy*raster_w+dx)*4;
@@ -1094,6 +1245,33 @@ void wheel_preview(){
 std::wstring statistics_whole(double value){wchar_t buffer[64];swprintf(buffer,64,L"%.0f",value);return buffer;}
 std::wstring statistics_clock(double ms){auto signed_seconds=int64_t(std::ceil(ms/1000));auto seconds=uint64_t(std::abs(signed_seconds));wchar_t buffer[64];swprintf(buffer,64,L"%ls%llu:%02llu",signed_seconds<0?L"-":L"",seconds/60,seconds%60);return buffer;}
 
+
+void paint_statistics_comparison(std::shared_ptr<const ssc_stats::Report> report){
+ ssc_stats::request_comparison(report,statistics_class,statistics_metric);auto result=std::atomic_load(&ssc_stats::comparison_result);
+ if(!result||result->report!=report||result->filter!=statistics_class||result->metric!=statistics_metric){text(112,340,L"Preparing full-run comparison...",muted,false,16);return;}
+ const auto& chart=result->chart;if(!chart.eligible){text(112,340,L"No complete three-round runs for this class.",muted,false,16);return;}
+ constexpr int left=112,top=306,width=1280,height=448,bottom=top+height;const double column=double(width)/3;
+ double maximum=1;for(const auto& r:chart.rounds)for(const auto& trace:r.traces)for(auto p:trace)if(std::isfinite(p.second))maximum=std::max(maximum,p.second);
+ for(const auto& r:chart.rounds)for(const auto& p:r.points){if(p.median)maximum=std::max(maximum,*p.median);if(p.mean)maximum=std::max(maximum,*p.mean);}
+ double step=ssc_stats::axis_step(maximum,statistics_intervals);maximum=std::ceil(maximum/step)*step;rectangle(left,top,width,height,RGB(16,37,62));
+ auto line=[&](int x,int y,int x2,int y2,COLORREF color,int weight=1){auto pen=CreatePen(PS_SOLID,weight,color);auto old=SelectObject(canvas,pen);MoveToEx(canvas,x,y,nullptr);LineTo(canvas,x2,y2);SelectObject(canvas,old);DeleteObject(pen);};
+ for(double v=0;v<=maximum+.01;v+=step){int y=bottom-int(height*v/maximum);line(left,y,left+width,y,RGB(41,64,88));text(24,y-6,statistics_whole(v).c_str(),muted,false,11);}
+ auto info=std::to_wstring(chart.eligible)+L" full runs   /   "+std::to_wstring(chart.excluded)+L" excluded";text(820,120,info.c_str(),muted,false,11);
+ text(500,120,L"RUNS",RGB(86,115,151),false,12);text(578,120,L"MEDIAN",cyan,false,12);text(688,120,L"MEAN",RGB(240,207,123),false,12);
+ std::wstring detail;
+ for(size_t rn=0;rn<3;++rn){const auto& r=chart.rounds[rn];int x0=left+int(column*rn);line(x0,top,x0,bottom,RGB(41,64,88));text(x0+10,top-30,(L"ROUND "+std::to_wstring(rn+1)).c_str(),ink,false,14);
+  auto X=[&](double ms){return x0+int(column*std::clamp(ms/r.end,0.0,1.0));};auto Y=[&](double v){return bottom-int(height*v/maximum);};
+  auto pen=CreatePen(PS_SOLID,1,RGB(57,82,113));auto old=SelectObject(canvas,pen);
+  for(const auto& trace:r.traces){bool previous=false;for(auto p:trace){if(!std::isfinite(p.second)){previous=false;continue;}int x=X(p.first),y=Y(p.second);if(previous)LineTo(canvas,x,y);else MoveToEx(canvas,x,y,nullptr);previous=true;}}
+  SelectObject(canvas,old);DeleteObject(pen);
+  for(int kind=0;kind<2;++kind){pen=CreatePen(PS_SOLID,kind?1:3,kind?RGB(240,207,123):cyan);old=SelectObject(canvas,pen);bool previous=false;for(const auto& p:r.points){auto value=kind?p.mean:p.median;if(!value){previous=false;continue;}int x=X(p.ms),y=Y(*value);if(previous)LineTo(canvas,x,y);else MoveToEx(canvas,x,y,nullptr);previous=true;}SelectObject(canvas,old);DeleteObject(pen);}
+  text(x0+5,bottom+14,statistics_clock(r.axis.label(0)).c_str(),muted,false,11);auto end=statistics_clock(r.axis.label(r.end));text(x0+int(column)-8-text_width(end.c_str(),11),bottom+14,end.c_str(),muted,false,11);
+  if(!r.axis.countdown())text(x0+10,bottom+38,L"Elapsed (mixed or unavailable clocks)",muted,false,10);
+  if(statistics_mouse_x>=x0&&statistics_mouse_x<x0+column&&statistics_mouse_y>=top&&statistics_mouse_y<=bottom){const auto& p=r.points[size_t(std::clamp(int(std::lround((statistics_mouse_x-x0)*64/column)),0,64))];if(p.median&&p.mean)detail=L"R"+std::to_wstring(rn+1)+L"  "+statistics_clock(r.axis.label(p.ms))+L"   Median "+statistics_whole(*p.median)+L"   Mean "+statistics_whole(*p.mean)+L"   n="+std::to_wstring(p.count);}
+ }
+ text(112,810,detail.empty()?L"Local recordings only. API peer references are in Match Summary.":detail.c_str(),cyan,false,13);
+}
+
 void paint_statistics_graph(){
     text(32,111,L"RUN GRAPHS",ink,true);
     button(609,1140,108,268,38,L"< STATISTICS");
@@ -1103,11 +1281,13 @@ void paint_statistics_graph(){
     if(runs.empty()){text(40,280,report->error.empty()?L"No recorded runs for this class.":ssc_chat::widen(report->error).c_str(),muted);return;}
     statistics_round=std::clamp(statistics_round,0,int(runs.size())-1);const auto& run=runs[size_t(statistics_round)];
     auto label=L"Run "+std::to_wstring(statistics_round+1)+L" / "+std::to_wstring(runs.size())+(statistics_round==0?L" (latest) - ":L" - ")+ssc_stats::local_date(run.started_utc_ms);
-    button(603,318,162,46,38,L"<",false,statistics_round>0);
-    button(610,374,162,790,38,label.c_str());
-    button(604,1174,162,46,38,L">",false,statistics_round+1<int(runs.size()));
+    button(603,318,162,46,38,L"<",false,!statistics_all_runs&&statistics_round>0);
+    button(610,374,162,790,38,statistics_all_runs?L"ALL ELIGIBLE FULL RUNS":label.c_str(),false,!statistics_all_runs);
+    button(604,1174,162,46,38,L">",false,!statistics_all_runs&&statistics_round+1<int(runs.size()));
     const wchar_t* labels[]={L"LEVEL",L"XP",L"CASH"};for(int i=0;i<3;++i)button(605+i,32+i*150,216,138,38,labels[i],statistics_metric==i);
     button(611,1150,216,258,38,statistics_intervals==4?L"GRID: LIGHT":statistics_intervals==8?L"GRID: DETAILED":L"GRID: STANDARD");
+    button(612,500,216,300,38,statistics_all_runs?L"ALL FULL RUNS":L"SINGLE RUN",statistics_all_runs);
+    if(statistics_all_runs){paint_statistics_comparison(report);return;}
     int rounds=3;double maximum=1;std::array<ssc_stats::RoundAxis,9> axes{};bool available=false,unknown_time=false;
     for(auto index:run.rounds){const auto& r=report->rounds[index];rounds=std::max(rounds,r.number);if(r.number>=1&&r.number<=8)axes[size_t(r.number)].include(r);for(const auto& p:r.points){if(p.values[size_t(statistics_metric)]){maximum=std::max(maximum,*p.values[size_t(statistics_metric)]);available=true;}if(!p.round_time)unknown_time=true;}}
     // A malformed local recording must never produce thousands of paint calls.
@@ -1140,7 +1320,7 @@ void paint_statistics_graph(){
     else if(unknown_time)text(112,810,L"Some older or partial recordings lack a round clock.",muted,false,12);
     else if(!available)text(112,810,L"This metric was not available in this recording.",muted,false,12);
 }
-int option_list(int count,int visible){int limit=std::max(0,count-visible);option_limits[settings_page]=limit;int& start=option_scroll[settings_page];start=std::clamp(start,0,limit);if(limit){button(1290,958,108,54,38,L"^",false,start>0);button(1291,1026,108,54,38,L"v",false,start<limit);rectangle(1094,166,4,450,RGB(18,41,72));rectangle(1094,166+450*start/count,4,std::max(16,450*visible/count),cyan);}return start;}
+int option_list(int count,int visible,int controls_y=108,int scroll_y=166,int scroll_h=450){int limit=std::max(0,count-visible);option_limits[settings_page]=limit;int& start=option_scroll[settings_page];start=std::clamp(start,0,limit);if(limit){button(1290,958,controls_y,54,38,L"^",false,start>0);button(1291,1026,controls_y,54,38,L"v",false,start<limit);rectangle(1094,scroll_y,4,scroll_h,RGB(18,41,72));rectangle(1094,scroll_y+scroll_h*start/count,4,std::max(16,scroll_h*visible/count),cyan);}return start;}
 #include "postgame_menu.h"
 void paint_panel() {
     prepare_canvas();if(!pixels)return;controls.clear();wheel_hits.clear();
@@ -1195,7 +1375,7 @@ void paint_panel() {
     } else if(manager&&settings_page==14){
         text(50,111,L"WHAT'S NEW",ink,true);
         auto bullet=[&](int y,const wchar_t* label){rectangle(54,y+7,5,5,cyan);text(72,y,label,ink,false,15);};
-        text(50,153,L"v0.1.34",cyan);
+        text(50,153,ssc_version::label,cyan);
         bullet(201,L"Anonymous-mode safeguards for shared colors and messages");
         bullet(247,L"Match Summary API toggle and early rating capture fixes");
         bullet(293,L"Shotgun pellet-hit estimates in Weapon Lab");
@@ -1204,10 +1384,12 @@ void paint_panel() {
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
-        const wchar_t* names[]={L"SOUND REPLACER",L"COSMETICS",L"DISCORD PRESENCE",L"HUD EDITOR",L"CUSTOM QUICK CHAT",L"AUTO MESSAGES",L"FREECAM",L"DRIVING"};
-        const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load()};const int ids[]={80,81,83,86,300,330,588,981},settings[]={91,92,93,94,301,302,585,980};
-        int row=0;for(int i=0;i<8;++i)if(quick_mask&(1u<<i)){int y=100+row++*64;rectangle(20,y,600,56,RGB(16,37,62));text(32,y+20,names[i],ink,false,15);toggle(ids[i],350,y+10,enabled[i]);button(settings[i],456,y+10,146,36,L"SETTINGS");}
-        int bottom=118+row*64;button(3,20,bottom,366,42,L"ALL MODULES",true,true,true);button(4,402,bottom,218,42,L"DISABLE ALL");
+        const wchar_t* names[]={L"SOUND REPLACER",L"COSMETICS",L"DISCORD PRESENCE",L"HUD EDITOR",L"CUSTOM QUICK CHAT",L"AUTO MESSAGES",L"FREECAM",L"DRIVING",L"FLASHBANG",L"KOS",L"CHAT COMMANDS",L"CHAT SPEECH",L"RANDOM DRAFTS",L"CHAOS MODE"};
+        const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load(),ssc_dark_flash::enabled.load(),ssc_kos::enabled,ssc_commands::router.enabled,ssc_chat_tts::settings.enabled,ssc_challenge::random.enabled,ssc_challenge::chaos.enabled};
+        const int ids[]={80,81,83,86,300,330,588,981,1200,1600,1700,1800,1900,1910},settings[]={91,92,93,94,301,302,585,980,1201,1601,1701,1801,1901,1911};
+        quick_scroll=std::clamp(quick_scroll,0,std::max(0,quick_count()-7));int row=0,selected=0;for(int i=0;i<quick_module_count;++i)if(quick_mask&(1u<<i)){if(selected++<quick_scroll||row>=7)continue;int y=100+row++*64;rectangle(20,y,600,56,RGB(16,37,62));text(32,y+20,names[i],ink,false,15);toggle(ids[i],350,y+10,enabled[i]);button(settings[i],456,y+10,146,36,L"SETTINGS");}
+        if(quick_count()>7){button(2120,20,100+row*64,286,30,L"EARLIER",false,quick_scroll>0);button(2121,322,100+row*64,298,30,L"LATER",false,quick_scroll<quick_count()-7);}
+        int bottom=118+row*64+(quick_count()>7?36:0);button(3,20,bottom,366,42,L"ALL MODULES",true,true,true);button(4,402,bottom,218,42,L"DISABLE ALL");
         if(save_failed)text(24,bottom+51,L"Could not save settings",RGB(247,191,83));
         else if(GetTickCount64()<ssc_freecam::notice_until)text(24,bottom+51,ssc_freecam::entry_status,RGB(255,190,120),false,11);
     } else {
@@ -1240,7 +1422,7 @@ void paint_panel() {
             text(266,188,L"SEE OTHER PLAYERS' COLORS",ink);toggle(561,986,176,shared_receive);
             text(266,252,L"SHARE MY COLORS",ink);toggle(562,986,240,shared_publish);
             text(266,304,ssc_cosmetic_access::status(),muted,false,13);
-            button(1600,266,350,300,36,L"SHARING BENEFITS");
+            button(1971,266,350,300,36,L"SHARING BENEFITS");
             text(266,426,ssc_shared::label(ssc_shared::service().status()),cyan,false,14);
             text(266,472,shared_notice.c_str(),muted,false,13);
             button(565,266,590,260,40,L"< COSMETICS");
@@ -1271,15 +1453,43 @@ void paint_panel() {
             text(266,500,bot_color_error?L"Enter 6 or 8 hex digits":L"Applies to overhead names and the scoreboard",bot_color_error?RGB(255,120,100):muted,false,13);
         } else if(settings_page==17){
             text(266,111,L"QUICK MENU",ink,true);
-            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving"};
-            int first=option_list(8,7);for(int row=0;row<7&&first+row<8;++row){int i=first+row,y=164+row*66;text(282,y+9,names[i]);toggle(i==7?982:i==6?965:481+i,978,y,(quick_mask&(1u<<i))!=0);}
+            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving",L"Flashbang",L"KOS",L"Chat commands",L"Chat speech",L"Random Drafts",L"Chaos Mode"};
+            int first=option_list(quick_module_count,7);for(int row=0;row<7&&first+row<quick_module_count;++row){int i=first+row,y=164+row*66;text(282,y+9,names[i]);toggle(2100+i,978,y,(quick_mask&(1u<<i))!=0);}
         } else if(settings_page==-1) {
             text(266,111,L"MODULES",ink,true);
-            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving",L"Flashbang"};
-            const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load(),ssc_dark_flash::enabled.load()};
-            const int ids[]={80,81,83,86,300,330,588,981,1200},settings[]={91,92,93,94,301,302,585,980,1201};
-            int first=option_list(9,7);for(int row=0;row<7&&first+row<9;++row){int i=first+row,y=164+row*66;rectangle(266,y,820,60,RGB(16,37,62));text(284,y+15,names[i],ink,true);toggle(ids[i],822,y+9,enabled[i]);button(settings[i],932,y+9,138,36,L"SETTINGS");}
+            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving",L"Flashbang",L"KOS",L"Chat commands",L"Chat speech",L"Random Drafts",L"Chaos Mode"};
+            const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load(),ssc_dark_flash::enabled.load(),ssc_kos::enabled,ssc_commands::router.enabled,ssc_chat_tts::settings.enabled,ssc_challenge::random.enabled,ssc_challenge::chaos.enabled};
+            const int ids[]={80,81,83,86,300,330,588,981,1200,1600,1700,1800,1900,1910},settings[]={91,92,93,94,301,302,585,980,1201,1601,1701,1801,1901,1911};
+            button(1870,550,108,94,36,L"ALL",module_filter==0);button(1871,652,108,120,36,L"ON",module_filter==1);button(1872,780,108,120,36,L"OFF",module_filter==2);std::vector<int> visible;for(int i=0;i<14;++i)if(!module_filter||(module_filter==1)==enabled[i])visible.push_back(i);int first=option_list(int(visible.size()),7);text(266,146,(std::to_wstring(visible.size())+L" modules").c_str(),muted,false,10);for(int row=0;row<7&&first+row<int(visible.size());++row){int i=visible[size_t(first+row)],y=164+row*66;rectangle(266,y,820,60,RGB(16,37,62));text(284,y+15,names[i],ink,true);toggle(ids[i],822,y+9,enabled[i]);button(settings[i],932,y+9,138,36,L"SETTINGS");}
             if(GetTickCount64()<ssc_freecam::notice_until){rectangle(266,636,820,26,RGB(50,37,53));text(276,640,ssc_freecam::entry_status,RGB(255,190,120),false,12);}
+        } else if(settings_page==37){
+            text(266,111,L"RANDOM DRAFTS",ink,true);toggle(1900,986,106,ssc_challenge::random.enabled);
+            text(266,177,L"Rerolls, then spends skill points automatically.",muted,false,15);
+            text(266,211,L"Random Stims uses syringes when a mutation is available.",muted,false,15);
+            rectangle(266,260,820,65,RGB(16,37,62));text(282,281,L"RANDOM STIMS");toggle(1902,978,274,ssc_challenge::random.stims);
+            
+            rectangle(266,333,820,65,RGB(16,37,62));text(282,354,L"BLIND DRAFTS");toggle(1903,978,347,ssc_challenge::random.blind);
+            text(266,408,ssc_challenge::blind_supported?L"Hide the build until the final round ends.":L"Blind Drafts unavailable: native draw guards changed.",muted,false,14);
+            text(266,438,L"Paid rerolls spend cash. Free modes stop at 100 per choice.",muted,false,14);
+            text(266,486,ssc_challenge::status.c_str(),cyan,false,14);
+        } else if(settings_page==39){
+            text(266,111,L"MOVEMENT CONTROLS",ink,true);toggle(1948,986,106,ssc_challenge::chaos.effects[8]);
+            text(266,176,L"Active while Chaos Mode is on.",muted,false,15);
+            text(266,250,L"Swaps up/down and left/right while on foot.",ink,false,17);
+            
+            text(266,350,L"Chat, aiming and driving are unaffected.",muted,false,14);
+        } else if(settings_page==38){
+            text(266,111,L"CHAOS MODE",ink,true);toggle(1910,986,106,ssc_challenge::chaos.enabled);
+            text(266,150,L"Effects stay active while menus are open.",muted,false,12);
+            button(1930,266,171,240,30,L"HUD / COLORS",chaos_options_page==0);button(1931,522,171,240,30,L"VIEW",chaos_options_page==1);
+            const wchar_t* effects[]={L"HUD shuffle [motion]",L"HUD drift [motion]",L"HUD size pulse [motion]",L"Slow color wash [visual warning]",L"Moving view obstructions [motion]",L"Upside-down camera [visual warning]",L"Zoomed-in camera (1.8x)",L"Pixelated view (visual effect)",L"Mirrored movement (on foot)"};
+            for(int row=0;row<(chaos_options_page?4:5);++row){int i=(chaos_options_page?5:0)+row,y=209+row*49;bool available=module_ready(1940+i);rectangle(266,y,820,44,RGB(16,37,62));text(282,y+11,(std::wstring(effects[i])+L" [+"+std::to_wstring(ssc_challenge::effect_weights[size_t(i)])+L"]").c_str(),available?ink:muted,false,15);if(i==8)button(1960,810,y+4,150,36,L"OPTIONS");toggle(1940+i,978,y+4,ssc_challenge::chaos.effects[size_t(i)]);}
+            if(chaos_options_page){text(266,418,L"Freecam overrides camera effects.",muted,false,13);text(266,442,L"Pixelation adds GPU work.",muted,false,13);if(ssc_render::pixelation.blocked_msaa)text(266,462,L"Pixelation unavailable with the current anti-aliasing.",RGB(255,190,100),false,12);}
+            auto preview=ssc_challenge::chaos;preview.enabled=true;int level=ssc_challenge::severity(preview);
+            text(266,481,(L"CHAOS SCORE: "+std::to_wstring(level)).c_str(),cyan,true);
+            text(266,517,L"Motion and color effects may cause discomfort or trigger symptoms.",RGB(255,190,100),false,13);
+            text(266,544,L"No setting is guaranteed safe for photosensitive users.",RGB(255,190,100),false,13);
+            button(1917,266,576,500,40,L"I UNDERSTAND - ENABLE",false,level>0&&ssc_hud::attached&&!ssc_challenge::chaos.enabled);
         } else if(settings_page==15){
             text(266,111,L"CUSTOM QUICK CHAT",ink,true);toggle(300,986,106,ssc_chat::enabled);
             wheel_preview();auto& slot=ssc_chat::slots[ssc_chat::order[ssc_chat::selected]];
@@ -1297,12 +1507,14 @@ void paint_panel() {
             button(322,720,554,175,34,L"MOVE UP",false,ssc_chat::selected>0);button(323,911,554,175,34,L"MOVE DOWN",false,ssc_chat::selected<8);
             button(325,720,596,366,34,L"RESET WHEEL");if(!ssc_wheel_images::status.empty())text(720,639,ssc_wheel_images::status.substr(0,40).c_str(),cyan,false,11);
             text(286,613,L"Each use sends a random saved message",muted,false,12);
+            text(266,649,(L"Custom wheel messages are limited to "+std::to_wstring(ssc_chat::max_custom_send_length)+L" characters.").c_str(),muted,false,12);
         } else if(settings_page==16){
             text(266,111,L"AUTO MESSAGES",ink,true);
+            text(266,137,L"Shares the game's chat cooldown.",muted,false,12);
             auto& r=ssc_auto::current();
             if(ssc_auto::import_pending){
                 const auto& incoming=ssc_auto::imported;text(266,185,ssc_chat::widen(incoming.name).c_str(),cyan,true);auto event=std::wstring(ssc_auto::events[incoming.event]);if(incoming.event==3||incoming.event==4)event+=L" "+std::to_wstring(incoming.threshold);text(266,234,event.c_str());
-                text(266,275,(L"Send "+std::to_wstring(incoming.repeats)+(incoming.repeats==1?L" time":L" times")).c_str());
+                text(266,275,L"Sends once per trigger");
                 if(incoming.min_level)text(660,275,(L"Minimum level: "+std::to_wstring(incoming.min_level)).c_str(),muted,false,14);
                 if(!incoming.conditions.empty()){text(266,311,incoming.any?L"Any condition (OR)":L"All conditions (AND)",muted,false,14);const auto& stats=ssc_auto::condition_labels;const wchar_t* op[]={L"at least",L"at most",L"equal to"};for(int i=0;i<int(incoming.conditions.size());++i){auto& c=incoming.conditions[i];auto line=std::wstring(stats[c.stat])+L" "+op[c.comparison]+L" "+std::to_wstring(c.value);text(266,340+i*27,line.c_str(),ink,false,14);}}
                 text(266,438,ssc_chat::widen(incoming.message.substr(0,65)).c_str(),ink,false,14);if(incoming.message.size()>65)text(266,465,ssc_chat::widen(incoming.message.substr(65)).c_str(),ink,false,14);
@@ -1329,7 +1541,7 @@ void paint_panel() {
                 const auto& stats=ssc_auto::condition_labels;const wchar_t* comparisons[]={L"At least",L"At most",L"Equal to"};
                 for(int i=0;i<int(r.conditions.size());++i){auto& c=r.conditions[i];int y=326+i*36;button(410+i,366,y,245,30,stats[c.stat]);button(420+i,621,y,205,30,comparisons[c.comparison]);editbox(450+i,836,y,196,30,ssc_chat::widen(chat_editing&&chat_field==3+i?chat_buffer:std::to_string(c.value)),chat_editing&&chat_field==3+i);button(430+i,1044,y,42,30,L"X");}
                 text(266,447,L"MESSAGE",muted,false,13);auto value=chat_editing&&chat_field==0?chat_buffer:r.message;editbox(320,366,437,720,36,ssc_chat::widen(value),chat_editing&&chat_field==0);
-                text(266,490,L"SEND",muted,false,13);button(406,366,479,160,34,(std::to_wstring(r.repeats)+(r.repeats==1?L" time":L" times")).c_str());button(344,546,479,295,34,ssc_auto::variable_labels[ssc_auto::variable]);button(345,853,479,233,34,L"INSERT VARIABLE");
+                text(266,490,L"MESSAGE",muted,false,13);text(366,490,L"Once per trigger",muted,false,13);button(344,546,479,295,34,ssc_auto::variable_labels[ssc_auto::variable]);button(345,853,479,233,34,L"INSERT VARIABLE");
                 std::string preview,error;auto previewRule=r;previewRule.message=value;error=ssc_auto::rule_warning(previewRule);if(error.empty())ssc_auto::format(value,ssc_auto::examples(),preview,error);text(266,528,L"EXAMPLE",cyan,false,12);text(366,528,ssc_chat::widen((error.empty()?preview:error).substr(0,76)).c_str(),ink,false,12);
                 button(321,266,562,150,36,L"SAVE",true,chat_editing);button(336,432,562,302,36,L"COPY RULE CODE");button(580,750,562,336,36,L"TIMING / CANCELLATION");
                 auto warning=ssc_auto::rule_warning(r);auto ruleStatus=warning.empty()?ssc_auto::status:ssc_chat::widen(warning)+L" - this rule cannot send with the current counter";if(!ruleStatus.empty())text(266,616,ruleStatus.substr(0,88).c_str(),cyan,false,12);
@@ -1347,22 +1559,40 @@ void paint_panel() {
             text(282,269,L"SHOW UPDATE NOTES");toggle(280,978,258,show_update_notes);
         } else if(settings_page==3) {
             text(266,111,L"SOUND REPLACER",ink,true);toggle(80,986,106,sound_requested);
-            text(266,152,L"WAV / MP3 imports. Restart game to apply changes.",muted);
+            text(266,152,L"WAV / MP3. Restart for effects; music changes at the next track.",muted);
             if(sound_results.empty()&&sound_query.empty())filter_sounds();
             editbox(104,266,187,540,36,sound_query,sound_search_editing,L"Search sounds");
             button(100,822,187,120,36,L"PREVIOUS");button(101,958,187,128,36,L"NEXT");
-            for(size_t i=0;i<5&&sound_page+i<sound_results.size();++i){size_t index=sound_results[sound_page+i];auto label=ssc_sound::display_name(ssc_sound::entries[index])+(ssc_sound::has_replacement(ssc_sound::entries[index])?L" [CUSTOM]":L"");button(110+int(i),266,236+int(i)*34,820,30,label.c_str(),index==ssc_sound::selection);}
+            for(size_t i=0;i<5&&sound_page+i<sound_results.size();++i){size_t index=sound_results[sound_page+i];const auto& entry=ssc_sound::entries[index];auto label=ssc_sound::list_label(entry);button(110+int(i),266,236+int(i)*34,820,30,label.c_str(),index==ssc_sound::selection);}
 
             if(ssc_sound::selection<ssc_sound::entries.size()){
-                auto& e=ssc_sound::entries[ssc_sound::selection];std::wstring info=ssc_sound::display_name(e)+L" / "+std::to_wstring(e.rate)+L" Hz / "+std::to_wstring(e.channels)+L" ch";
+                auto& e=ssc_sound::entries[ssc_sound::selection];std::wstring info=ssc_sound::shared_category(e)?ssc_sound::coverage_label(e):ssc_sound::display_name(e)+L" / "+std::to_wstring(e.rate)+L" Hz / "+std::to_wstring(e.channels)+L" ch";
                 text(266,424,info.c_str(),cyan,false,14);
             }
-            button(102,266,454,242,36,L"IMPORT AUDIO");button(103,526,454,242,36,L"RESTORE ORIGINAL");
+            const bool selected_sound=ssc_sound::selection<ssc_sound::entries.size();const bool grouped_sound=selected_sound&&ssc_sound::shared_category(ssc_sound::entries[ssc_sound::selection]);const bool single_sound=selected_sound&&!ssc_sound::pool_count(ssc_sound::entries[ssc_sound::selection]);button(102,266,454,242,36,(grouped_sound||(selected_sound&&!single_sound))?L"ADD SOUNDS":L"IMPORT AUDIO",false,selected_sound&&ssc_sound::pool_count(ssc_sound::entries[ssc_sound::selection])<ssc_sound_pool::max_clips);button(103,526,454,242,36,L"RESTORE ORIGINAL",false,grouped_sound?!ssc_sound::original_groups.count(ssc_sound::pool_key(ssc_sound::entries[ssc_sound::selection])):single_sound);
             text(792,464,L"MATCH LEVEL",muted,false,12);toggle(82,982,454,match_sound_level);
             text(266,640,ssc_sound::status.c_str(),ink,false,11);
-            if(ssc_sound::selection<ssc_sound::entries.size()){auto& e=ssc_sound::entries[ssc_sound::selection];text(266,514,e.music?L"ALL MUSIC TRACKS":L"ALL RELATED SOUNDS",muted,false,13);button(487,600,500,150,36,ssc_sound::all_variants(e)?L"ON":L"OFF",ssc_sound::all_variants(e),(ssc_sound::all_variants(e)||e.imported)&&!ssc_sound::variant_group(e).empty());text(792,514,L"VOLUME",muted,false,13);button(488,914,500,172,36,(std::to_wstring(ssc_sound::clip_volume(e))+L"%").c_str(),false,ssc_sound::has_replacement(e));}
-            button(489,566,586,280,38,L"PREVIEW CUSTOM",false,ssc_sound::selection<ssc_sound::entries.size()&&ssc_sound::has_replacement(ssc_sound::entries[ssc_sound::selection]));
+            if(ssc_sound::selection<ssc_sound::entries.size()){auto& e=ssc_sound::entries[ssc_sound::selection];text(266,514,e.music?L"ALL MUSIC TRACKS":ssc_sound::shared_category(e)?L"SHARED RANDOM LIST":L"ALL RELATED SOUNDS",muted,false,13);button(487,600,500,150,36,ssc_sound::pool_count(e)?L"POOL ACTIVE":ssc_sound::shared_category(e)?(ssc_sound::original_groups.count(ssc_sound::pool_key(e))?L"ORIGINAL":L"NOT SET"):ssc_sound::all_variants(e)?L"ON":L"OFF",ssc_sound::pool_count(e)||ssc_sound::all_variants(e),!ssc_sound::shared_category(e)&&!ssc_sound::pool_count(e)&&(ssc_sound::all_variants(e)||e.imported)&&!ssc_sound::variant_group(e).empty());text(792,514,L"VOLUME",muted,false,13);button(488,914,500,172,36,(std::to_wstring(ssc_sound::clip_volume(e))+L"%").c_str(),false,ssc_sound::has_replacement(e));}
+            button(489,566,586,280,38,ssc_sound::preview_active?L"STOP PREVIEW":L"PREVIEW CUSTOM",false,ssc_sound::preview_active||(ssc_sound::selection<ssc_sound::entries.size()&&ssc_sound::has_replacement(ssc_sound::entries[ssc_sound::selection])));
             button(105,266,586,280,38,L"PREVIEW ORIGINAL",false,ssc_sound::selection<ssc_sound::entries.size());
+            if(ssc_sound::selection<ssc_sound::entries.size())button(1850,862,586,224,38,(L"SOUND LIST ("+std::to_wstring(ssc_sound::pool_count(ssc_sound::entries[ssc_sound::selection]))+L")").c_str());
+        } else if(settings_page==36) {
+            text(266,111,L"RANDOM SOUND POOL",ink,true);
+            if(ssc_sound::selection<ssc_sound::entries.size()){
+                const auto& entry=ssc_sound::entries[ssc_sound::selection];auto key=ssc_sound::pool_key(entry);auto found=ssc_sound::pools.find(key);size_t count=ssc_sound::pool_count(entry);
+                auto heading=entry.music?L"Music - all tracks":ssc_sound::category_label(entry);
+                text(266,162,heading.c_str(),cyan,false,16);text(266,190,(count?std::to_wstring(count)+(entry.music?L" tracks / equal chance at each track change":L" sounds / one random choice per sound event"):L"No shared pool configured yet").c_str(),muted,false,13);
+                button(1856,822,163,120,34,L"PREVIOUS",false,ssc_sound::pool_page>0);button(1857,958,163,128,34,L"NEXT",false,(ssc_sound::pool_page+1)*6<count);
+                if(found!=ssc_sound::pools.end())for(size_t i=0;i<6&&ssc_sound::pool_page*6+i<count;++i){size_t index=ssc_sound::pool_page*6+i;auto label=ssc_chat::widen(found->second[index].label);if(label.size()>65)label=label.substr(0,62)+L"...";button(1860+int(i),266,218+int(i)*40,820,36,label.c_str(),ssc_sound::pool_choice==index);}
+                if(!count){
+                    auto saved=ssc_sound::saved_custom_count(entry);
+                    text(282,246,saved?L"Saved replacements are available.":L"Add sounds to create a random pool.",muted,false,14);
+                    if(saved&&!entry.music){text(282,282,(std::to_wstring(saved)+L" saved replacements available.").c_str(),muted,false,13);button(1858,282,326,740,40,L"USE SAVED CUSTOM SOUNDS");}
+                }
+                button(1851,266,486,250,40,L"ADD SOUNDS",false,count<ssc_sound_pool::max_clips);button(1852,534,486,250,40,L"REMOVE SELECTED",false,count&&ssc_sound::pool_choice<count);button(1853,802,486,284,40,L"CLEAR POOL",false,count>0);
+                button(1854,266,552,820,40,ssc_sound::preview_active?L"STOP PREVIEW":L"PREVIEW SELECTED",false,ssc_sound::preview_active||(count&&ssc_sound::pool_choice<count));
+                text(266,600,(entry.music?L"Shared across all game music; each file is streamed from disk.":ssc_sound::coverage_label(entry)).c_str(),muted,false,12);text(266,620,entry.music?L"Edits apply at the next track change; clearing restores single-file choices.":ssc_sound::automatic_group(ssc_sound::family(entry))?L"Restart after edits. Clearing uses original game sounds.":L"Restart after edits. Clearing restores saved single-file choices.",muted,false,12);text(266,640,ssc_sound::status.c_str(),ink,false,11);
+            }
         } else if(settings_page==4) {
             text(266,111,L"COSMETICS",ink,true);toggle(81,986,106,cosmetic_requested);
             if(!ssc_names::attached)text(266,160,L"Unavailable on this game version",RGB(247,191,83));
@@ -1380,11 +1610,74 @@ void paint_panel() {
                 auto value=ssc_names::solid_rgb;button(550,680,328,42,40,L"");rectangle(686,334,30,28,RGB((value>>16)&255,(value>>8)&255,value&255));
             }
             text(266,494,L"PREVIEW",muted);
-            float phase=0;ssc_names::native_phase(phase);
+            float phase=0;ssc_names::local_phase(phase);
             auto rgb=ssc_names::solid_rgb;auto color=RGB((rgb>>16)&255,(rgb>>8)&255,rgb&255);
             text(282,540,L"Example player",color,true,0,(ssc_names::rainbow||ssc_names::gradient)?phase:-1);
-            button(560,266,598,300,40,L"SHARED COSMETICS");
+            button(560,266,598,300,40,L"SHARED COSMETICS");button(1500,584,598,300,40,L"ANIMATION");
 
+        } else if(settings_page==31) {
+            text(266,111,L"COSMETIC ANIMATION",ink,true);
+            const wchar_t* motions[]={L"FORWARD",L"REVERSE",L"PING-PONG"};
+            text(266,176,L"DIRECTION");button(1501,696,164,386,42,motions[int(ssc_names::animation.motion)],false,ssc_names::rainbow||ssc_names::gradient);
+            text(266,242,L"SPEED");button(1502,696,230,386,42,(std::to_wstring(ssc_names::animation.speed_percent)+L"%").c_str(),false,ssc_names::rainbow||ssc_names::gradient);
+            text(266,308,L"BREATHING");toggle(1503,986,296,ssc_names::animation.breathing);
+            text(266,374,L"MINIMUM BRIGHTNESS");button(1504,696,362,386,42,(std::to_wstring(ssc_names::animation.minimum_percent)+L"%").c_str(),false,ssc_names::animation.breathing);
+            text(266,440,L"BREATH CYCLE");button(1505,696,428,386,42,(std::to_wstring(ssc_names::animation.period_seconds)+L" SECONDS").c_str(),false,ssc_names::animation.breathing);
+            float phase=0;ssc_names::local_phase(phase);auto c=ssc_names::solid_rgb;float factor=ssc_names::local_brightness();
+            text(282,510,L"Example player",RGB(int(((c>>16)&255)*factor),int(((c>>8)&255)*factor),int((c&255)*factor)),true,0,(ssc_names::rainbow||ssc_names::gradient)?phase:-1);
+            text(266,566,L"Animation is visible only to you.",muted,false,13);
+            button(1506,266,612,300,40,L"RESET ANIMATION");
+        } else if(settings_page==32) {
+            text(266,111,L"KOS",ink,true);toggle(1600,986,106,ssc_kos::enabled);
+            text(266,170,L"Anonymous players stay unmarked.",muted,false,14);button(1608,800,154,282,40,L"MARK COLOR");
+            button(1602,266,207,520,40,ssc_kos::selected.target.player.handle.empty()?L"CURRENT / RECENT PLAYERS":ssc_chat::widen(ssc_kos::selected.target.player.handle).c_str());
+            button(1603,802,207,280,40,ssc_kos::list.marked(ssc_kos::selected.target.player)?L"REMOVE FROM KOS":L"MARK PLAYER",false,ssc_kos::eligible(ssc_kos::selected.target.player));
+            editbox(1605,266,264,460,38,ssc_chat::widen(kos_handle.empty()&&!kos_handle_editing?"Player handle":kos_handle),kos_handle_editing);button(1606,742,264,160,38,L"ADD HANDLE");button(1607,918,264,164,38,L"REMOVE");
+            text(266,322,L"SAVED PLAYERS",muted,false,14);
+            int first=option_list(int(ssc_kos::list.entries().size()),5,312,350,220);for(int row=0;row<5&&first+row<int(ssc_kos::list.entries().size());++row){const auto& entry=ssc_kos::list.entries()[size_t(first+row)];rectangle(266,350+row*44,820,38,RGB(16,37,62));text(282,358+row*44,ssc_chat::widen(entry.handle).c_str(),RGB((ssc_kos::color_rgb>>16)&255,(ssc_kos::color_rgb>>8)&255,ssc_kos::color_rgb&255),false,18);button(1620+row,920,353+row*44,150,32,L"REMOVE");}
+            text(266,594,!kos_status.empty()?kos_status.c_str():ssc_kos::saved?L"Saved locally":L"Could not save KOS list",muted,false,13);
+            text(266,646,ssc_planned_native::kos?L"/kos NAME toggles marking     /kos list shows saved names":L"Unavailable on this game build",muted,false,13);
+        } else if(settings_page==33) {
+            text(266,111,L"LOCAL CHAT COMMANDS",ink,true);toggle(1700,986,106,ssc_commands::router.enabled);
+            text(266,165,L"LOCAL SENDER",muted,false,15);editbox(1705,650,152,432,38,ssc_chat::widen(command_sender_editing?command_sender_buffer:ssc_commands::sender_name),command_sender_editing);
+            text(266,214,L"ALIAS PREFIX",muted,false,15);button(1702,800,201,280,38,std::wstring(1,wchar_t(ssc_commands::router.prefix)).c_str());
+            struct CommandHint {const char* action;const wchar_t* args;const wchar_t* description;};
+            const CommandHint hints[]={{"help",L"",L"List every local command"},{"team",L"",L"Switch to team chat"},{"all",L"",L"Switch to public chat"},{"summary",L"",L"Open match summary"},{"kos",L" NAME",L"Toggle marked name"},{"tts",L" mute/unmute NAME",L"Speech controls"}};
+            for(size_t i=0;i<std::size(hints);++i){int y=265+int(i)*34;text(266,y,(command_example(hints[i].action)+hints[i].args).c_str(),cyan,false,16);text(690,y,hints[i].description,ink,false,15);}
+            text(266,480,L"Tab completes; arrows choose. Use ./ to send a leading slash.",muted,false,13);
+            button(1703,266,520,390,42,L"COPY ALIAS SETTINGS");button(1704,672,520,410,42,L"IMPORT FROM CLIPBOARD");
+            if(!ssc_commands::attached)text(266,595,L"Unavailable on this game version",muted,false,13);
+        } else if(settings_page==34) {
+            text(266,111,L"CHAT SPEECH",ink,true);toggle(1800,986,106,ssc_chat_tts::settings.enabled);
+            auto voices=ssc_chat_tts::speech().voices();std::wstring label=L"Loading local voices";if(!voices.empty())label=voices[size_t(ssc_chat_tts::voice_choice)%voices.size()].label;if(ssc_chat_tts::backend==1){label=L"Piper voice";for(const auto& model:ssc_piper::assets().snapshot().models)if(model.id==ssc_chat_tts::piper_voice)label=ssc_piper::wide(model.label);}
+            button(1802,266,170,610,42,label.c_str());button(1803,892,170,190,42,L"PREVIEW");
+            auto speech_slider=[&](int id,int y,const wchar_t* label,int value,int low){text(266,y+12,label);controls.push_back({id,550,y,390,42,true});rectangle(560,y+20,350,6,muted);int knob=560+int(std::lround(350.f*(value-low)/(200-low)));rectangle(560,y+20,knob-560,6,cyan);rectangle(knob-6,y+10,12,26,keyboard_focus==id?ink:cyan);text(950,y+12,(std::to_wstring(value)+L"%").c_str(),cyan);};
+            speech_slider(1804,230,L"VOLUME",ssc_chat_tts::volume,0);
+            speech_slider(1805,296,L"SPEED",ssc_chat_tts::speed_percent,50);
+            text(266,374,L"ANNOUNCEMENTS");toggle(1806,986,362,ssc_chat_tts::settings.system);
+            text(266,440,L"READ OWN MESSAGES");toggle(1807,986,428,ssc_chat_tts::settings.own);
+            text(266,506,L"READ SENDER NAMES");toggle(1808,986,494,ssc_chat_tts::settings.read_names);
+            button(1809,266,568,330,42,L"STOP SPEECH / CLEAR");button(1810,612,568,470,42,L"NEURAL VOICES / IMPORT");
+            text(266,630,ssc_chat::widen(ssc_chat_tts::source_status).c_str(),muted,false,13);
+            text(266,650,ssc_chat::widen(ssc_chat_tts::speech().status()).c_str(),muted,false,13);
+        } else if(settings_page==35) {
+            text(266,111,L"LOCAL NEURAL VOICES",ink,true);
+            auto state=ssc_piper::assets().snapshot();bool norman=std::any_of(state.models.begin(),state.models.end(),[](const auto& v){return v.id=="norman";});
+            text(266,171,state.ready?L"Piper engine installed":L"Optional engine: 73 MB. Norman voice: 64 MB.",muted,false,14);
+            button(1812,266,216,390,42,norman?L"USE NORMAN":state.ready?L"DOWNLOAD NORMAN - 64 MB":L"DOWNLOAD NORMAN - 137 MB",ssc_chat_tts::backend==1&&ssc_chat_tts::piper_voice=="norman",!state.busy);
+            button(1811,672,216,410,42,L"USE WINDOWS (DAVID)",ssc_chat_tts::backend==0);
+            button(1814,266,284,390,42,L"IMPORT PIPER MODEL",false,state.ready&&!state.busy);
+            button(1816,672,284,410,42,state.ready?L"VERIFY / REPAIR ENGINE":L"DOWNLOAD ENGINE - 73 MB",false,!state.busy);
+            const ssc_piper::Model* selected=nullptr;for(const auto& model:state.models)if(model.id==ssc_chat_tts::piper_voice)selected=&model;
+            button(1815,266,358,610,42,selected?ssc_piper::wide(selected->label).c_str():L"NO PIPER VOICE SELECTED",false,!state.models.empty());
+            button(1817,892,358,190,42,L"USE VOICE",ssc_chat_tts::backend==1,selected!=nullptr);
+            text(266,432,L"SPEAKER",muted,false,15);button(1818,800,418,280,38,(std::to_wstring(ssc_chat_tts::piper_speaker+1)+L" / "+std::to_wstring(selected?selected->speakers:1)).c_str(),false,selected&&selected->speakers>1);
+            text(266,484,L"Import an .onnx model and matching .onnx.json. Limit: 256 MiB.",muted,false,13);
+            text(266,516,L"Runs locally on your CPU.",muted,false,13);
+            if(state.busy){button(1813,266,560,260,40,L"CANCEL DOWNLOAD");if(state.total){auto percent=std::min(uint64_t(100),state.done*100/state.total);text(552,572,(std::to_wstring(percent)+L"%").c_str(),cyan,false,18);}}
+            else button(1819,266,560,330,40,L"OPEN VOICE FOLDER",false,!state.models.empty());
+            
+            text(266,634,ssc_piper::wide(state.message).c_str(),muted,false,12);
         } else if(settings_page==5) {
             text(266,111,L"DISCORD PRESENCE",ink,true);toggle(83,986,106,rpc_requested);
             auto connection=presence_supported?ssc_rpc::status():std::wstring(L"Unavailable on this game version");text(266,168,connection.c_str(),cyan);
@@ -1402,13 +1695,14 @@ void paint_panel() {
             button(161,266,308,340,48,ssc_update::action_label(),true,ssc_update::available()&&(rpc_preview.phase==1||!presence_supported));
             button(1,630,308,180,48,L"LATER");
         } else if(settings_page==9){
-            text(266,111,L"MISC",ink,true);int first=option_list(6,3);
+            text(266,111,L"MISC",ink,true);int first=option_list(7,3);
             for(int visible=0;visible<3;++visible){int item=first+visible,y=168+visible*150;rectangle(266,y,820,138,RGB(16,37,62));
              if(item==0){text(282,y+18,L"HUD HOVER FADE");toggle(192,978,y+9,ssc_hud::hover_fade);text(282,y+68,L"Fade HUD elements near your cursor.",muted,false,14);}
              else if(item==1){text(282,y+18,L"READY SKILL PULSE");toggle(193,978,y+9,ssc_cooldown::settings.enabled);text(282,y+58,L"Restore the health / skill HUD when a cooldown ends.",muted,false,14);button(197,282,y+88,210,38,L"1 SECOND",ssc_cooldown::settings.duration_ms==1000);button(198,508,y+88,210,38,L"1.5 SECONDS",ssc_cooldown::settings.duration_ms==1500);button(199,734,y+88,210,38,L"2.5 SECONDS",ssc_cooldown::settings.duration_ms==2500);}
              else if(item==2){text(282,y+18,L"GERI CHALLENGE");toggle(570,978,y+9,ssc_geri::enabled.load());text(282,y+68,ssc_geri::attached?L"Hide the skill draft and syringe selection panel.":L"Unavailable for this game build.",muted,false,14);text(282,y+102,L"UI only; challenge rules are not enforced.",muted,false,12);}
              else if(item==3){text(282,y+18,L"HIDE CROSSHAIR");toggle(586,978,y+9,ssc_creator::hide_crosshair.load());text(282,y+68,L"Hide your crosshair for captures.",muted,false,14);}
              else if(item==4){text(282,y+18,L"RESPECT ANONYMOUS MODE");toggle(3400,978,y+9,ssc_privacy::respect.load());text(282,y+60,L"Pause identifying mod features when the game hides your name.",muted,false,14);text(282,y+96,ssc_privacy::status(),cyan,false,12);}
+             else if(item==6){text(282,y+18,L"CUSTOM LOADING TIPS");toggle(1950,978,y+9,ssc_loading_tips::enabled.load());text(282,y+60,L"Add community loading tips.",muted,false,14);}
              else if(item==5){text(282,y+18,L"CAPTURE UPLOADS");text(282,y+58,L"Capture uploads stay held after anonymity until resumed.",muted,false,14);button(3402,282,y+88,320,36,L"RESUME HELD UPLOADS",false,!ssc_privacy::blocked()&&ssc_privacy::uploads_held.load());}
             }
         } else if(settings_page==30){
@@ -1424,30 +1718,30 @@ void paint_panel() {
             text(266,111,L"MATCH SUMMARY",ink,true);
             text(282,204,recording_requested?L"RECORDING ON":L"RECORDING OFF",recording_requested?cyan:muted);button(15,710,190,330,44,L"RECORDING SETTINGS");
             text(282,258,L"Enable Recording before the match starts.",muted,false,15);
-            text(282,294,L"Analysis runs on your PC using the public game API.",muted,false,14);
+            
             button(1003,282,338,330,44,L"OPEN POST-GAME REPORT",false,presence_supported&&rpc_preview.phase==1&&!ssc_postgame::busy.load());
             button(1113,630,338,330,44,L"LAST SAVED MATCH",false,presence_supported&&rpc_preview.phase==1&&!ssc_review_history::busy.load());
             text(282,412,L"USE GAME API",ink,false,16);toggle(1125,978,402,ssc_review_online::requested);
-            text(282,452,L"Scores locally using API results, including in anonymous mode.",muted,false,13);
+            text(282,452,L"Fetch match results and rating comparisons; scoring stays local.",muted,false,13);
             if(ssc_advisor::private_access()){
                 text(282,492,L"SHARE EXTENDED DRAFT RESEARCH",muted,false,13);toggle(1002,978,480,ssc_training::enabled);
             }
             button(1107,282,550,540,40,postgame_binding?L"PRESS KEY (ESC CANCEL)":(L"SUMMARY KEY: "+key_label(postgame_hotkey)).c_str());button(1108,838,550,202,40,L"RESET KEY");
-            button(1301,282,606,330,40,L"PASTE BUILD CODE");text(640,619,L"Skills only; no account data.",muted,false,13);if(!postgame_share_status.empty())text(282,661,ssc_chat::widen(postgame_share_status).c_str(),cyan,false,12);
+            button(1301,282,606,330,40,L"PASTE SUMMARY CODE");if(!postgame_share_status.empty())text(282,661,ssc_chat::widen(postgame_share_status).c_str(),cyan,false,12);
         } else if(settings_page==26){
             text(266,111,L"DRIVING",ink,true);
             text(282,204,L"CAMERA-RELATIVE CONTROLS");toggle(981,978,195,ssc_vehicle::enabled.load());
             text(282,272,L"Experimental: singleplayer only.",muted);
-            text(282,330,L"Your movement bindings follow the screen directions.",muted,false,15);
-            text(282,372,L"Controls switch as the car crosses each 45-degree boundary.",muted,false,14);
-            text(282,414,L"Native braking, acceleration and steering stay in use.",muted,false,14);
-            text(282,470,L"Only the driver is affected. Passengers keep normal controls.",muted,false,14);
-            text(282,526,ssc_vehicle::attached?L"Multiplayer keeps the original driving controls.":L"Unavailable for this game build.",muted,false,14);
+            text(282,330,L"Steer relative to the camera. Driver only.",muted,false,15);
+            
+            
+            
+            if(!ssc_vehicle::attached)text(282,526,L"Unavailable on this game version",muted,false,14);
         } else if(settings_page==25){
             text(266,111,L"FREECAM PHOTO",ink,true);button(585,850,106,236,38,L"< FREECAM");
             text(282,204,L"PHOTO FREEZE");toggle(963,978,195,ssc_freecam::photo_enabled);
-            text(282,254,L"Freeze offline simulation while keeping the camera movable.",muted,false,13);
-            text(282,286,L"Only available while Freecam is active in offline single-player.",muted,false,13);
+            text(282,254,L"Pause the game while moving the camera.",muted,false,13);
+            text(282,286,L"Requires single-player Freecam.",muted,false,13);
             text(282,350,L"FREEZE KEY");{std::wstring key=ssc_freecam::photo_key>=VK_F1&&ssc_freecam::photo_key<=VK_F12?L"F"+std::to_wstring(ssc_freecam::photo_key-VK_F1+1):std::wstring(1,wchar_t(ssc_freecam::photo_key));button(964,600,337,430,40,photo_binding?L"PRESS KEY (ESC CANCEL)":key.c_str());}
             text(282,420,L"Press again to resume. Leaving Freecam always resumes.",muted,false,13);
             button(990,282,450,748,40,L"LOCATION CAPTURE");
@@ -1463,9 +1757,9 @@ void paint_panel() {
             button(3300,282,445,350,36,L"GET UPLOAD CODE");button(3301,646,445,384,36,L"PASTE UPLOAD CODE");
             text(282,500,L"SEND NEW F9 CAPTURES FOR REVIEW",muted,false,14);toggle(3302,978,490,ssc_capture_upload::enabled.load());
             text(282,540,ssc_capture_upload::message(),muted,false,12);
-            text(282,564,L"Compact still + six faces + location. 20/day. Owner review required.",muted,false,12);
+            text(282,564,L"Limit: 20 captures per day. Submissions are reviewed.",muted,false,12);
             button(3304,282,582,270,36,L"CLEAR UPLOAD CODE");
-            text(282,634,(L"FLOOR CLEARANCE (NATIVE UNITS): "+std::to_wstring(int(ssc_freecam::eye_height))).c_str(),muted,false,13);button(994,850,620,80,36,L"-");button(995,950,620,80,36,L"+");
+            text(282,634,(L"FLOOR CLEARANCE: "+std::to_wstring(int(ssc_freecam::eye_height))).c_str(),muted,false,13);button(994,850,620,80,36,L"-");button(995,950,620,80,36,L"+");
         } else if(settings_page==24){
             text(266,111,L"FREECAM",ink,true);button(962,610,106,220,38,L"PHOTO SETTINGS");button(587,850,106,236,38,L"< MISC");
             button(592,282,190,230,38,L"PAN",!ssc_freecam::fly,!ssc_freecam::capture::session.active());button(593,528,190,250,38,L"3D FREECAM",ssc_freecam::fly&&!ssc_freecam::fps,!ssc_freecam::capture::session.active());button(993,794,190,236,38,L"3D + FLOOR",ssc_freecam::fps,!ssc_freecam::capture::session.active()&&ssc_freecam::ground_supported);
@@ -1491,7 +1785,7 @@ void paint_panel() {
             text(282,492,L"To everyone in the SSC Discord who provided feedback",muted,false,14);
             text(282,523,L"during early module development, thank you!",muted,false,14);
             button(276,282,572,360,38,L"discord.gg/skillshotcity");
-            button(1601,670,572,360,38,L"MORE PEOPLE");
+            button(1970,670,572,360,38,L"MORE PEOPLE");
         } else if(settings_page==20){
             text(266,111,L"PERSONAL STATISTICS",ink,true);
             button(601,926,108,160,38,L"REFRESH",false,!ssc_stats::reader().busy.load());
@@ -1512,8 +1806,8 @@ void paint_panel() {
             text(266,200,L"RECORDING");toggle(270,520,190,recording_requested);
             button(271,646,190,420,44,L"OPEN RECORDINGS FOLDER");
             const wchar_t* statuses[]={L"Stopped",L"Recording locally",L"Unable to write recording",L"Storage limit reached",L"Starting",L"Stopping",L"Waiting for an active BR round"};text(266,267,statuses[std::min(6u,ssc_record::state().status.load())],cyan);
-            text(266,318,L"Saves round stats, build choices and post-game report data.",muted,false,14);
-            text(266,356,L"Enable before a match. This setting persists across restarts.",muted,false,14);
+            text(266,318,L"Records stats, builds and match reports.",muted,false,14);
+            text(266,356,L"Enable before joining a match.",muted,false,14);
             button(600,266,422,400,44,L"VIEW PERSONAL STATISTICS");button(997,682,422,384,44,L"POST-GAME SUMMARY");
         } else if(settings_page==11){
             text(266,111,L"WEAPON LAB",ink,true);
@@ -1525,9 +1819,9 @@ void paint_panel() {
             button(233,904,190,182,38,L"INFO",ssc_lab::tab==3);
             if(ssc_lab::tab==3){
                 text(282,265,L"Select a weapon for Player A and Player B.",ink,false,15);
-                text(282,305,L"Each player fires at the other; bars belong to that player.",muted,false,13);
+                
                 text(282,356,L"PLAY DUEL runs shots and reloads until someone wins.",ink,false,14);
-                text(282,396,L"Target Setup applies the same starting health and shield to both.",muted,false,13);
+                text(282,396,L"Target Setup sets both players' starting health and shield.",muted,false,13);
                 text(282,447,L"MISS adds a chance for each projectile to miss.",ink,false,14);
                 text(282,487,L"REROLL MISSES tries a different pattern of hits and misses.",muted,false,13);
                 text(282,538,L"Weapon Stats compares up to four weapons; blue marks the best values.",muted,false,12);
@@ -1621,7 +1915,7 @@ void paint_panel() {
             button(146,266,188,300,48,L"EDIT HUD",false,ssc_hud::attached);button(143,266,254,300,40,L"RESET LAYOUT");
         } else {
             text(266,111,L"ABOUT SSC MOD MENU",ink,true);
-            text(266,157,L"0.1.33",cyan);
+            text(266,157,ssc_version::label,cyan);
             text(266,203,L"Optional client-side features for Skillshot City.",muted);
             rectangle(266,255,820,118,RGB(16,37,62));
             text(282,273,L"GAME COMPATIBILITY");
@@ -1637,6 +1931,7 @@ void paint_panel() {
 
         }
         rectangle(20,669,1080,1,RGB(38,65,101));if(save_failed)text(28,687,L"Could not save settings",RGB(247,191,83));
+        if(settings_page==31||settings_page==35||settings_page==36||settings_page==39)button(1890,266,677,320,34,settings_page==31?L"< COLORS":settings_page==35?L"< CHAT SPEECH":settings_page==39?L"< CHAOS":L"< SOUNDS");
         button(5,862,677,226,34,L"<  QUICK MENU");
     }
     if(dropdown>=0){auto owner=std::find_if(controls.begin(),controls.end(),[](const Control& c){return c.id==dropdown;});if(owner!=controls.end()){int x=owner->x,w=std::max(owner->w,210),rows=std::min(8,int(dropdown_items.size())),first=std::clamp(dropdown_choice-rows/2,0,std::max(0,int(dropdown_items.size())-rows)),height=rows*32,y=owner->y+owner->h+3;if(y+height>panel_h-66)y=std::max(90,owner->y-height-3);w=std::min(w,panel_w-20-x);rectangle(x-2,y-2,w+4,height+4,cyan);for(int row=0;row<rows;++row){int i=first+row;button(1000+i,x,y+row*32,w,32,dropdown_items[i].c_str(),i==dropdown_choice);}}}
@@ -1646,19 +1941,20 @@ void paint_panel() {
         text(146,141,L"MORE PEOPLE",ink,true);
         struct Credit {const wchar_t* name;const wchar_t* lines[4];};
         static const Credit people[]={
-          {L"yari_check",{L"For testing out the Linux build and helping me suffer through",L"an Arch VM install",nullptr,nullptr}},
+          {L"yari_check<3",{L"For testing out the Linux build and helping me suffer through",L"an Arch VM install",nullptr,nullptr}},
           {L"jyxalag",{L"For reviewing early builds and testing out the private access feature",nullptr,nullptr,nullptr}},
           {L"alsamandal",{L"For resisting against the Manga Recruit monopoly!",nullptr,nullptr,nullptr}},
           {L"ironmonkey808",{L"For giving great feedback and making a really cool SSC Starter Guide!",L"And for putting up with me joining his lobbies in the last 2 minutes",L"and winning",nullptr}},
           {L"chill",{L"For being a chill guy (and for giving some great suggestions)",nullptr,nullptr,nullptr}},
           {L"geri",{L"Founder of the Geri Challenge (fan-made challenge where",L"you aren't allowed to draft skills or use stims)",nullptr,nullptr}},
           {L"mang",{L"For answering a ton of questions I had as a new player and for their",L"work on a synergy chart (which is planned to be implemented in",L"the mod soon)",nullptr}},
-          {L"deus",{L"For building my hatred for snipers so much that I always keep one",L"in my second weapon slot :D",nullptr,nullptr}}};
-        for(int row=0;row<3;++row){int index=credits_page*3+row;if(index>=int(std::size(people)))break;int y=193+row*126;bool acid=std::wcscmp(people[index].name,L"alsamandal")==0;COLORREF name_color=std::wcscmp(people[index].name,L"mang")==0?RGB(60,179,113):std::wcscmp(people[index].name,L"deus")==0?RGB(207,196,0):std::wcscmp(people[index].name,L"jyxalag")==0?RGB(239,191,4):cyan;text(146,y,people[index].name,name_color,true,20,acid?float(GetTickCount64()%6000)/6000.f:-1.f);for(int line=0;line<4&&people[index].lines[line];++line)text(146,y+33+line*23,people[index].lines[line],muted,false,14);}
+          {L"deus",{L"For building my hatred for snipers so much that I always keep one",L"in my second weapon slot :D",nullptr,nullptr}},
+          {L"RageMC",{L"For existing!",nullptr,nullptr,nullptr}}};
+        for(int row=0;row<3;++row){int index=credits_page*3+row;if(index>=int(std::size(people)))break;int y=193+row*126;bool acid=std::wcscmp(people[index].name,L"alsamandal")==0;COLORREF name_color=std::wcscmp(people[index].name,L"yari_check<3")==0?RGB(199,0,255):std::wcscmp(people[index].name,L"ironmonkey808")==0?RGB(172,165,216):std::wcscmp(people[index].name,L"geri")==0?RGB(46,214,255):std::wcscmp(people[index].name,L"chill")==0?RGB(255,215,0):std::wcscmp(people[index].name,L"RageMC")==0?RGB(252,248,3):std::wcscmp(people[index].name,L"mang")==0?RGB(60,179,113):std::wcscmp(people[index].name,L"deus")==0?RGB(207,196,0):std::wcscmp(people[index].name,L"jyxalag")==0?RGB(239,191,4):cyan;text(146,y,people[index].name,name_color,true,20,acid?float(GetTickCount64()%6000)/6000.f:-1.f);for(int line=0;line<4&&people[index].lines[line];++line)text(146,y+33+line*23,people[index].lines[line],muted,false,14);}
         button(572,146,590,100,36,L"<",false,credits_page>0);button(573,260,590,100,36,L">",false,credits_page<2);
         auto page=std::to_wstring(credits_page+1)+L" / 3";text(390,599,page.c_str(),muted,false,14);button(571,794,590,180,36,L"CLOSE");
     }
-    if(color_popup!=-2&&manager&&settings_page==4){
+    if(color_popup!=-2&&manager&&(settings_page==4||settings_page==32)){
         controls.clear();edit_visuals.clear();rectangle(398,178,324,406,RGB(38,65,101));rectangle(400,180,320,402,RGB(17,35,57));
         text(420,200,L"CHOOSE COLOR",ink,true,20);
         button(557,420,244,276,190,L"");button(558,420,454,276,22,L"");

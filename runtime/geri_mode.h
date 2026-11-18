@@ -1,15 +1,17 @@
 #pragma once
 #include "compatibility.h"
+#include "creator_controls.h"
 #include <atomic>
 namespace ssc_geri {
 inline std::atomic<bool> enabled{false};
 inline bool attached=false;
 using Panel=void(*)(uintptr_t);
-inline Panel original=nullptr;
+inline bool (*hide_panel)()=nullptr;
+inline Panel original=nullptr;inline void (*after_panel)(uintptr_t)=nullptr;inline bool (*before_panel)(uintptr_t)=nullptr;inline void (*restore_panel)()=nullptr;
 // This call encloses the skill draft/reroll/syringe UI, not the currency HUD.
 // Suppress its rendering and its own interaction handlers together. No actor,
 // inventory, draft offer, skill-point or syringe data is modified.
-inline void panel(uintptr_t context){if(!enabled.load()&&original)original(context);}
+inline void panel(uintptr_t context){if(!enabled.load()&&original){struct Scope{bool active;explicit Scope(uintptr_t p):active(before_panel&&before_panel(p)){}~Scope(){if(active&&restore_panel)restore_panel();}} scope(context);{if(hide_panel&&hide_panel()){ssc_creator::WriteMask mask;original(context);}else original(context);}if(after_panel)after_panel(context);}}
 // The world-click dispatcher tests this separately from drawing the panel.
 // Returning false skips only the skill-panel hit region; its next inventory and
 // other UI tests still run normally. No persistent game UI/actor state is changed.

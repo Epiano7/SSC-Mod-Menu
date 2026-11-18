@@ -26,6 +26,7 @@ ssc_hud_bridge:
  movl %r10d, %ecx
  leaq 0x180(%rsp), %rdx
  leaq 0x250(%rsp), %r8
+ movq 0xd8(%rsp), %r9
  call ssc_hud_before
  movq %rax, 0x168(%rsp)
  movl 0x180(%rsp), %ecx
@@ -45,6 +46,25 @@ ssc_hud_bridge:
  movss 0x188(%rsp), %xmm0
  movss %xmm0, 0x20(%rsp,%rax)
 3:
+ // Only validated build presentation roots override low floating arguments.
+ testb $4, 0x18c(%rsp)
+ jz 4f
+ movl $0, 0x120(%rsp)
+4:
+ testb $8, 0x18c(%rsp)
+ jz 5f
+ movl $0, 0x130(%rsp)
+5:
+ testb $16, 0x18c(%rsp)
+ jz 6f
+ movq 0x190(%rsp), %rax
+ movq %rax, 0xd0(%rsp)
+6:
+ // Blind active skills use the validated native question-mark tile.
+ testb $32, 0x18c(%rsp)
+ jz 7f
+ movl $807, 0x30(%rsp)
+7:
  movq 0xf8(%rsp), %rax
  pushq %rax
  popfq

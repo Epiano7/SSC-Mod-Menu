@@ -23,6 +23,6 @@ $includes+=@("-ffile-prefix-map=$(($root.Replace('\','/') -replace '^[A-Za-z]:/U
 if($LASTEXITCODE){throw 'Proxy generation failed'}
 & $Compiler @includes -O2 -ffp-contract=off -std=c++17 -shared -static -Wall -Wextra -Werror -Wno-cast-function-type "-I$build" "$root/runtime/proxy_loader.cpp" "$build/proxy_stubs.S" "$build/proxy.def" @auth -lbcrypt -lole32 -lwindowscodecs -o "$build/opengl32.dll"
 if($LASTEXITCODE){throw 'Proxy compilation failed'}
-& $Compiler @includes -O2 -ffp-contract=off -fno-devirtualize -std=c++17 -shared -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/runtime/overlay.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" @auth -o "$build/runtime.dll" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 "$audioCodec" -lmfreadwrite -lmfplat -lmfuuid -lole32 -lshell32 -lwindowscodecs
+& $Compiler @includes -O2 -ffp-contract=off -fno-devirtualize -std=c++17 -shared -static -Wall -Wextra -Werror -Wno-cast-function-type "$root/runtime/overlay.cpp" "$root/runtime/score_bridge.S" "$root/runtime/hud_bridge.S" @auth -o "$build/runtime.dll" -lopengl32 -lgdi32 -lbcrypt -lcomdlg32 "$audioCodec" -lmfreadwrite -lmfplat -lmfuuid -lole32 -lsapi -lwinmm -lshell32 -lwindowscodecs
 if($LASTEXITCODE){throw 'Runtime compilation failed'}
 Get-FileHash -LiteralPath "$build/opengl32.dll","$build/runtime.dll" -Algorithm SHA256

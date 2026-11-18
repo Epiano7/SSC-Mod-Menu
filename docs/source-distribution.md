@@ -13,8 +13,9 @@ digests are rejected. Do not regenerate fingerprints or pins just to obtain a pa
 Full native binding/call audits also require `--private-source PATH`.
 
 The public compatibility probe and Freecam/Driving fixtures build without private
-inputs. Installer, updater, Linux source and payload approvals retain the current
-stable v0.1.29 behavior. This cleanup does not publish a release or replace any assets.
+inputs. The v0.1.37 source snapshot includes the new client modules and requires its
+matching private build input. Release packaging validates the approved Windows
+and Linux payloads separately. Source publication does not install or publish assets.
 
 The exact reviewed public inventory is hash-sealed in source-export.json. Release
 packaging verifies it first. Do not put private inputs, owner settings, logs, real

@@ -1,7 +1,6 @@
  <a href="https://epiano7.dev" target="_blank" rel="noopener noreferrer"><img src="https://epiano7.dev/assets/buttons/epiano7.png" width="88" height="31" alt="epiano7.dev"></a>
 [![Downloads](https://raw.githubusercontent.com/Epiano7/SSC-Mod-Menu/traffic-data/downloads.svg)](https://github.com/Epiano7/SSC-Mod-Menu/releases)
 ![Traffic](https://raw.githubusercontent.com/Epiano7/SSC-Mod-Menu/traffic-data/badge.svg)
-[![Latest release](https://img.shields.io/github/v/release/Epiano7/SSC-Mod-Menu?style=flat&label=Latest%20release&labelColor=555&color=049104)](https://github.com/Epiano7/SSC-Mod-Menu/releases/latest)
 # SSC Mod Menu
 
 An unofficial client-side mod for Skillshot City, with a Windows installer and an experimental Linux installer for Steam Proton.
@@ -29,7 +28,7 @@ The installer runs natively; the game and mod use Proton. The native Linux game 
 
 ## Modules
 
-- **Sound Replacer:** import WAV or MP3 replacements for sound effects and music, preview clips, adjust individual volume, and replace related variants together. **All Music Tracks** uses one custom song across the music playlist. Track lengths are shown, and replacements apply only after restarting the game
+- **Sound Replacer:** use random sound lists for related events, including human kills and vehicle engines, or a shared music list. Existing event replacements migrate automatically; ambience groups are optional. Effect changes require a restart; music edits apply at the next track change. Preview clips and adjust individual volume
 - **Cosmetics:** customize your name with a solid color, animated rainbow, or a custom gradient with up to three colors. Colors are client-side by default and can be shared to other mod menu users if you have bought the DLC or you currently have the Acid Pass active in SSC. [Details and supported displays](docs/shared-cosmetics.md)
 - **Discord Presence:** shows game status, available round and level details, elapsed time, and SSC rating. Only works on the discord app (windows and linux) as the web one does not support a custom rpc.
 - **HUD Editor:** move and resize most HUD elements, save layouts, and reset individual elements
@@ -42,11 +41,20 @@ The installer runs natively; the game and mod use Proton. The native Linux game 
 - **Flashbang:** choose an inverted black flash or a fully opaque custom image, with the original strength and fade timing.
 - **Map Capture Submissions:** optional F9 still and panorama contributions from single-player 3D Freecam. Get an upload code from [Skillshot Guesser](https://ssg.epiano7.dev/contribute), paste it in Location Capture settings and enable sending. Submissions require review before inclusion.
 
+- **Random Drafts:** automatically reroll and choose skills and available stim mutations. Paid rerolls spend in-game cash. Enable Blind Drafts to hide your build until the final round ends. The enabled setting and options persist across restarts.
+- **Chaos Mode:** combine weighted HUD, camera, color, pixelation and mirrored-movement effects. Off by default, with motion and visual warnings.
+- **KOS:** mark public player names locally with a customizable color. Use the settings list or `/kos NAME`; anonymous players stay unmarked.
+- **Chat Commands:** press **/** for local commands and suggestions. `/help` lists commands; `/team` and `/all` select the chat audience. JARVIS replies stay local in normal chat history. Start a public message with `./` to send a leading slash.
+- **Chat Speech:** local TTS, Windows / David by default, with an optional Piper Norman download or custom Piper model import. Includes announcement, own-message and sender-name filters, per-name muting, and volume up to 200%. No sign-in is required.
+
 ## Other features
+
+- **Cosmetic Animation:** forward, reverse or ping-pong movement, adjustable speed and optional breathing; animation is client-side.
+- **Loading Tips:** community tips are on by default and can be disabled in Misc.
 
 - **Weapon Lab:** search weapons by name, tier, or type. Compare up to four weapons with stronger values highlighted; adjust health, shields, and miss chance; and watch a timed duel with reloads. Simulations are estimates and do not account for skills or other round perks like shop purchases 
 - **Match Recording:** optionally save observed Battle Royale rounds together in a local match file, including class, level, XP, cash, health, weapons, selected skills, skill levels and any mutations if applicable.
-- **Personal Statistics:** browse local recordings by class and date, view summary statistics, and inspect level, XP and cash graphs with grid options and hover values. Late joins will also collect some data.
+- **Personal Statistics:** browse local recordings by class and date, view summary statistics, and inspect larger level, XP and cash graphs with grid options and hover values. Late joins and unavailable fields are distinguished from complete observations.
 - **Interface:** adjust UI scale, choose which modules appear in the quick menu, and customize animation and HUD display preferences.
 - **Geri Challenge:** hide the skill-draft and syringe selection panel from **All Modules > Misc**. Disabled by default; switch it off to restore the panel. This hides the UI and does not enforce challenge rules. [Details and testing limits](docs/geri-challenge.md)
 - **Updates:** check for releases through the in-game prompt. Once every game boot, the mod will automatically check and prompt the user to update if any are avaliable
@@ -72,16 +80,17 @@ A custom HUD layout in game:
 
 The menu will install into your Skillshot City Steam folder. Each native module checks its dependencies at startup for compatibility issues. Game updates might break some modules depending on the update, in which a hotfix will be released. Larger game changes may still require a mod update.
 
-If something goes wrong, open **All Modules > About > Open logs**, and dm them to me (epiano7) or make an issue here with them included. Startup checks are recorded in `runtime.log`, and crash reports are saved under `diagnostics` when Windows allows the crash handler to run. These reports are not automatically uploaded to any servers and stay local.
+If something goes wrong, open **All Modules > About > Open logs**, and dm them to Epiano7 or make an issue here with them included. Startup checks are recorded in `runtime.log`; crash reports are saved under `diagnostics` when Windows allows the crash handler to run. These reports are not automatically uploaded to any servers and stay local. Minidumps can contain process data, so review them before sharing.
 
 ## Credits
 - bencelot (dev of SSC) for giving feedback before this released and for making the game!
 - everyone in the [SSC discord](https://discord.gg/skillshotcity) that provided feedback regarding early module dev, thank you!
 - for some more specific names:
-  - yari_check for requesting/testing the Linux build and helping me install arch on a VM :D
-  - jyxalag for reviewing and testing early builds and beta features (and for popularizing the geri challenge)
+  - yari_check for testing out the Linux build and helping me suffer through an Arch VM install
+  - jyxalag for reviewing and testing early builds
   - alsamandal for resisting against the Manga Recruit monopoly!
-  - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk)
+  - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk), and for putting up with me 
+  joining his lobbies in the last 2 minutes and winning
   - chill for being a chill guy (and for giving some great suggestions)
   - geri, founder of the Geri Challenge (fan-made challenge where you aren't allowed to draft skills)
   - mang for answering a ton of questions I had as a new player and for their work on a synergy chart

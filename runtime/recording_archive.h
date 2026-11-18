@@ -20,11 +20,22 @@ inline std::string read(const std::filesystem::path& path,uintmax_t limit){
     f.read(data.data(),std::streamsize(size));require(size_t(f.gcount())==size);return data;
 }
 struct Zip {
-    mz_zip_archive zip{};std::string data;bool opened=false,writer=false;
-    explicit Zip(const std::filesystem::path& path){if(std::filesystem::exists(path)){data=read(path,ssc_record::archive_budget_bytes);require(mz_zip_reader_init_mem(&zip,data.data(),data.size(),0));opened=true;}}
+    struct Input {HANDLE handle=INVALID_HANDLE_VALUE;uint64_t size=0;~Input(){if(handle!=INVALID_HANDLE_VALUE)CloseHandle(handle);}} input;
+    mz_zip_archive zip{};bool opened=false,writer=false;
+    static size_t read_at(void* opaque,mz_uint64 offset,void* destination,size_t bytes){
+        auto& file=*static_cast<Input*>(opaque);if(offset>file.size||bytes>file.size-offset||bytes>MAXDWORD)return 0;
+        LARGE_INTEGER at{};at.QuadPart=LONGLONG(offset);if(!SetFilePointerEx(file.handle,at,nullptr,FILE_BEGIN))return 0;
+        DWORD got=0;return ReadFile(file.handle,destination,DWORD(bytes),&got,nullptr)?got:0;
+    }
+    explicit Zip(const std::filesystem::path& path){if(std::filesystem::exists(path)){
+        input.handle=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_FLAG_RANDOM_ACCESS,nullptr);require(input.handle!=INVALID_HANDLE_VALUE);
+        LARGE_INTEGER size{};require(GetFileSizeEx(input.handle,&size)&&size.QuadPart>=0&&uint64_t(size.QuadPart)<=ssc_record::archive_budget_bytes);input.size=uint64_t(size.QuadPart);
+        zip.m_pRead=read_at;zip.m_pIO_opaque=&input;require(mz_zip_reader_init(&zip,input.size,0));opened=true;
+    }}
     Zip(){writer=true;require(mz_zip_writer_init_heap(&zip,0,0));opened=true;}
     Zip(const Zip&)=delete;Zip& operator=(const Zip&)=delete;
     ~Zip(){if(opened){if(writer)mz_zip_writer_end(&zip);else mz_zip_reader_end(&zip);}}
+    void close_reader(){if(opened&&!writer){mz_zip_reader_end(&zip);opened=false;if(input.handle!=INVALID_HANDLE_VALUE){CloseHandle(input.handle);input.handle=INVALID_HANDLE_VALUE;}}}
     unsigned count(){return opened?mz_zip_reader_get_num_files(&zip):0;}
     std::string entry(unsigned i,std::string& name){
         mz_zip_archive_file_stat st{};require(mz_zip_reader_file_stat(&zip,i,&st));
@@ -50,7 +61,7 @@ inline void compact(const std::filesystem::path& folder){
     auto target=folder/L"recordings.zip";auto temp=folder/(L"recordings-"+std::to_wstring(GetCurrentProcessId())+L".zip.tmp");
     Zip old(target),out;std::set<std::string> names;uintmax_t expanded=0;
     require(old.count()+loose.size()<=10000);
-    for(unsigned i=0;i<old.count();++i){std::string name;auto raw=old.entry(i,name);expanded+=raw.size();require(expanded<=ssc_record::archive_budget_bytes&&names.insert(name).second);require(mz_zip_writer_add_from_zip_reader(&out.zip,&old.zip,i));}
+    for(unsigned i=0;i<old.count();++i){mz_zip_archive_file_stat st{};require(mz_zip_reader_file_stat(&old.zip,i,&st));std::string name=st.m_filename;require(!name.empty()&&name.size()<250&&name.find_first_of("/\\:")==std::string::npos&&std::filesystem::path(name).extension()==L".jsonl"&&!st.m_is_directory&&!st.m_is_encrypted&&st.m_uncomp_size<=ssc_record::file_budget_bytes);expanded+=st.m_uncomp_size;require(expanded<=ssc_record::archive_budget_bytes&&names.insert(name).second);require(mz_zip_writer_add_from_zip_reader(&out.zip,&old.zip,i));}
     for(const auto& p:loose){auto name=p.filename().string();auto raw=read(p,ssc_record::file_budget_bytes);
         if(!names.insert(name).second){int index=mz_zip_reader_locate_file(&old.zip,name.c_str(),nullptr,0);require(index>=0);std::string prior;require(old.entry(unsigned(index),prior)==raw);continue;}
         expanded+=raw.size();require(expanded<=ssc_record::archive_budget_bytes);require(mz_zip_writer_add_mem(&out.zip,name.c_str(),raw.data(),raw.size(),6));
@@ -61,9 +72,10 @@ inline void compact(const std::filesystem::path& folder){
     DWORD written=0;bool ok=WriteFile(h,bytes,DWORD(size),&written,nullptr)&&written==size&&FlushFileBuffers(h);CloseHandle(h);require(ok);
     {Zip verify(temp);require(verify.count()==names.size());for(unsigned i=0;i<verify.count();++i){std::string name;verify.entry(i,name);}
      for(const auto& p:loose){int index=mz_zip_reader_locate_file(&verify.zip,p.filename().string().c_str(),nullptr,0);require(index>=0);std::string name;require(verify.entry(unsigned(index),name)==read(p,ssc_record::file_budget_bytes));}}
+    old.close_reader();
     require(MoveFileExW(temp.c_str(),target.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH));
     // The replacement is durable and every original was compared byte-for-byte.
     for(const auto& p:loose)std::filesystem::remove(p);
 }
-inline void try_compact(const std::filesystem::path& folder) noexcept {try{compact(folder);}catch(...){OutputDebugStringA("SSC: recording compression failed; originals preserved\n");}}
+inline void try_compact(const std::filesystem::path& folder) noexcept {try{std::unique_lock<std::recursive_mutex> lock(mutex(),std::try_to_lock);if(!lock.owns_lock())return;compact(folder);}catch(...){OutputDebugStringA("SSC: recording compression failed; originals preserved\n");}}
 }

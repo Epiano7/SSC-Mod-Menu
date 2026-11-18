@@ -140,14 +140,21 @@ struct Engine {
    fired.insert(i);waiting.erase(it);
    std::string text,error;if(!format(r.message,o.values,text,error)){auto detail=r.name+": "+error;round_error=std::wstring(detail.begin(),detail.end());status=round_error;continue;}
    uint64_t due=now+uint64_t(r.delay_seconds)*1000;
-   for(int repeat=0;repeat<r.repeats&&pending.size()<60;++repeat)pending.push_back({text,due+15000+uint64_t(repeat)*message_interval_ms,i,code(r),due,r.message,o.values});
+   // Keep the legacy repeats field readable for saved/shared rules, but send
+   // only once per trigger. Never build a backlog of repeated announcements.
+   if(pending.size()<12)pending.push_back({text,due+15000,i,code(r),due,r.message,o.values});
   }
   if(finish)ended=true;
   previous=o.values;
  }
- template<class Sender> void dispatch(uint64_t now,Sender send){
+ template<class Sender> void dispatch(uint64_t now,Sender send,bool budget_available=true){
   if(!enabled){reset();return;}
   pending.erase(std::remove_if(pending.begin(),pending.end(),[&](const Pending& p){return now>=p.expires||p.rule>=rules.size()||!rules[p.rule].enabled||code(rules[p.rule])!=p.signature;}),pending.end());
+  if(!budget_available){
+   const auto first_due=std::remove_if(pending.begin(),pending.end(),[&](const Pending& p){return now>=p.due;});
+   if(first_due!=pending.end()){pending.erase(first_due,pending.end());status=L"Auto message skipped: chat cooldown";}
+   return;
+  }
   if(last_send&&(now<last_send||now-last_send<message_interval_ms))return;
   auto it=std::find_if(pending.begin(),pending.end(),[&](const Pending& p){return now>=p.due;});
   if(it!=pending.end()){

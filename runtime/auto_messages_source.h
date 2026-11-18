@@ -1,15 +1,17 @@
 #pragma once
 #include "privacy.h"
+#include "chat_send_budget.h"
 #include "quick_chat.h"
 #include "auto_messages.h"
 #include "combat_stats.h"
 namespace ssc_auto {
-// Native weapon HUD (group 8, 41c120): +4b0 stores the assigned slot.
-// 0 = melee, 1 = throwable, 2/3 = first/second gun. Array order is unstable.
+// Native weapon HUD reads +4b0 as a category, not a displayed slot number.
+// Its bottom-up row traversal is 0,2,3 (melee, second gun, first gun);
+// category 1 is the separately placed throwable. Inventory array order is unstable.
 inline void sample_inventory_slots(uintptr_t begin,uintptr_t end,Values& values){
  using ssc_names::read;
  if(end<begin||(end-begin)%0x748||(end-begin)/0x748>16||(!begin&&end))return;
- const int native_slots[]={2,3,0};
+ const int native_slots[]={3,2,0};
  for(int i=0;i<3;++i){
   auto key="weapon"+std::to_string(i+1);values.erase(key);uintptr_t match=0;bool valid=true;
   for(auto record=begin;record<end;record+=0x748){
@@ -117,16 +119,16 @@ inline bool send_native(uintptr_t base,uintptr_t world,uintptr_t actor,const std
  // temporary native-layout string into its own outbound queue, then shows it locally.
  ssc_chat::NativeString message{reinterpret_cast<uintptr_t>(text.data()),0,text.size(),std::max(size_t(16),text.size())};
  if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x223570));
+ if(!ssc_chat::native_spam_available(actor))return false;
  sender(world,0,actor,&message);
- // Engine::dispatch limits automatic messages. Observe the native wheel's
- // cooldown above, but never impose an additional lockout on manual input.
+ ssc_chat::charge_native_spam(actor,false);
  return true;
 }
 inline void diagnose(const Observation& o,uint64_t now){
  static std::string previous;
  if(diagnostic_dir.empty())return;
  try{
-  Json state={{"connected",o.connected},{"valid",o.valid},{"round",o.round},{"active",o.active},{"ending",o.ending},{"preparing",o.preparing},{"tracker_running",round_tracker.running},{"tracker_prepared",round_tracker.prepared},{"timing_complete",round_tracker.complete},{"damage_baseline_available",round_tracker.start_damage>=0},{"damage_available",o.values.count("damageTaken")!=0},{"pending",engine.pending.size()},{"status",std::string(status.begin(),status.end())}};
+  Json state={{"weapon_mapping",2},{"connected",o.connected},{"valid",o.valid},{"round",o.round},{"active",o.active},{"ending",o.ending},{"preparing",o.preparing},{"tracker_running",round_tracker.running},{"tracker_prepared",round_tracker.prepared},{"timing_complete",round_tracker.complete},{"damage_baseline_available",round_tracker.start_damage>=0},{"damage_available",o.values.count("damageTaken")!=0},{"pending",engine.pending.size()},{"status",std::string(status.begin(),status.end())}};
   for(const auto* key:{"weapon1","weapon2","weapon3","weaponName"}){auto it=o.values.find(key);if(it!=o.values.end())state[key]=it->second;}
   auto signature=state.dump();if(signature==previous)return;previous=signature;
   state["tick"]=now;state["damage_counter"]=o.damage_total;state["damage_baseline"]=round_tracker.start_damage;
@@ -154,10 +156,11 @@ inline void tick(uint64_t now,bool recording=false){
  last=now;
  ssc_combat::enabled.store(requested&&ssc_combat::attached,std::memory_order_relaxed);
  if(!requested){tracking_observation={};tracking_at=0;engine.reset();round_tracker.reset();std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();return;}
+ ssc_perf::Scope tracker_timing(ssc_perf::tracker);
  try{auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t actor=0,world=0;auto o=sample(base,actor,world);round_tracker.observe(o,now);
  if(ssc_combat::attached){std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::Context c;c.valid=o.valid;c.active=o.active;c.ending=o.ending;c.preparing=o.preparing;c.session=o.session;c.actor=actor;c.round=o.round;ssc_combat::counter.observe(c);if(o.valid)append_combat_values(o.values,ssc_combat::counter);}
  tracking_observation=o;tracking_at=now;
- if(messaging){engine.observe(o,now);if(o.valid)engine.dispatch(now,[&](const std::string& text){return send_native(base,world,actor,text);});diagnose(o,now);}else engine.reset();}
+ if(messaging){engine.observe(o,now);if(o.valid&&!engine.pending.empty())engine.dispatch(now,[&](const std::string& text){return send_native(base,world,actor,text);},ssc_chat::native_spam_available(actor));diagnose(o,now);}else engine.reset();}
  catch(...){tracking_observation={};tracking_at=0;enabled=false;ssc_combat::enabled=false;engine.reset();round_tracker.reset();status=L"Auto messages paused after a data error";}
 }
 }

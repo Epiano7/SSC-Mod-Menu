@@ -4,24 +4,36 @@
 #include <map>
 #include <string>
 #include <atomic>
+#include <memory>
 #include <algorithm>
 #include <cstring>
+#include <vector>
+#include "sound_pool_playback.h"
 namespace ssc_music {
 using Open=HANDLE(WINAPI*)(LPCWSTR,DWORD,DWORD,LPSECURITY_ATTRIBUTES,DWORD,DWORD,HANDLE);
 inline Open original=CreateFileW;
-// Immutable once the game import is attached; UI edits apply on restart.
-inline std::map<std::wstring,std::wstring> redirects;
+using Redirects=std::map<std::wstring,std::wstring>;
+inline Redirects redirects;
+using Playlists=std::map<std::wstring,std::vector<std::wstring>>;
+struct Snapshot {Redirects singles;Playlists lists;};
+inline std::shared_ptr<const Snapshot> live_redirects;
+inline std::atomic<bool> enabled{true};
+inline void publish(Redirects value,Playlists lists={}){std::atomic_store(&live_redirects,std::make_shared<const Snapshot>(Snapshot{std::move(value),std::move(lists)}));}
 inline std::atomic<unsigned> redirected{0};
+inline bool (*next_random)(uint32_t&)=ssc_sound_pool::random_word;
 inline bool attached=false;
 inline std::wstring normalized(const std::filesystem::path& path){
  auto s=std::filesystem::absolute(path).lexically_normal().wstring();std::replace(s.begin(),s.end(),L'/',L'\\');CharLowerBuffW(s.data(),DWORD(s.size()));return s;
 }
 inline HANDLE WINAPI open(LPCWSTR path,DWORD access,DWORD sharing,LPSECURITY_ATTRIBUTES security,DWORD creation,DWORD flags,HANDLE template_file){
- if(path&&!redirects.empty()&&wcslen(path)>=4&&!_wcsicmp(path+wcslen(path)-4,L".ogg")&&creation==OPEN_EXISTING&&(access&GENERIC_READ)&&!(access&(GENERIC_WRITE|DELETE|FILE_WRITE_DATA|FILE_APPEND_DATA))){
-  try{auto found=redirects.find(normalized(path));if(found!=redirects.end()){
-   auto handle=original(found->second.c_str(),access,sharing,security,creation,flags,template_file);
-   if(handle!=INVALID_HANDLE_VALUE){++redirected;return handle;}
-  }}catch(...){}
+ auto snapshot=std::atomic_load(&live_redirects);
+ if(enabled.load()&&path&&snapshot&&(!snapshot->singles.empty()||!snapshot->lists.empty())&&wcslen(path)>=4&&!_wcsicmp(path+wcslen(path)-4,L".ogg")&&creation==OPEN_EXISTING&&(access&GENERIC_READ)&&!(access&(GENERIC_WRITE|DELETE|FILE_WRITE_DATA|FILE_APPEND_DATA))){
+  try{const auto key=normalized(path);auto list=snapshot->lists.find(key);
+   if(list!=snapshot->lists.end()&&!list->second.empty()){
+    size_t choice=0;if(!ssc_sound_pool::choose(list->second.size(),next_random,choice))return original(path,access,sharing,security,creation,flags,template_file);
+    for(size_t i=0;i<list->second.size();++i){const auto& file=list->second[(choice+i)%list->second.size()];auto handle=original(file.c_str(),access,sharing,security,creation,flags,template_file);if(handle!=INVALID_HANDLE_VALUE){++redirected;return handle;}}
+   }else{auto found=snapshot->singles.find(key);if(found!=snapshot->singles.end()){auto handle=original(found->second.c_str(),access,sharing,security,creation,flags,template_file);if(handle!=INVALID_HANDLE_VALUE){++redirected;return handle;}}}
+  }catch(...){}
  }
  return original(path,access,sharing,security,creation,flags,template_file);
 }

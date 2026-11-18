@@ -12,9 +12,9 @@ inline Detection native_read(){
  return value==0?Detection::off:value==1?Detection::on:Detection::unavailable;
 }
 inline bool initialize_native(uintptr_t base){
- native_base=0;
+ native_base=0;tournament_validated=false;
  struct Span{uint32_t rva,length;uint64_t hash;};
- const Span spans[]={{0x6a20e0,9088,0xea3a4c3d4869032aULL},{0x1f3660,3466,0x532d3b1852a5cdf3ULL}};
+ const Span spans[]={{0x3ad410,41,0x6f2f73be202a23acULL},{0x7ddfa4,103,0xc5864bda29e180ffULL},{0xc7b1b0,13,0xd544cc964571dddeULL},{0x6a20e0,9088,0xea3a4c3d4869032aULL},{0x1f3660,3466,0x532d3b1852a5cdf3ULL}};
  for(const auto& span:spans){std::vector<unsigned char> bytes(span.length);SIZE_T read=0;
   if(!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(base+span.rva),bytes.data(),bytes.size(),&read)||read!=bytes.size()){reader=native_read;return false;}
   uint64_t hash=14695981039346656037ULL;for(auto byte:bytes)hash=(hash^byte)*1099511628211ULL;
@@ -22,6 +22,6 @@ inline bool initialize_native(uintptr_t base){
  }
  unsigned char value=255;SIZE_T read=0;
  if(!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(base+0xfb38bb),&value,1,&read)||read!=1||value>1){reader=native_read;return false;}
- native_base=base;reader=native_read;return true;
+ tournament_validated=true;native_base=base;reader=native_read;return true;
 }
 }

@@ -64,7 +64,16 @@ inline void parse_recording(const std::string& input,Report& report){
     while(std::getline(stream,line)){
         if(line.size()>1024*1024||++count>200000){throw std::runtime_error("Recording exceeds analysis limits");}
         try{
-            auto row=Json::parse(line,[](int depth,Json::parse_event_t,Json&){if(depth>32)throw std::runtime_error("JSON nesting limit");return true;});
+            std::string root_key,tracking_key;
+            auto row=Json::parse(line,[&](int depth,Json::parse_event_t event,Json& value){
+             if(depth>32){throw std::runtime_error("JSON nesting limit");}if(event!=Json::parse_event_t::key)return true;
+             const auto& key=value.get_ref<const std::string&>();
+             if(depth==1){root_key=key;return key=="event"||key=="started_utc_ms"||key=="timeline"||key=="sampling_interval_ms"||key=="tracking"||key=="elapsed_ms"||key=="dropped_events";}
+             if(depth==2&&root_key=="timeline")return key=="match_id";
+             if(depth==2&&root_key=="tracking"){tracking_key=key;return key=="round"||key=="round_end_observed"||key=="full_round_timing"||key=="round_elapsed_ms"||key=="round_countdown_ms"||key=="metrics"||key=="availability";}
+             if(depth==3&&root_key=="tracking"&&(tracking_key=="metrics"||tracking_key=="availability"))return key=="className"||key=="level"||key=="xp"||key=="money"||key=="roundTime";
+             return true;
+            });
             if(!row.is_object()){++report.warnings;continue;}
             const auto event=row.find("event");if(event==row.end()||!event->is_string())continue;
             if(*event=="recording_started"){
@@ -135,4 +144,36 @@ inline Summary summarize(const Report& report,int filter=0){
     size_t maximum=0;for(const auto& entry:out.class_counts)if(entry.second>maximum){maximum=entry.second;out.most_played=entry.first;}else if(entry.second==maximum)out.most_played="Tied";
     return out;
 }
+// Local full-run comparison. Equal weight per run; missing/gapped intervals are
+// never extrapolated. API final-stat references are not progression curves.
+struct ComparisonPoint {double ms=0;Value median,mean;size_t count=0;};
+struct ComparisonRound {double end=1;RoundAxis axis;std::vector<std::vector<std::pair<double,double>>> traces;std::vector<ComparisonPoint> points;};
+struct Comparison {size_t eligible=0,excluded=0;std::array<ComparisonRound,3> rounds;};
+inline Value sample_at(const Round& r,size_t metric,double ms){
+ auto it=std::lower_bound(r.points.begin(),r.points.end(),ms,[](const Point& p,double t){return p.round_time&&*p.round_time<t;});
+ if(it==r.points.end()||!it->round_time||!it->values[metric])return {};
+ if(std::abs(*it->round_time-ms)<.1)return it->values[metric];
+ if(it==r.points.begin())return {};
+ auto prev=it-1;if(!prev->round_time||!prev->values[metric]||it->gap||it->breaks[metric]||*it->round_time-*prev->round_time>15000)return {};
+ if(metric==0)return prev->values[metric];
+ double fraction=(ms-*prev->round_time)/(*it->round_time-*prev->round_time);return *prev->values[metric]+fraction*(*it->values[metric]-*prev->values[metric]);
+}
+inline Comparison compare(const Report& report,int filter,int metric){
+ Comparison out;if(metric<0||metric>2)return out;std::vector<std::array<const Round*,3>> full;
+ for(const auto& run:runs(report,filter)){std::array<const Round*,3> rows{};bool valid=run.id.rfind("legacy-",0)!=0&&run.rounds.size()==3;std::string cls;
+  for(size_t index:run.rounds){const auto& r=report.rounds[index];if(r.number<1||r.number>3||!r.complete||!r.ended||r.rollback||r.gaps||r.dropped||r.points.empty()){valid=false;continue;}if(rows[size_t(r.number-1)])valid=false;rows[size_t(r.number-1)]=&r;if(cls.empty())cls=r.player_class;else if(cls!=r.player_class)valid=false;
+   for(const auto& p:r.points)if(!p.round_time)valid=false;
+  }
+  if(valid&&rows[0]&&rows[1]&&rows[2])full.push_back(rows);else ++out.excluded;
+ }
+ out.eligible=full.size();if(full.empty())return out;size_t trace_samples=std::clamp(size_t(24000)/(3*full.size()),size_t(2),size_t(96));
+ for(size_t rn=0;rn<3;++rn){auto& chart=out.rounds[rn];for(const auto& run:full){chart.axis.include(*run[rn]);chart.end=std::max(chart.end,*run[rn]->points.back().round_time);}
+  for(const auto& run:full){const auto& r=*run[rn];std::vector<std::pair<double,double>> trace;double end=*r.points.back().round_time;
+   for(size_t i=0;i<trace_samples;++i){double at=end*i/(trace_samples-1);auto value=sample_at(r,size_t(metric),at);trace.push_back({at,value?*value:NAN});}chart.traces.push_back(std::move(trace));
+  }
+  for(int i=0;i<=64;++i){ComparisonPoint p;p.ms=chart.end*i/64;std::vector<double> values;double sum=0;for(const auto& run:full){auto v=sample_at(*run[rn],size_t(metric),p.ms);if(v){values.push_back(*v);sum+=*v;}}p.count=values.size();if(!values.empty()){std::sort(values.begin(),values.end());size_t mid=values.size()/2;p.median=values.size()%2?values[mid]:(values[mid-1]+values[mid])/2;p.mean=sum/values.size();}chart.points.push_back(p);}
+ }
+ return out;
+}
+
 }

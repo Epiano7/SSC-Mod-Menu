@@ -21,14 +21,14 @@ inline bool rewrite(std::string& source){
  for(const auto& term:{a,b}){size_t pos=0;const std::string expression=term==a?"flashIntensity":"flashIntensity*0.3";
   // Image adds only a scene-independent signal to the dark flash. It does not
   // restore scene contrast or use an independent fade clock.
-  const std::string replacement="baseColour.rgb = flashIntensity < 0.0 ? max(baseColour.rgb + "+expression+", vec3(0.0)) + (sscFlashImage != 0 ? texture2D(sscFlashTexture, vec2((gl_FragCoord.x-sscFlashViewport.x)/sscFlashViewport.z, 1.0-(gl_FragCoord.y-sscFlashViewport.y)/sscFlashViewport.w)).rgb * clamp(-("+expression+"),0.0,1.0) : vec3(0.0)) : baseColour.rgb + "+expression+";";
+  const std::string replacement="baseColour.rgb = flashIntensity < 0.0 ? max(baseColour.rgb + "+expression+", vec3(0.0)) : baseColour.rgb + "+expression+";";
   while((pos=copy.find(term,pos))!=std::string::npos){copy.replace(pos,term.size(),replacement);pos+=replacement.size();++count;}
  }
  if(count<1||count>2)return false;
  // Reject new/unknown shader uses of this uniform instead of applying a partial rewrite.
  auto stripped=source;for(const auto& term:{std::string("uniform float flashIntensity;"),a,b}){size_t pos;while((pos=stripped.find(term))!=std::string::npos)stripped.erase(pos,term.size());}
  if(stripped.find("flashIntensity")!=std::string::npos)return false;
- copy.replace(copy.find("uniform float flashIntensity;"),29,"uniform float flashIntensity;uniform int sscFlashImage;uniform sampler2D sscFlashTexture;uniform vec4 sscFlashViewport;");
+ // Custom images are composited once after all native scene and HUD draws.
  source=std::move(copy);return true;
 }
 using Source=void(APIENTRY*)(GLuint,GLsizei,const char* const*,const GLint*);
@@ -55,17 +55,17 @@ inline void APIENTRY shader_source(GLuint shader,GLsizei count,const char* const
  original_source(shader,count,strings,lengths);
 }
 inline void APIENTRY attach_shader(GLuint program,GLuint shader){original_attach(program,shader);std::lock_guard<std::mutex> lock(mutex);if(shaders.count(shader))programs.insert(program);}
-inline void APIENTRY use_program(GLuint program){ssc_flash_image::restore();original_use(program);current_program=program;if(enabled.load(std::memory_order_relaxed)&&ssc_flash_image::mode.load()==1){std::lock_guard<std::mutex> lock(mutex);if(image_programs.count(program))ssc_flash_image::bind();}}
+inline void APIENTRY use_program(GLuint program){ssc_flash_image::restore();original_use(program);current_program=program;}
 inline GLint APIENTRY location(GLuint program,const char* name){auto result=original_location(program,name);if(result>=0&&name&&!std::strcmp(name,"flashIntensity")){std::lock_guard<std::mutex> lock(mutex);locations[program]=result;}return result;}
+// One frame-owned sample: no second fade timer and no visibility changes to game state.
+inline thread_local HGLRC intensity_context=nullptr;
+inline thread_local float frame_intensity=0;
+inline void observe_intensity(HGLRC context,float value){if(intensity_context!=context){intensity_context=context;frame_intensity=0;}if(std::isfinite(value)&&value>=0)frame_intensity=std::max(frame_intensity,value);}
+inline float take_intensity(HGLRC context){const float value=intensity_context==context?frame_intensity:0;frame_intensity=0;return value;}
 inline void APIENTRY uniform(GLint index,GLfloat value){
- if(enabled.load(std::memory_order_relaxed)&&(value>0||ssc_flash_image::mode.load()==1)){std::lock_guard<std::mutex> lock(mutex);auto it=locations.find(current_program);if(programs.count(current_program)&&it!=locations.end()&&it->second==index){
-  value=encode(value,true);
-  if(wglGetCurrentContext()){
-   using Int=void(APIENTRY*)(GLint,GLint);using Vec=void(APIENTRY*)(GLint,GLfloat,GLfloat,GLfloat,GLfloat);
-   auto set_int=reinterpret_cast<Int>(wglGetProcAddress("glUniform1i"));auto set_vec=reinterpret_cast<Vec>(wglGetProcAddress("glUniform4f"));
-   if(set_int&&set_vec){bool image=value<0&&ssc_flash_image::mode.load()==1&&ssc_flash_image::bind();if(image)image_programs.insert(current_program);else image_programs.erase(current_program);set_int(original_location(current_program,"sscFlashImage"),image?1:0);if(image){GLint viewport[4]{};glGetIntegerv(GL_VIEWPORT,viewport);set_int(original_location(current_program,"sscFlashTexture"),15);set_vec(original_location(current_program,"sscFlashViewport"),float(viewport[0]),float(viewport[1]),float(std::max(1,viewport[2])),float(std::max(1,viewport[3])));}}
-  }
- }}
+ if(!enabled.load(std::memory_order_relaxed)){original_uniform(index,value);return;}
+ bool flash=false;{std::lock_guard<std::mutex> lock(mutex);auto it=locations.find(current_program);flash=programs.count(current_program)&&it!=locations.end()&&it->second==index;}
+ if(flash){observe_intensity(wglGetCurrentContext(),value);value=encode(value,enabled.load(std::memory_order_relaxed));}
  original_uniform(index,value);
 }
 inline void APIENTRY delete_program(GLuint program){original_delete_program(program);std::lock_guard<std::mutex> lock(mutex);programs.erase(program);image_programs.erase(program);locations.erase(program);}

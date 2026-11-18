@@ -1,6 +1,9 @@
 #pragma once
+#include "challenge_modes.h"
 #include "compatibility.h"
 #include "cooldown_pulse.h"
+#include "blind_render_guards.h"
+#include "blind_question_icon.h"
 #include <array>
 namespace ssc_hud {
 struct Item {const wchar_t* name;const char* key;float home_x,home_y,w,h,x,y,scale;};
@@ -45,7 +48,7 @@ template<int Index> void __cdecl draw(uintptr_t object){
     GLint after=GL_MODELVIEW;glGetIntegerv(GL_MATRIX_MODE,&after);glMatrixMode(GL_PROJECTION);glLoadMatrixf(projection);glMatrixMode(after);
 }
 // Hook only validated call sites. Renderer hooks forward 14/20 native arguments.
-struct Hook {uintptr_t call,target;int item;unsigned stack_bytes;bool map_root=false;bool fade=false;bool skills_root=false;};
+struct Hook {uintptr_t call,target;int item;unsigned stack_bytes;bool map_root=false;bool fade=false;bool skills_root=false;unsigned blind_alpha=0,blind_registers=0;bool blind_local=false,exact=false;};
 inline Hook hooks[]={
  {0x3bae9b,0x43bea0,1,0},
  {0x3baa27,0x4260d0,2,0,true},{0x3bad7e,0x4260d0,2,0,true},
@@ -84,7 +87,15 @@ inline Hook hooks[]={
  // Screen-wide progress strips share the currency function, but are not counters.
  {0x40d566,0x4865c0,-1,128},{0x40d693,0x4865c0,-1,128},{0x40d7c4,0x486d70,-1,120},
  // Local skill readiness and only its icon draw (not health/background).
- {0x410acb,0x967a40,-4,0},{0x411237,0x487d10,-5,80}
+ {0x410acb,0x967a40,-4,0},{0x411237,0x487d10,-5,80,false,false,false,0x28},
+ // Build-list presentation only: preserve native side effects and layout returns.
+ {0x3bcb34,0x4078f0,-6,128,false,false,false,0,24,true,true},
+ {0x3d9f79,0x4078f0,-6,128,false,false,false,0,24,false,true},
+ {0x3f82af,0x4078f0,-6,128,false,false,false,0,24,true,true},
+ {0x404460,0x4078f0,-6,128,false,false,false,0,24,true,true},
+ {0x3da0ff,0x3e0e00,-6,32,false,false,false,0,4,false,true},
+ // Ctrl-only active-skill name; key labels and cooldown numbers use other calls.
+ {0x4111c2,0x481470,-6,80,false,false,false,0x20,0,false,true}
 };
 inline uintptr_t game_base=0;
 // One owner for the version/FPS call; Freecam can wrap its native target.
@@ -94,26 +105,31 @@ inline bool changed(const Item& item){return item.scale!=1||item.x!=item.home_x|
 inline thread_local const float* map_projection=nullptr;
 inline thread_local float skill_pulse=0;
 inline thread_local int skill_icon=-1;
-struct Scope {unsigned stack_bytes;unsigned alpha_offset;float alpha;bool skills_root;bool active;bool root;const float* previous;GLfloat projection[16];int previous_item;bool capture;};
+inline constexpr std::array<uintptr_t,3> concealed_build{{0,0,0}};
+struct Scope {unsigned stack_bytes;unsigned alpha_offset;float alpha;unsigned zero_registers;uintptr_t replacement_vector;bool skills_root;bool active;bool root;const float* previous;GLfloat projection[16];int previous_item;bool capture;};
 static_assert(sizeof(Scope)<=0xa0);
-static_assert(offsetof(Scope,alpha_offset)==4&&offsetof(Scope,alpha)==8);
+static_assert(offsetof(Scope,alpha_offset)==4&&offsetof(Scope,alpha)==8&&offsetof(Scope,zero_registers)==12&&offsetof(Scope,replacement_vector)==16);
 inline void begin(Scope& scope,const Hook& hook){
  scope={};scope.stack_bytes=hook.stack_bytes;scope.previous=map_projection;scope.previous_item=active_item;scope.skills_root=hook.skills_root;
  if(scope.skills_root){skill_pulse=0;skill_icon=-1;}
  if(hook.fade||hook.item<=-3)return;
  active_item=hook.item;
  if(editing&&capture_frame&&available(hook.item))last_drawn[hook.item]=capture_at;
- if(hook.item>=0&&capture_frame&&(!measured[hook.item]||editing||enabled))scope.capture=start_capture();
- if(!enabled)return;
- const bool modified=hook.item>=0&&changed(items[hook.item]);
- const bool root_needed=hook.map_root&&(changed(items[2])||changed(items[4])||changed(items[5]));
+ const bool challenge=ssc_challenge::active();
+ if(!challenge&&hook.item>=0&&capture_frame&&(!measured[hook.item]||editing||enabled))scope.capture=start_capture();
+ if(!enabled&&!challenge)return;
+ Item effective=hook.item>=0?items[hook.item]:Item{};
+ if(!enabled){effective.x=effective.home_x;effective.y=effective.home_y;effective.scale=1;}
+ if(challenge&&hook.item>=0){auto p=ssc_challenge::placement(hook.item,effective.x,effective.y,effective.scale,effective.w,effective.h,double(ssc_challenge::frame_ms)*.001);effective.x=p.x;effective.y=p.y;effective.scale=p.scale;}
+ const bool modified=hook.item>=0&&changed(effective);
+ const bool root_needed=hook.map_root&&(challenge||changed(items[2])||changed(items[4])||changed(items[5]));
  if(!modified&&!map_projection&&!root_needed)return;
  GLint mode;glGetIntegerv(GL_MATRIX_MODE,&mode);glGetFloatv(GL_PROJECTION_MATRIX,scope.projection);
  scope.active=true;scope.root=hook.map_root;
  const float* base=map_projection?map_projection:scope.projection;
  if(scope.root)map_projection=scope.projection;
  glMatrixMode(GL_PROJECTION);
- if(modified){auto matrix=transform(items[hook.item]);glLoadMatrixf(matrix.data());glMultMatrixf(base);}
+ if(modified){auto matrix=transform(effective);glLoadMatrixf(matrix.data());glMultMatrixf(base);}
  else glLoadMatrixf(base);
  glMatrixMode(mode);
 }
@@ -177,8 +193,19 @@ inline void prepare_skill_alpha(Scope& scope,const unsigned char* stack){
     skill_pulse=0;skill_icon=-1;
 }
 extern "C" void ssc_hud_bridge();
-extern "C" __attribute__((used,noinline)) uintptr_t ssc_hud_before(unsigned index,Scope* scope,const unsigned char* stack){
+extern "C" __attribute__((used,noinline)) uintptr_t ssc_hud_before(unsigned index,Scope* scope,const unsigned char* stack,uintptr_t actor=0){
     const auto& hook=hooks[index];begin(*scope,hook);
+    if(ssc_challenge::blind()&&(hook.blind_alpha||hook.blind_registers)){
+      bool conceal=!hook.blind_local;if(hook.blind_local){int local=-1,slot=-2;conceal=actor&&ssc_names::read(actor+0x78,slot)&&ssc_names::read(game_base+ssc_compat::resolve(0xe20678),local)&&local>=0&&slot==local;}
+      if(conceal){scope->alpha_offset=hook.blind_alpha;scope->alpha=0;scope->zero_registers=hook.blind_registers;if(hook.blind_registers&16)scope->replacement_vector=reinterpret_cast<uintptr_t>(concealed_build.data());}
+    }
+    if(hook.item==-5&&ssc_challenge::blind()){
+      static thread_local uintptr_t checked_base=0;static thread_local uint64_t checked_at=0;static thread_local bool valid=false;auto now=GetTickCount64();
+      if(checked_base!=game_base||!checked_at||now<checked_at||now-checked_at>=1000){checked_base=game_base;checked_at=now;const auto record=game_base+0xe2b370;int width=0,height=0,columns=0,rows=0,tile=0;
+        valid=ssc_names::read(record+0x24,width)&&ssc_names::read(record+0x28,height)&&ssc_names::read(record+0x2c,columns)&&ssc_names::read(record+0x30,rows)&&ssc_names::read(record+0x34,tile)&&ssc_blind::question_frame(ssc_rpc::native_string(record),width,height,columns,rows,tile)==807;
+      }
+      if(valid){scope->alpha_offset=0;scope->zero_registers|=32;}
+    }
     if(hook.item==-3)capture_queued_rectangle(stack);
     if(hook.item==-4)return reinterpret_cast<uintptr_t>(skill_ready_hook);
     // The group fade hook now restores the complete native appearance.
@@ -188,19 +215,21 @@ extern "C" __attribute__((used,noinline)) uintptr_t ssc_hud_before(unsigned inde
 extern "C" __attribute__((used,noinline)) void ssc_hud_after(Scope* scope){end(*scope);}
 inline bool attach(){
  if(!ssc_compat::supports(2))return false;
- for(auto& hook:hooks){hook.call=ssc_compat::resolve(uint32_t(hook.call));hook.target=ssc_compat::resolve(uint32_t(hook.target));}
  const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
- for(const auto& hook:hooks){auto p=reinterpret_cast<const unsigned char*>(base+hook.call);int32_t relative;std::memcpy(&relative,p+1,4);if(p[0]!=0xe8||base+hook.call+5+relative!=base+hook.target)return false;}
- unsigned char* bridge=nullptr;
+ ssc_challenge::blind_supported=ssc_blind_render::validate(base,[](uintptr_t p,auto& value){return ssc_names::read(p,value);});
+ std::vector<unsigned> selected;
+ for(unsigned i=0;i<std::size(hooks);++i){auto& hook=hooks[i];if(hook.exact&&!ssc_challenge::blind_supported)continue;if(!hook.exact){hook.call=ssc_compat::resolve(uint32_t(hook.call));hook.target=ssc_compat::resolve(uint32_t(hook.target));}selected.push_back(i);}
+ for(auto i:selected){const auto& hook=hooks[i];auto p=reinterpret_cast<const unsigned char*>(base+hook.call);int32_t relative;std::memcpy(&relative,p+1,4);if(p[0]!=0xe8||base+hook.call+5+relative!=base+hook.target)return false;}
+ static_assert(std::size(hooks)*32<=4096,"HUD bridge capacity");unsigned char* bridge=nullptr;
  for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((base+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));
  if(!bridge)return false;
  const uintptr_t entry=reinterpret_cast<uintptr_t>(ssc_hud_bridge);
  for(unsigned i=0;i<std::size(hooks);++i){auto p=bridge+i*32;p[0]=0x41;p[1]=0xba;std::memcpy(p+2,&i,4);const unsigned char jump[]={0xff,0x25,0,0,0,0};std::memcpy(p+6,jump,6);std::memcpy(p+12,&entry,8);}
  DWORD old;if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,4096);
- DWORD protection[std::size(hooks)]{};
- for(unsigned i=0;i<std::size(hooks);++i)if(!VirtualProtect(reinterpret_cast<void*>(base+hooks[i].call),5,PAGE_EXECUTE_READWRITE,&protection[i])){for(int j=int(i)-1;j>=0;--j){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+hooks[j].call),5,protection[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
+ DWORD protection[std::size(hooks)]{};size_t acquired=0;
+ for(auto i:selected){if(!VirtualProtect(reinterpret_cast<void*>(base+hooks[i].call),5,PAGE_EXECUTE_READWRITE,&protection[i])){while(acquired){auto j=selected[--acquired];DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+hooks[j].call),5,protection[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}++acquired;}
  game_base=base;
- for(unsigned i=0;i<std::size(hooks);++i){int32_t rel=static_cast<int32_t>(reinterpret_cast<uintptr_t>(bridge+i*32)-(base+hooks[i].call+5));std::memcpy(reinterpret_cast<void*>(base+hooks[i].call+1),&rel,4);FlushInstructionCache(GetCurrentProcess(),reinterpret_cast<void*>(base+hooks[i].call),5);}
- for(int i=int(std::size(hooks))-1;i>=0;--i){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+hooks[i].call),5,protection[i],&ignored);}return true;
+ for(auto i:selected){int32_t rel=static_cast<int32_t>(reinterpret_cast<uintptr_t>(bridge+i*32)-(base+hooks[i].call+5));std::memcpy(reinterpret_cast<void*>(base+hooks[i].call+1),&rel,4);FlushInstructionCache(GetCurrentProcess(),reinterpret_cast<void*>(base+hooks[i].call),5);}
+ while(acquired){auto i=selected[--acquired];DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+hooks[i].call),5,protection[i],&ignored);}return true;
 }
 }

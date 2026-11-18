@@ -5,10 +5,12 @@ namespace ssc_privacy {
 enum class Detection { unavailable,off,on };
 using Reader=Detection(*)();
 inline std::atomic<Reader> reader{nullptr};
+inline std::atomic<bool> tournament_validated{false};
+inline std::atomic<Detection> lobby{Detection::off};
 inline std::atomic<bool> respect{true},manual{false},uploads_held{false};
 inline std::atomic<bool> effective{false};
 inline std::atomic<uint64_t> generation{0};
-inline Detection detection(){auto probe=reader.load();return probe?probe():Detection::unavailable;}
+inline Detection detection(){auto probe=reader.load();auto setting=probe?probe():Detection::unavailable;auto actor=lobby.load();return setting==Detection::on||actor==Detection::on?Detection::on:setting==Detection::unavailable||actor==Detection::unavailable?Detection::unavailable:Detection::off;}
 inline bool blocked(){
  const bool next=manual.load()||(respect.load()&&detection()!=Detection::off);
  if(effective.exchange(next)!=next){++generation;if(next)uploads_held=true;}

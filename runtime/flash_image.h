@@ -63,4 +63,15 @@ inline bool bind(){
  }
  active(old);return true;
 }
+// Called once at the end of the saved, pixel-space overlay state. All native
+// world, labels and HUD layers are already complete; native intensity owns fade.
+inline bool draw_final(int width,int height,float intensity){
+ if(width<=0||height<=0||!std::isfinite(intensity)||intensity<=0||!bind())return false;
+ restore();auto active=reinterpret_cast<Active>(wglGetProcAddress("glActiveTexture"));if(!active)return false;
+ active(0x84c0);glEnable(GL_TEXTURE_2D);glBindTexture(GL_TEXTURE_2D,gl.texture);glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
+ glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glColor4f(1,1,1,std::clamp(intensity,0.f,1.f));
+ glBegin(GL_QUADS);glTexCoord2f(0,0);glVertex2i(0,0);glTexCoord2f(1,0);glVertex2i(width,0);glTexCoord2f(1,1);glVertex2i(width,height);glTexCoord2f(0,1);glVertex2i(0,height);glEnd();
+ glDisable(GL_TEXTURE_2D);glColor4f(1,1,1,1);return true;
+}
+
 }

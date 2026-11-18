@@ -25,7 +25,8 @@ inline Image reference,replacement;
 inline std::once_flag selection;
 inline bool selected=false,ready=false;
 inline std::filesystem::path preview_marker;
-inline bool preview=false,reported=false;
+inline bool preview=false,reported=false,retry_attempted=false;
+inline std::wstring reference_path;
 inline DWORD preview_attributes=0,preview_error=0;
 inline std::filesystem::path state_path(){
  wchar_t value[32768];DWORD n=GetEnvironmentVariableW(L"SSCMODS_STATE_DIR",value,32768);
@@ -56,6 +57,11 @@ inline bool select_preview(const std::filesystem::path& installed,const std::fil
 // Reject the incomplete final bucket instead of introducing modulo bias.
 inline int lottery(uint32_t value){return value>=4294967200u?-1:value%100==0?1:0;}
 inline bool roll(){uint32_t value=0;for(unsigned i=0;i<8;++i){if(BCryptGenRandom(nullptr,reinterpret_cast<PUCHAR>(&value),sizeof value,BCRYPT_USE_SYSTEM_PREFERRED_RNG)<0)return false;int result=lottery(value);if(result>=0)return result==1;}return false;}
+inline unsigned missed_launches=0;
+inline unsigned chance_percent(unsigned missed){return std::min(20u,1u+std::min(missed,19u));}
+inline unsigned read_misses(){try{unsigned value=0;auto p=state_path()/L"title-logo-misses.txt";if(std::filesystem::exists(p)&&std::filesystem::file_size(p)<=16){std::ifstream in(p);if(in>>value)return std::min(value,10000u);}}catch(...){}return 0;}
+inline void save_misses(unsigned value){try{auto p=state_path();if(p.empty())return;std::filesystem::create_directories(p);auto tmp=p/L"title-logo-misses.tmp";{std::ofstream out(tmp);out<<std::min(value,10000u);out.close();if(!out)return;}MoveFileExW(tmp.c_str(),(p/L"title-logo-misses.txt").c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);}catch(...) {}}
+inline bool roll_with_misses(unsigned missed){uint32_t value=0;for(unsigned i=0;i<8;++i){if(BCryptGenRandom(nullptr,reinterpret_cast<PUCHAR>(&value),sizeof value,BCRYPT_USE_SYSTEM_PREFERRED_RNG)<0)return false;if(value<4294967200u)return value%100<chance_percent(missed);}return false;}
 inline bool decode(IWICImagingFactory* factory,IWICBitmapDecoder* decoder,Image& image,UINT width=0,UINT height=0){
  Com<IWICBitmapFrameDecode> frame;Com<IWICFormatConverter> converter;Com<IWICBitmapScaler> scaler;
  if(FAILED(decoder->GetFrame(0,frame.out())))return false;
@@ -97,19 +103,25 @@ inline bool align_artwork(IWICImagingFactory* factory){
  }return true;
 }
 inline bool load(const wchar_t* logo){
- HRESULT initialized=CoInitializeEx(nullptr,COINIT_MULTITHREADED);
- bool success=false;
- {Com<IWICImagingFactory> factory;Com<IWICBitmapDecoder> native,alternate;Com<IWICStream> stream;
-  if(SUCCEEDED(CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_IWICImagingFactory,reinterpret_cast<void**>(factory.out())))&&
-     SUCCEEDED(factory.p->CreateDecoderFromFilename(logo,nullptr,GENERIC_READ,WICDecodeMetadataCacheOnLoad,native.out()))&&decode(factory.p,native.p,reference)&&
-     SUCCEEDED(factory.p->CreateStream(stream.out()))&&SUCCEEDED(stream.p->InitializeFromMemory(const_cast<BYTE*>(larpshot_png),sizeof larpshot_png))&&
-     SUCCEEDED(factory.p->CreateDecoderFromStream(stream.p,nullptr,WICDecodeMetadataCacheOnLoad,alternate.out())))
-    success=decode(factory.p,alternate.p,replacement)&&align_artwork(factory.p);
+ HRESULT initialized=CoInitializeEx(nullptr,COINIT_MULTITHREADED);bool success=false;
+ {Com<IWICImagingFactory> factory;Com<IWICBitmapDecoder> native,alternate;Com<IWICStream> stream;HRESULT hr=S_OK;const char* stage="factory";
+  do{
+   hr=CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_IWICImagingFactory,reinterpret_cast<void**>(factory.out()));if(FAILED(hr))break;
+   stage="native PNG";hr=factory.p->CreateDecoderFromFilename(logo,nullptr,GENERIC_READ,WICDecodeMetadataCacheOnLoad,native.out());if(FAILED(hr))break;
+   stage="native pixels";if(!decode(factory.p,native.p,reference))break;
+   stage="memory stream";hr=factory.p->CreateStream(stream.out());if(FAILED(hr))break;
+   stage="replacement bytes";hr=stream.p->InitializeFromMemory(const_cast<BYTE*>(larpshot_png),sizeof larpshot_png);if(FAILED(hr))break;
+   stage="replacement PNG";hr=factory.p->CreateDecoderFromStream(stream.p,nullptr,WICDecodeMetadataCacheOnLoad,alternate.out());if(FAILED(hr))break;
+   stage="replacement pixels";if(!decode(factory.p,alternate.p,replacement))break;
+   stage="artwork alignment";success=align_artwork(factory.p);
+  }while(false);
+  if(!success){char info[192];snprintf(info,sizeof info,"Logo decode failed at %s; HRESULT=%08lx COM=%08lx",stage,(unsigned long)hr,(unsigned long)initialized);diagnostic(info);}
  }
  if(SUCCEEDED(initialized))CoUninitialize();
  if(!success){reference={};replacement={};}
  return success;
 }
+
 inline bool matches(const unsigned char* data,bool bgra,bool flipped){
  for(UINT y=0;y<reference.h;++y)for(UINT x=0;x<reference.w;++x){
   size_t a=(size_t(y)*reference.w+x)*4,b=(size_t(flipped?reference.h-1-y:y)*reference.w+x)*4;
@@ -132,20 +144,21 @@ inline bool substitute(const void* pixels,GLenum format,std::vector<unsigned cha
  return true;
 }
 inline void APIENTRY upload(GLenum target,GLint level,GLint internal,GLsizei width,GLsizei height,GLint border,GLenum format,GLenum type,const void* pixels){
+ if(!ready&&!retry_attempted&&!reference_path.empty()&&pixels&&target==GL_TEXTURE_2D&&level==0&&width==2048&&height==1024&&type==GL_UNSIGNED_BYTE&&(format==GL_RGBA||format==0x80E1)){retry_attempted=true;try{ready=load(reference_path.c_str());}catch(...){}diagnostic(ready?"Logo retry succeeded on upload thread":"Logo retry failed; native artwork retained");}
  if(ready&&query&&pixels&&target==GL_TEXTURE_2D&&level==0&&border==0&&width==int(reference.w)&&height==int(reference.h)&&type==GL_UNSIGNED_BYTE&&(format==GL_RGBA||format==0x80E1)){
   GLint buffer=0,row=0,skip_rows=0,skip_pixels=0;
   query(0x88EF,&buffer);query(GL_UNPACK_ROW_LENGTH,&row);query(GL_UNPACK_SKIP_ROWS,&skip_rows);query(GL_UNPACK_SKIP_PIXELS,&skip_pixels);
-  if(!buffer&&!row&&!skip_rows&&!skip_pixels){try{std::vector<unsigned char> changed;if(substitute(pixels,format,changed)){original(target,level,internal,width,height,border,format,type,changed.data());if(!reported){reported=true;diagnostic("Larpshot logo uploaded");if(preview&&!preview_marker.empty()){if(DeleteFileW(preview_marker.c_str()))diagnostic("One-time preview consumed; later launches use 1/100 chance");else diagnostic("Preview flag could not be removed");}}return;}}catch(...) {}}
+  if(!buffer&&!row&&!skip_rows&&!skip_pixels){try{std::vector<unsigned char> changed;if(substitute(pixels,format,changed)){original(target,level,internal,width,height,border,format,type,changed.data());if(!reported){reported=true;save_misses(0);diagnostic("Larpshot logo uploaded; missed-launch count reset");if(preview&&!preview_marker.empty()){if(DeleteFileW(preview_marker.c_str()))diagnostic("One-time preview consumed; future missed launches increase the chance");else diagnostic("Preview flag could not be removed");}}return;}}catch(...) {}}
  }
  original(target,level,internal,width,height,border,format,type,pixels);
 }
 inline Upload configure(Upload next,Query get_integer){
- std::call_once(selection,[]{preview=select_preview(installed_state(),state_path());selected=preview||roll();});
+ std::call_once(selection,[]{preview=select_preview(installed_state(),state_path());missed_launches=read_misses();selected=preview||roll_with_misses(missed_launches);if(!preview)save_misses(missed_launches+1);});
  diagnostic((std::string("Logo selection: preview=")+std::to_string(preview)+" selected="+std::to_string(selected)+" flag_attributes="+std::to_string(preview_attributes)+" flag_error="+std::to_string(preview_error)).c_str());
  if(!selected||!next)return nullptr;
  original=next;query=get_integer;
- try{wchar_t exe[32768];DWORD n=GetModuleFileNameW(nullptr,exe,32768);if(!n||n>=32768)return nullptr;std::wstring path(exe,n);auto end=path.find_last_of(L"\\/");if(end==std::wstring::npos)return nullptr;path.resize(end);path+=L"\\data\\textures\\logo.png";ready=load(path.c_str());}catch(...){ready=false;}
+ try{wchar_t exe[32768];DWORD n=GetModuleFileNameW(nullptr,exe,32768);if(!n||n>=32768)return nullptr;std::wstring path(exe,n);auto end=path.find_last_of(L"\\/");if(end==std::wstring::npos)return nullptr;path.resize(end);path+=L"\\data\\textures\\logo.png";reference_path=path;ready=load(path.c_str());}catch(...){ready=false;}
  diagnostic(ready?"Larpshot selected; texture replacement ready":"Larpshot selected; image loading failed");
- return ready?upload:nullptr;
+ return upload;
 }
 }

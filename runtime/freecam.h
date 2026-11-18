@@ -1,4 +1,5 @@
 #pragma once
+#include "challenge_modes.h"
 #include "creator_controls.h"
 #include "freecam_state.h"
 #include "freecam_camera.h"
@@ -122,7 +123,7 @@ inline void raw_motion(LPARAM lp){
 // Called at the final translation of each world render pass, before native
 // inverse-view caches are calculated. Never affects menu/portrait transforms.
 inline void APIENTRY view(float x,float y,float z){
- glTranslatef(x,y,z);if(!state.active)return;
+ glTranslatef(x,y,z);if(!state.active){ssc_challenge::world_view();return;}
  GLfloat m[16]{},projection[16]{};glGetFloatv(GL_MODELVIEW_MATRIX,m);glGetFloatv(GL_PROJECTION_MATRIX,projection);camera.projection(projection[0],projection[5]);
  if(!camera.seeded){if(!camera.seed(m)){stop();return;}if(fps)limit_floor();pan_origin=camera.eye;pan_x=state.x;pan_y=state.y;std::copy(projection,projection+16,saved_projection.begin());}
  // A followed player can jump or change the native zoom. Both view and
@@ -227,9 +228,12 @@ inline void scene(){
  // Restore it even when Freecam stops during that draw; never save game config.
  auto flag=reinterpret_cast<unsigned char*>(base+0xfb3a05);
  const unsigned char previous=*flag;
+ const bool chaos_view=!state.active&&ssc_challenge::active()&&ssc_challenge::view_supported&&(ssc_challenge::chaos.effects[5]||ssc_challenge::chaos.effects[6]);
+ std::array<float,16> prior_projection{};if(chaos_view){glGetFloatv(GL_PROJECTION_MATRIX,prior_projection.data());ssc_challenge::view_output_valid=false;}
  const bool hidden=state.active&&hide_shadows;
  if(hidden)*flag=0;
  native_scene();
+ if(chaos_view){GLint mode=GL_MODELVIEW;glGetIntegerv(GL_MATRIX_MODE,&mode);glMatrixMode(GL_PROJECTION);glLoadMatrixf(prior_projection.data());glMatrixMode(mode);ssc_challenge::view_output_valid=false;}
  if(hidden)*flag=previous;
 }
 using DebugDraw=void(*)(uintptr_t,uintptr_t,uintptr_t,int);inline DebugDraw native_debug=nullptr;
