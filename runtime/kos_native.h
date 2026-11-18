@@ -18,13 +18,13 @@ inline NativeTarget player(uintptr_t actor){
  NativeTarget out;if(!ssc_planned_native::kos)return out;
  uintptr_t world=0,first=0,last=0;int kind=-1,slot=-1;unsigned char active=0,anon=2;
  auto base=ssc_names::image_base;
- if(!ssc_names::read(base+ssc_compat::resolve(0xdec5d0),world)||!world||!ssc_names::read(world+0xa658,first)||!ssc_names::read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048||actor<first||actor>=last||(actor-first)%0x34b8)return out;
+ if(!ssc_names::read(base+ssc_compat::resolve(0xded5d0),world)||!world||!ssc_names::read(world+0xa658,first)||!ssc_names::read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048||actor<first||actor>=last||(actor-first)%0x34b8)return out;
  if(!ssc_names::read(actor+0x78,slot)||slot<0||uintptr_t(slot)!=(actor-first)/0x34b8||!ssc_names::read(actor+0x81,active)||!active||!ssc_names::read(actor+0x7dc,kind)||(kind!=0&&kind!=1)||!ssc_names::read(actor+0x209,anon)||anon>1)return out;
  // Tournament titles can force anonymity independently of the actor setting.
  if(ssc_privacy::tournament_validated.load()&&ssc_privacy::community_cup_anonymity(world,[](uintptr_t p,auto& v){return ssc_names::read(p,v);})==ssc_privacy::Detection::on)return out;
  // Reject anonymous actors BEFORE reading their account or display string.
  out.target.player.visibility=anon?Visibility::anonymous:Visibility::public_player;if(anon)return out;
- if(kind==1){int start=-1,offset=-1,count=-1,total=int((last-first)/0x34b8);uintptr_t owner=1;if(!ssc_names::bot_layout||!ssc_names::read(base+0xfb68d4,start)||!ssc_names::read(world+0x190,offset)||!ssc_names::read(world+0x28c,count)||!ssc_names::bot_range(slot,kind,start,offset,count,total)||!ssc_names::read(actor+0x2e8,owner)||owner)return out;}
+ if(kind==1){int start=-1,offset=-1,count=-1,total=int((last-first)/0x34b8);uintptr_t owner=1;if(!ssc_names::bot_layout||!ssc_names::read(base+0xfb78fc,start)||!ssc_names::read(world+0x190,offset)||!ssc_names::read(world+0x28c,count)||!ssc_names::bot_range(slot,kind,start,offset,count,total)||!ssc_names::read(actor+0x2e8,owner)||owner)return out;}
  if(kind==0){auto identity=ssc_names::identify(actor);out.target.player.local=identity.local;out.target.player.account=identity.account;}
  out.target.player.handle=ssc_rpc::native_string(actor+0x798);
  if(kind==1&&valid_text(out.target.player.handle,64))out.target.player.account="handle:"+canonical(out.target.player.handle);
@@ -32,7 +32,7 @@ inline NativeTarget player(uintptr_t actor){
 }
 inline std::vector<NativeTarget> roster(){
  std::vector<NativeTarget> out;uintptr_t world=0,first=0,last=0;
- if(!ssc_planned_native::kos||!ssc_names::read(ssc_names::image_base+ssc_compat::resolve(0xdec5d0),world)||!world||!ssc_names::read(world+0xa658,first)||!ssc_names::read(world+0xa660,last)||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048)return out;
+ if(!ssc_planned_native::kos||!ssc_names::read(ssc_names::image_base+ssc_compat::resolve(0xded5d0),world)||!world||!ssc_names::read(world+0xa658,first)||!ssc_names::read(world+0xa660,last)||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048)return out;
  for(auto a=first;a<last;a+=0x34b8){auto p=player(a);if(eligible(p.target.player))out.push_back(std::move(p));}return out;
 }
 inline bool save(){if(directory.empty())return false;auto path=directory/L"kos.json",temp=directory/L"kos.json.tmp";std::ofstream f(temp,std::ios::binary);f<<encode(list);f.close();saved=bool(f)&&MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);return saved;}
@@ -46,7 +46,7 @@ inline std::vector<NativeTarget> choices(){auto out=roster();for(const auto& p:r
 inline bool resolve_choice(const NativeTarget& choice,NativeTarget& current){
  if(!choice.historical){current=player(choice.actor);return current.world==choice.world&&target_still_public(choice.target,current.target);}
  if(!eligible(choice.target.player)||std::none_of(recent_public.begin(),recent_public.end(),[&](const NativeTarget& e){return e.world==choice.world&&e.actor==choice.actor&&target_still_public(choice.target,e.target);}))return false;
- uintptr_t world=0;if(!ssc_names::read(ssc_names::image_base+ssc_compat::resolve(0xdec5d0),world))return false;
+ uintptr_t world=0;if(!ssc_names::read(ssc_names::image_base+ssc_compat::resolve(0xded5d0),world))return false;
  if(world==choice.world){current=player(choice.actor);return current.world==choice.world&&target_still_public(choice.target,current.target);}
  // Past public identity only: do not dereference stale actors or associate it
  // with any currently anonymous player. tint() still checks live anonymity.

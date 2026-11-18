@@ -39,7 +39,7 @@ inline void make_first(Slot& slot,size_t i){if(i&&i<message_count(slot)){auto te
 inline const std::string& choose_message(const Slot& slot){static std::mt19937 engine(std::random_device{}());return message_at(slot,std::uniform_int_distribution<size_t>(0,message_count(slot)-1)(engine));}
 inline bool save(const std::filesystem::path& dir){try{for(auto& slot:slots)if(!valid_slot(slot))return false;nlohmann::json j={{"schema",2},{"enabled",enabled},{"order",order},{"auto_text",auto_text},{"auto_timing",auto_timing}};j["slots"]=nlohmann::json::array();for(auto& slot:slots)j["slots"].push_back({{"text",slot.text},{"variants",slot.variants},{"icon",slot.icon},{"custom",slot.custom}});auto tmp=dir/L"quick-chat.json.tmp";std::ofstream out(tmp);out<<j.dump(2);out.close();return out&&MoveFileExW(tmp.c_str(),(dir/L"quick-chat.json").c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);}catch(...){return false;}}
 inline void load(const std::filesystem::path& dir){ssc_wheel_images::load(dir);try{auto p=dir/L"quick-chat.json";if(!std::filesystem::exists(p))return;if(std::filesystem::file_size(p)>32768)return;std::ifstream in(p);nlohmann::json j;in>>j;int schema=j.at("schema");if(schema!=1&&schema!=2)return;auto next=slots;auto ord=j.at("order").get<std::array<int,9>>();auto sorted=ord;std::sort(sorted.begin(),sorted.end());for(int i=0;i<9;++i){if(sorted[i]!=i)return;const auto& row=j.at("slots").at(i);next[i]={row.at("text").get<std::string>(),row.at("icon").get<int>(),row.value("custom",false)};if(schema==2)next[i].variants=row.value("variants",std::vector<std::string>{});if(!valid_slot(next[i]))return;}auto text=j.value("auto_text",std::string("GG"));int timing=j.value("auto_timing",0);if(!valid_text(text)||timing<0||timing>2)return;bool on=j.value("enabled",false);slots=next;order=ord;auto_text=text;auto_timing=timing;enabled=on;}catch(...){status=L"Could not load quick message settings";}}
-inline uintptr_t stock_atlas(){auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));return ssc_compat::supports(16)?base+ssc_compat::resolve(0xe2b580):0;}
+inline uintptr_t stock_atlas(){auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));return ssc_compat::supports(16)?base+ssc_compat::resolve(0xe2c580):0;}
 // Native records are owned by the game. Never put a mod allocator's buffer in them.
 using Builder=void(*)(uintptr_t);
 using Assign=void*(*)(uintptr_t,const void*,size_t,size_t);
@@ -51,9 +51,9 @@ template<class Read>bool validate_spam_layout(uintptr_t base,Read read){
  std::array<unsigned char,8> load{},store{};std::array<unsigned char,10> lock{};double cost=0;float threshold=0;
  const std::array<unsigned char,8> expected_load={0xf3,0x0f,0x10,0x83,0xf0,0x26,0,0},expected_store={0xf3,0x0f,0x11,0x8b,0xf0,0x26,0,0};
  const std::array<unsigned char,10> expected_lock={0xc7,0x83,0xf4,0x26,0,0,0,0,0,0x41};
- return read(base+0x8143f7,load)&&load==expected_load&&read(base+0x814415,store)&&store==expected_store&&read(base+0x81441f,lock)&&lock==expected_lock&&read(base+0xc7d338,cost)&&cost==double(ssc_chat_limit::stock_cost)&&read(base+0xc7db10,threshold)&&threshold==ssc_chat_limit::threshold;
+ return read(base+0x814887,load)&&load==expected_load&&read(base+0x8148a5,store)&&store==expected_store&&read(base+0x8148af,lock)&&lock==expected_lock&&read(base+0xc7e2c8,cost)&&cost==double(ssc_chat_limit::stock_cost)&&read(base+0xc7eaa0,threshold)&&threshold==ssc_chat_limit::threshold;
 }
-inline bool local_actor(uintptr_t actor){uintptr_t world=0,first=0,last=0,steam=0;int slot=-1;return ssc_names::read(image_base+ssc_compat::resolve(0xdec5d0),world)&&world&&ssc_names::read(world+0xa658,first)&&ssc_names::read(world+0xa660,last)&&ssc_names::read(image_base+ssc_compat::resolve(0xe24138),steam)&&first==steam&&ssc_names::read(image_base+ssc_compat::resolve(0xe20678),slot)&&slot>=0&&first&&last>=first&&(last-first)%0x34b8==0&&uintptr_t(slot)<(last-first)/0x34b8&&actor==first+uintptr_t(slot)*0x34b8;}
+inline bool local_actor(uintptr_t actor){uintptr_t world=0,first=0,last=0,steam=0;int slot=-1;return ssc_names::read(image_base+ssc_compat::resolve(0xded5d0),world)&&world&&ssc_names::read(world+0xa658,first)&&ssc_names::read(world+0xa660,last)&&ssc_names::read(image_base+ssc_compat::resolve(0xe25138),steam)&&first==steam&&ssc_names::read(image_base+ssc_compat::resolve(0xe21678),slot)&&slot>=0&&first&&last>=first&&(last-first)%0x34b8==0&&uintptr_t(slot)<(last-first)/0x34b8&&actor==first+uintptr_t(slot)*0x34b8;}
 inline bool native_spam_meter(uintptr_t actor,ssc_chat_limit::Meter& value){
  // Group 16 fingerprints the whole native wheel function, including the counter read/write instructions and lockout; also verify the
  // exact non-overlapping field layout at attachment. Never use unguarded
@@ -140,7 +140,7 @@ inline void split_chat(uintptr_t font,uintptr_t text,float width,int limit,uintp
 }
 inline bool attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
  if(!ssc_compat::supports(17)||!validate_spam_layout(base,[](uintptr_t p,auto& value){return ssc_names::read(p,value);}))return false;
- struct Hook{uint32_t call,target,reserved;};Hook hooks[]={{0x81446f,0x80f840,0},{0x3cbb35,0x80f840,0},{0x3cc263,0x487d10,0},{0x3cc3b4,0x481600,0},{0x80f801,0x245b0,0},{0x8143f2,0x223570,0},{0x6ac7bf,0x3a8e90,0},{0x6aca38,0x3a8e90,0}};
+ struct Hook{uint32_t call,target,reserved;};Hook hooks[]={{0x8148ff,0x80fcb0,0},{0x3cbe05,0x80fcb0,0},{0x3cc533,0x488010,0},{0x3cc684,0x481900,0},{0x80fc71,0x245b0,0},{0x814882,0x223630,0},{0x6aca1f,0x3a9200,0},{0x6acc98,0x3a9200,0}};
  constexpr int hook_count=int(std::size(hooks));
  for(auto& h:hooks){h.call=ssc_compat::resolve(h.call);h.target=ssc_compat::resolve(h.target);auto p=reinterpret_cast<const unsigned char*>(base+h.call);int32_t rel;std::memcpy(&rel,p+1,4);if(p[0]!=0xe8||base+h.call+5+rel!=base+h.target)return false;}
  unsigned char* bridge=nullptr;for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((base+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
@@ -149,11 +149,11 @@ inline bool attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(n
  std::memcpy(bridge+192,jump,6);std::memcpy(bridge+198,&split_entry,8);
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,4096);
  DWORD protections[hook_count]{};for(int i=0;i<hook_count;++i)if(!VirtualProtect(reinterpret_cast<void*>(base+hooks[i].call),5,PAGE_EXECUTE_READWRITE,&protections[i])){for(int j=i-1;j>=0;--j){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+hooks[j].call),5,protections[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
- image_base=base;original=reinterpret_cast<Builder>(base+ssc_compat::resolve(0x80f840));assign=reinterpret_cast<Assign>(base+ssc_compat::resolve(0x245b0));
- original_send=reinterpret_cast<Sender>(base+ssc_compat::resolve(0x223570));
- original_label=reinterpret_cast<LabelDraw>(base+ssc_compat::resolve(0x481600));
- original_chat_split=reinterpret_cast<ChatSplit>(base+ssc_compat::resolve(0x3a8e90));
- ssc_wheel_images::original=reinterpret_cast<ssc_wheel_images::Draw>(base+ssc_compat::resolve(0x487d10));
+ image_base=base;original=reinterpret_cast<Builder>(base+ssc_compat::resolve(0x80fcb0));assign=reinterpret_cast<Assign>(base+ssc_compat::resolve(0x245b0));
+ original_send=reinterpret_cast<Sender>(base+ssc_compat::resolve(0x223630));
+ original_label=reinterpret_cast<LabelDraw>(base+ssc_compat::resolve(0x481900));
+ original_chat_split=reinterpret_cast<ChatSplit>(base+ssc_compat::resolve(0x3a9200));
+ ssc_wheel_images::original=reinterpret_cast<ssc_wheel_images::Draw>(base+ssc_compat::resolve(0x488010));
  for(int i=0;i<hook_count;++i){int32_t rel=int32_t(reinterpret_cast<uintptr_t>(bridge+(i>=2?(i-1)*32:0))-(base+hooks[i].call+5));std::memcpy(reinterpret_cast<void*>(base+hooks[i].call+1),&rel,4);FlushInstructionCache(GetCurrentProcess(),reinterpret_cast<void*>(base+hooks[i].call),5);}
  // Hooks may share a page: finish every write before restoring protection,
  // then unwind in reverse so the original RX protection wins.

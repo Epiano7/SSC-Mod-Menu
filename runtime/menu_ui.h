@@ -1221,8 +1221,8 @@ bool preview_native_tile(uintptr_t record,int index,int x,int y,int size,ReportA
 bool preview_stock_tile(int index,int x,int y,int size){static ReportAtlasCache cache;return preview_native_tile(ssc_chat::attached?ssc_chat::stock_atlas():0,index,x,y,size,cache);}
 bool preview_skill_tile(int index,int x,int y,int size){
  static ReportAtlasCache cache;
- // Native skill-panel call at 3dec36 uses this atlas; startup validates its containing function.
- const auto record=ssc_advisor::attached?ssc_advisor::game+0xe29330:0;
+ // Use the same validated native skill atlas as recorded build images.
+ const auto record=ssc_advisor::attached?ssc_advisor::game+0xe2c370:0;
  return preview_native_tile(record,index,x,y,size,cache);
 }
 

@@ -20,11 +20,11 @@ template<class T>bool shortcut_write(uintptr_t p,T value){static_assert(sizeof(T
 inline void cancel_slash(){std::lock_guard<std::mutex> lock(slash_mutex);slash_request={};command_input={};completions.clear();completion_source.clear();slash_pending=false;slash_key_held=0;slash_enter_held=false;command_return_held=false;completion_key_held=false;}
 inline bool chat_context(uintptr_t& world,uintptr_t& actor,bool require_closed){
  using ssc_names::read;uintptr_t first=0,last=0;int slot=-1,world_slot=-1;unsigned char active=2;float cooldown=-1;
- if(!shortcut_enabled()||!read(shortcut_base+0xdec5d0,world)||!world||!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048||!read(shortcut_base+0xe20678,slot)||slot<0||uintptr_t(slot)>=(last-first)/0x34b8||!read(world+0x6ba0,active)||active>1)return false;
+ if(!shortcut_enabled()||!read(shortcut_base+0xded5d0,world)||!world||!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048||!read(shortcut_base+0xe21678,slot)||slot<0||uintptr_t(slot)>=(last-first)/0x34b8||!read(world+0x6ba0,active)||active>1)return false;
  actor=first+uintptr_t(slot)*0x34b8;if(!read(world+0x6b98,world_slot)||world_slot!=slot||!ssc_chat::local_actor(actor))return false;
  if(!require_closed)return true;
  if(active||!read(world+0x6ba4,cooldown)||!std::isfinite(cooldown)||cooldown>0)return false;
- for(auto rva:{0xfb4718u,0xfb346au,0xfb3990u}){unsigned char modal=2;if(!read(shortcut_base+rva,modal)||modal!=0)return false;}
+ for(auto rva:{0xfb5740u,0xfb446au,0xfb4990u}){unsigned char modal=2;if(!read(shortcut_base+rva,modal)||modal!=0)return false;}
  return true;
 }
 inline bool input_text(uintptr_t world,std::wstring& text){
@@ -40,7 +40,7 @@ inline CompletionPopup completion_popup(int width,int height){
  uintptr_t current=0,actor=0;std::wstring input;
  if(!chat_context(current,actor,false)||current!=world||!input_text(world,input)||input.empty()||input.front()!=L'/')return {};
  using ssc_names::read;int x=0,y=0,w=0,h=0,ax=0,ay=0,lw=0,lh=0;auto p=world+0x6bb0;
- if(!read(p+0x14,x)||!read(p+0x18,y)||!read(p+0x1c,w)||!read(p+0x20,h)||!read(p+0x70,ax)||!read(p+0x74,ay)||!read(shortcut_base+ssc_compat::resolve(0xfb3ae8),lw)||!read(shortcut_base+ssc_compat::resolve(0xfb3aec),lh))return {};
+ if(!read(p+0x14,x)||!read(p+0x18,y)||!read(p+0x1c,w)||!read(p+0x20,h)||!read(p+0x70,ax)||!read(p+0x74,ay)||!read(shortcut_base+ssc_compat::resolve(0xfb4ae8),lw)||!read(shortcut_base+ssc_compat::resolve(0xfb4aec),lh))return {};
  out.anchor=chat_anchor(x,y,w,h,ax,ay,lw,lh,width,height);if(!out.anchor.valid)return {};return out;
 }
 inline std::string input_utf8(const std::wstring& text){int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text.data(),int(text.size()),nullptr,0,nullptr,nullptr);if(n<=0)return {};std::string out(size_t(n),'\0');return WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text.data(),int(text.size()),out.data(),n,nullptr,nullptr)?out:std::string{};}
@@ -69,7 +69,7 @@ inline bool process_command_input(uintptr_t world,unsigned char transport){
  replace_input(world,{});shortcut_write(world+0x6ba0,static_cast<unsigned char>(0));{std::lock_guard<std::mutex> lock(slash_mutex);completions.clear();completion_source.clear();}return true;
 }
 inline uintptr_t public_chat_press(){
- using ssc_names::read;uintptr_t first=0,last=0,cap=0,found=0;if(!read(shortcut_base+0xfba310,first)||!read(shortcut_base+0xfba318,last)||!read(shortcut_base+0xfba320,cap)||!first||last<first||cap<last||(last-first)%0x150||(last-first)/0x150>256)return 0;
+ using ssc_names::read;uintptr_t first=0,last=0,cap=0,found=0;if(!read(shortcut_base+0xfbb330,first)||!read(shortcut_base+0xfbb338,last)||!read(shortcut_base+0xfbb340,cap)||!first||last<first||cap<last||(last-first)%0x150||(last-first)/0x150>256)return 0;
  for(auto p=first;p<last;p+=0x150){int id=-1;if(!read(p+0x148,id))return 0;if(id==34){if(found)return 0;found=p+0x14c;}}return found;
 }
 inline bool arm_slash(){uintptr_t world=0,actor=0;if(!chat_context(world,actor,true)||!public_chat_press())return false;std::lock_guard<std::mutex> lock(slash_mutex);if(slash_pending.load())return false;slash_request={world,actor,GetTickCount64(),L"/",false};slash_pending=true;return true;}
@@ -116,9 +116,9 @@ inline bool shortcut_chat_update(uintptr_t world){return shortcut_chat_update_fo
 inline bool shortcut_chat_update_single(uintptr_t world){return shortcut_chat_update_for(world,1);}
 inline bool attach_shortcut(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
  auto read=[](uintptr_t p,auto& v){return ssc_names::read(p,v);};if(!attached||!validate_chat_shortcut(base,read))return false;
- constexpr uint32_t sites[]={0x223411,0x2e9f14};for(auto rva:sites){std::array<unsigned char,5> bytes{};int32_t rel=0;if(!ssc_names::read_bytes(base+rva,bytes.data(),5)||bytes[0]!=0xe8)return false;std::memcpy(&rel,bytes.data()+1,4);if(base+rva+5+rel!=base+0x317f70)return false;}
+ constexpr uint32_t sites[]={0x2234d1,0x2ea284};for(auto rva:sites){std::array<unsigned char,5> bytes{};int32_t rel=0;if(!ssc_names::read_bytes(base+rva,bytes.data(),5)||bytes[0]!=0xe8)return false;std::memcpy(&rel,bytes.data()+1,4);if(base+rva+5+rel!=base+0x3182e0)return false;}
  unsigned char* bridge=nullptr;for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((base+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;const unsigned char jump[]={0xff,0x25,0,0,0,0};const uintptr_t targets[]={reinterpret_cast<uintptr_t>(shortcut_chat_update_single),reinterpret_cast<uintptr_t>(shortcut_chat_update)};for(int i=0;i<2;++i){std::memcpy(bridge+i*16,jump,6);std::memcpy(bridge+i*16+6,&targets[i],8);}DWORD old=0;if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,32);
  DWORD protection[2]{};for(int i=0;i<2;++i)if(!VirtualProtect(reinterpret_cast<void*>(base+sites[i]),5,PAGE_EXECUTE_READWRITE,&protection[i])){for(int j=i-1;j>=0;--j){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+sites[j]),5,protection[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
- popup_anchor_supported=validate_popup_anchor(base,read);shortcut_base=base;original_chat_update=reinterpret_cast<ChatUpdate>(base+0x317f70);set_chat_text=reinterpret_cast<SetChatText>(base+0x9a46d0);for(int i=0;i<2;++i){auto rva=sites[i];int32_t rel=int32_t(reinterpret_cast<uintptr_t>(bridge+i*16)-(base+rva+5));std::memcpy(reinterpret_cast<void*>(base+rva+1),&rel,4);FlushInstructionCache(GetCurrentProcess(),reinterpret_cast<void*>(base+rva),5);}for(int i=1;i>=0;--i){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+sites[i]),5,protection[i],&ignored);}return true;
+ popup_anchor_supported=validate_popup_anchor(base,read);shortcut_base=base;original_chat_update=reinterpret_cast<ChatUpdate>(base+0x3182e0);set_chat_text=reinterpret_cast<SetChatText>(base+0x9a4a00);for(int i=0;i<2;++i){auto rva=sites[i];int32_t rel=int32_t(reinterpret_cast<uintptr_t>(bridge+i*16)-(base+rva+5));std::memcpy(reinterpret_cast<void*>(base+rva+1),&rel,4);FlushInstructionCache(GetCurrentProcess(),reinterpret_cast<void*>(base+rva),5);}for(int i=1;i>=0;--i){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+sites[i]),5,protection[i],&ignored);}return true;
 }
 }

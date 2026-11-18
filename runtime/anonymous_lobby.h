@@ -19,12 +19,12 @@ template<class Read>Detection community_cup_anonymity(uintptr_t world,Read read)
 // The native name formatter and local actor layout must already be validated.
 template<class Read>Detection lobby_anonymity(uintptr_t base,bool supported,Read read){
  if(!supported)return Detection::off;
- int phase=0;if(!read(base+0xfb470c,phase))return Detection::unavailable;if(phase!=2)return Detection::off;
+ int phase=0;if(!read(base+0xfb5734,phase))return Detection::unavailable;if(phase!=2)return Detection::off;
  uintptr_t world=0,first=0,last=0,canonical=0;int slot=-1,world_slot=-2,stored=-3,kind=-1;unsigned char anonymous=2,active=0;
- if(!read(base+0xdec5d0,world)||!world)return Detection::unavailable;
+ if(!read(base+0xded5d0,world)||!world)return Detection::unavailable;
  if(!tournament_validated.load())return Detection::unavailable;
  auto cup=community_cup_anonymity(world,read);if(cup!=Detection::off)return cup;
- if(!read(base+0xe20678,slot)||slot<0||slot>=2048||!read(world+0x6b98,world_slot)||world_slot!=slot||!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048||uintptr_t(slot)>=(last-first)/0x34b8||!read(base+0xe24138,canonical)||canonical!=first)return Detection::unavailable;
+ if(!read(base+0xe21678,slot)||slot<0||slot>=2048||!read(world+0x6b98,world_slot)||world_slot!=slot||!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048||uintptr_t(slot)>=(last-first)/0x34b8||!read(base+0xe25138,canonical)||canonical!=first)return Detection::unavailable;
  auto actor=first+uintptr_t(slot)*0x34b8;
  if(!read(actor+0x78,stored)||stored!=slot||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||active!=1||!read(actor+0x209,anonymous)||anonymous>1)return Detection::unavailable;
  return anonymous?Detection::on:Detection::off;

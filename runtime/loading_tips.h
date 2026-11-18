@@ -61,22 +61,22 @@ struct BottomClip {
 inline ssc_names::Wrapped original=nullptr;
 inline uintptr_t cached_renderer=0;inline int cached_w=0,cached_h=0;inline float cached_base=0;inline Layout cached_layout;
 inline int wrapped(uintptr_t renderer,float x,float y,float width,float height,void* name,float size,float r,float g,float b,float alpha,int align,int vertical,int first,unsigned char flags,int limit,float start,float end,float phase){
- std::call_once(selection,[]{uintptr_t begin=0,last=0;if(ssc_names::read(image+0xfb35e8,begin)&&ssc_names::read(image+0xfb35f0,last)&&begin&&last>=begin&&(last-begin)%4==0)selected=choose(size_t((last-begin)/4),ssc_challenge::random_word);});
+ std::call_once(selection,[]{uintptr_t begin=0,last=0;if(ssc_names::read(image+0xfb45e8,begin)&&ssc_names::read(image+0xfb45f0,last)&&begin&&last>=begin&&(last-begin)%4==0)selected=choose(size_t((last-begin)/4),ssc_challenge::random_word);});
  if(!enabled.load(std::memory_order_relaxed)||selected<0||size_t(selected)>=message_count)return original(renderer,x,y,width,height,name,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
  const char* text=messages[selected];const size_t n=std::strlen(text);ssc_chat::NativeString literal{reinterpret_cast<uintptr_t>(text),0,n,std::max(size_t(16),n)};
  if(selected!=long_tip)return original(renderer,x,y,width,height,&literal,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
- int w=0,h=0;if(!ssc_names::read(image+0xfb3ae8,w)||!ssc_names::read(image+0xfb3aec,h)||w<320||h<240)return original(renderer,x,y,width,height,&literal,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
+ int w=0,h=0;if(!ssc_names::read(image+0xfb4ae8,w)||!ssc_names::read(image+0xfb4aec,h)||w<320||h<240)return original(renderer,x,y,width,height,&literal,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
  if(cached_renderer!=renderer||cached_w!=w||cached_h!=h||cached_base!=size||cached_layout.size<=0){cached_layout=fit_bottom(w,h,size,[&](float line_width,float scale){return original(renderer,0,0,line_width,0,&literal,scale,r,g,b,0,0,0,0,1,9999,start,end,phase);});cached_renderer=renderer;cached_w=w;cached_h=h;cached_base=size;}
  const auto& l=cached_layout;if(l.size<=0)return original(renderer,x,y,width,height,&literal,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
  BottomClip clip(l,w,h);const int drawn=original(renderer,l.x+l.width*.5f,l.y,l.width,l.height,&literal,l.size,r,g,b,alpha,1,0,0,1,9999,start,end,phase);return drawn;
 }
 inline bool attach(){
  image=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));if(!validate(image,[](uintptr_t p,auto& v){return ssc_names::read(p,v);}))return false;
- auto site=reinterpret_cast<unsigned char*>(image+0x744bbc);int32_t before=0;std::memcpy(&before,site+1,4);if(site[0]!=0xe8||uintptr_t(site+5+before)!=image+0x481600)return false;
+ auto site=reinterpret_cast<unsigned char*>(image+0x744e3c);int32_t before=0;std::memcpy(&before,site+1,4);if(site[0]!=0xe8||uintptr_t(site+5+before)!=image+0x481900)return false;
  unsigned char* bridge=nullptr;for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((image+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
  const unsigned char jump[]={0xff,0x25,0,0,0,0};std::memcpy(bridge,jump,6);auto target=reinterpret_cast<uintptr_t>(wrapped);std::memcpy(bridge+6,&target,8);DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,14);
  if(!VirtualProtect(site,5,PAGE_EXECUTE_READWRITE,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- original=reinterpret_cast<ssc_names::Wrapped>(image+0x481600);int32_t relative=int32_t(bridge-(site+5));std::memcpy(site+1,&relative,4);FlushInstructionCache(GetCurrentProcess(),site,5);DWORD ignored;VirtualProtect(site,5,old,&ignored);return true;
+ original=reinterpret_cast<ssc_names::Wrapped>(image+0x481900);int32_t relative=int32_t(bridge-(site+5));std::memcpy(site+1,&relative,4);FlushInstructionCache(GetCurrentProcess(),site,5);DWORD ignored;VirtualProtect(site,5,old,&ignored);return true;
 }
 }

@@ -8,20 +8,20 @@ inline Detection native_read(){
  if(!native_base)return Detection::unavailable;
  // The game stores this byte in its process-lifetime settings block. The
  // settings and native account-copy functions are validated before enabling it.
- const auto value=*reinterpret_cast<volatile const unsigned char*>(native_base+0xfb38bb);
+ const auto value=*reinterpret_cast<volatile const unsigned char*>(native_base+0xfb48bb);
  return value==0?Detection::off:value==1?Detection::on:Detection::unavailable;
 }
 inline bool initialize_native(uintptr_t base){
  native_base=0;tournament_validated=false;
  struct Span{uint32_t rva,length;uint64_t hash;};
- const Span spans[]={{0x3ad410,41,0x6f2f73be202a23acULL},{0x7ddfa4,103,0xc5864bda29e180ffULL},{0xc7b1b0,13,0xd544cc964571dddeULL},{0x6a20e0,9088,0xea3a4c3d4869032aULL},{0x1f3660,3466,0x532d3b1852a5cdf3ULL}};
+ const Span spans[]={{0x3ad780,41,0x6b1d26a64cb3f64ULL},{0x7de344,103,0x2b0bdcccaed32548ULL},{0xc7c140,13,0xd544cc964571dddeULL},{0x6a2340,9088,0x9ef1c7faecc6d097ULL},{0x1f36e0,3466,0xcc665d6aa69b2288ULL}};
  for(const auto& span:spans){std::vector<unsigned char> bytes(span.length);SIZE_T read=0;
   if(!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(base+span.rva),bytes.data(),bytes.size(),&read)||read!=bytes.size()){reader=native_read;return false;}
   uint64_t hash=14695981039346656037ULL;for(auto byte:bytes)hash=(hash^byte)*1099511628211ULL;
   if(hash!=span.hash){reader=native_read;return false;}
  }
  unsigned char value=255;SIZE_T read=0;
- if(!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(base+0xfb38bb),&value,1,&read)||read!=1||value>1){reader=native_read;return false;}
+ if(!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(base+0xfb48bb),&value,1,&read)||read!=1||value>1){reader=native_read;return false;}
  tournament_validated=true;native_base=base;reader=native_read;return true;
 }
 }

@@ -25,9 +25,9 @@ inline uint64_t hash(const unsigned char* bytes,size_t count){uint64_t h=1469598
 inline bool matches(const unsigned char* base,size_t size){
  // Independently reviewed Windows build 25847950. Unknown native code leaves
  // this optional visual feature unavailable without affecting public modules.
- if(size<0x84ab98||hash(base+0x846ef0,0x3ca8)!=0x49bfea493ab47689ULL||hash(base+0x3b96c0,0x6e)!=0x83927504c64d1406ULL)return false;
- int32_t relative=0;std::memcpy(&relative,base+0x3b9717,4);
- return base[0x3b9716]==0xe8&&int64_t(0x3b971b)+relative==0x846ef0;
+ if(size<0x84b0a8||hash(base+0x847400,0x3ca8)!=0x2321ef423b9b72abULL||hash(base+0x3b9990,0x6e)!=0x8b4f5aad6021a75dULL)return false;
+ int32_t relative=0;std::memcpy(&relative,base+0x3b99e7,4);
+ return base[0x3b99e6]==0xe8&&int64_t(0x3b99eb)+relative==0x847400;
 }
 inline bool attach(){
  auto base=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));
@@ -41,9 +41,9 @@ inline bool attach(){
  const unsigned char jump[]={0xff,0x25,0,0,0,0};auto target=reinterpret_cast<uintptr_t>(draw);
  std::memcpy(bridge,jump,6);std::memcpy(bridge+6,&target,8);DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=base+0x3b9716;
+ FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=base+0x3b99e6;
  if(!VirtualProtect(site,5,PAGE_EXECUTE_READWRITE,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- original=reinterpret_cast<AimDraw>(base+0x846ef0);
+ original=reinterpret_cast<AimDraw>(base+0x847400);
  auto displacement=int32_t(bridge-(site+5));std::memcpy(site+1,&displacement,4);
  FlushInstructionCache(GetCurrentProcess(),site,5);DWORD ignored=0;VirtualProtect(site,5,old,&ignored);return true;
 }

@@ -130,7 +130,7 @@ void render(HDC dc) {
     static ULONGLONG shared_at=0;static uint64_t shared_privacy=0;
     const auto privacy_revision=ssc_privacy::generation.load();
     if(now-shared_at>=1000||shared_privacy!=privacy_revision){shared_at=now;shared_privacy=privacy_revision;
-      std::string own;if(ssc_names::attached)ssc_names::account_string(ssc_names::image_base+ssc_compat::resolve(0xe061e8),own);
+      std::string own;if(ssc_names::attached)ssc_names::account_string(ssc_names::image_base+ssc_compat::resolve(0xe071e8),own);
       ssc_shared::Style appearance;appearance.mode=ssc_names::gradient?ssc_shared::Mode::gradient:ssc_names::rainbow?ssc_shared::Mode::rainbow:ssc_shared::Mode::solid;
       appearance.count=ssc_names::gradient?unsigned(std::clamp(ssc_names::gradient_count,2,3)):ssc_names::rainbow?0:1;
       appearance.colors=ssc_names::gradient?ssc_names::gradient_colors:std::array<unsigned,3>{ssc_names::solid_rgb,0,0};
@@ -257,7 +257,7 @@ void render(HDC dc) {
     if(ssc_challenge::blind()){
         unsigned char actor_panel=0,global_panel=0;
         if(pg.valid&&pg.actor)ssc_names::read(pg.actor+0x26a9,actor_panel);
-        ssc_names::read(ssc_challenge::game+0xfb45c8,global_panel);
+        ssc_names::read(ssc_challenge::game+0xfb55f0,global_panel);
         ssc_blind::draw(width,height,actor_panel||global_panel||(GetAsyncKeyState(VK_CONTROL)&0x8000),
                         board_drawn||ssc_kos::tab_held(),blind_view.intermission);
     }else{
@@ -422,7 +422,7 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     ssc_advisor::attached=ssc_advisor::attach();log(ssc_advisor::attached?"Post-game recording adapter validated":"Post-game recording adapter unavailable");
     ssc_challenge::input_supported=ssc_mirror::attach();log(ssc_challenge::input_supported?"Mirrored on-foot movement attached":"Mirrored movement unavailable: native guards");
     ssc_challenge::attached=ssc_challenge::attach();log(ssc_challenge::attached?"Random Drafts action guards attached":"Random Drafts unavailable: native guards");
-    ssc_geri::hide_panel=+[](){if(!ssc_challenge::blind())return false;if(GetAsyncKeyState(VK_CONTROL)&0x8000)return true;unsigned char actor=0,global=0;const auto& observed=ssc_auto::tracking_observation;if(observed.valid&&observed.actor)ssc_names::read(observed.actor+0x26a9,actor);ssc_names::read(ssc_challenge::game+0xfb45c8,global);return actor||global;};ssc_geri::after_panel=ssc_challenge::dispatch_panel;ssc_geri::before_panel=nullptr;ssc_geri::restore_panel=nullptr;
+    ssc_geri::hide_panel=+[](){if(!ssc_challenge::blind())return false;if(GetAsyncKeyState(VK_CONTROL)&0x8000)return true;unsigned char actor=0,global=0;const auto& observed=ssc_auto::tracking_observation;if(observed.valid&&observed.actor)ssc_names::read(observed.actor+0x26a9,actor);ssc_names::read(ssc_challenge::game+0xfb55f0,global);return actor||global;};ssc_geri::after_panel=ssc_challenge::dispatch_panel;ssc_geri::before_panel=nullptr;ssc_geri::restore_panel=nullptr;
     ssc_geri::attached=ssc_geri::attach();log(ssc_geri::attached?"Geri panel adapter attached":"Geri panel adapter unavailable");
     if(!ssc_geri::attached){ssc_challenge::attached=false;ssc_challenge::reroll_supported=false;}
     ssc_creator::attached=ssc_creator::attach();log(ssc_creator::attached?"Creator crosshair adapter attached":"Creator crosshair adapter unavailable");
