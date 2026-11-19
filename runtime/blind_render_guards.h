@@ -10,7 +10,7 @@ inline constexpr Guard guards[]={
 {0x3da3f3,17,0x9bc34023c50fc3ULL},
 {0x4114c6,17,0x82e6bbcd871af91bULL},
 {0x411540,7,0x8af5eb618cba5a9bULL},
-{0x407c00,12832,0xe590e80bdb711ad3ULL},
+{0x407c00,12832,0xb11daf23cdb27bddULL},
 };
 template<class Read> bool validate(uintptr_t base,Read read){for(const auto& g:guards){uint64_t h=14695981039346656037ULL;for(uint32_t i=0;i<g.size;++i){unsigned char b=0;if(!read(base+g.rva+i,b))return false;h=(h^b)*1099511628211ULL;}if(h!=g.hash)return false;}return true;}
 }

@@ -25,7 +25,7 @@ inline uint64_t hash(const unsigned char* bytes,size_t count){uint64_t h=1469598
 inline bool matches(const unsigned char* base,size_t size){
  // Independently reviewed Windows build 25847950. Unknown native code leaves
  // this optional visual feature unavailable without affecting public modules.
- if(size<0x84b228||hash(base+0x847580,0x3ca8)!=0x9944975a65722ff2ULL||hash(base+0x3b99b0,0x6e)!=0xc6fb3cd6ee4e4981ULL)return false;
+ if(size<0x84b228||hash(base+0x847580,0x3ca8)!=0x6e595fbe51d2dcc8ULL||hash(base+0x3b99b0,0x6e)!=0xc6fb3cd6ee4e4981ULL)return false;
  int32_t relative=0;std::memcpy(&relative,base+0x3b9a07,4);
  return base[0x3b9a06]==0xe8&&int64_t(0x3b9a0b)+relative==0x847580;
 }

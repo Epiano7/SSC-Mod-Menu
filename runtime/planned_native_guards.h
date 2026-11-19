@@ -5,12 +5,12 @@ struct Guard {uint32_t rva,size;uint64_t hash;};
 // Reviewed against Steam build 26346222. These feature guards are checked before
 // any name/chat hooks; the existing compatibility manifest remains unchanged.
 inline constexpr Guard guards[]={
-{0x7de170,1281,0x66fb216241b1faaeULL},
-{0x223190,1204,0x857a00816ea5a5a4ULL},
-{0x2ea130,5775,0xdc1d42ad74423ad0ULL},
-{0x223650,819,0x71230631a86118d1ULL},
-{0x9b0e00,808,0x82349d79813493b8ULL},
-{0x31b400,4492,0xb96e6b3fd9db6551ULL},
+{0x7de170,1281,0xc98143f7e13a860eULL},
+{0x223190,1204,0x9cbc8d0772de5c3fULL},
+{0x2ea130,5775,0x6e92c2f75497b67bULL},
+{0x223650,819,0x97a6358b16f13a3dULL},
+{0x9b0e30,808,0x4a15fa72e2d057ddULL},
+{0x31b400,4492,0x9a4c3331bd604de0ULL},
 {0x31c590,242,0x186e2c03108d8c81ULL},
 {0x3438e0,182,0x84063e969ee06217ULL}
 };

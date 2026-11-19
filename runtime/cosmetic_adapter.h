@@ -111,7 +111,7 @@ inline bool bot_range(int slot,int kind,int start,int offset,int count,size_t to
 // generated-player range from the world start, offset and count fields.
 inline void validate_bot_layout(){
  bot_layout=false;std::array<unsigned char,13124> code{};std::array<unsigned char,32> hash{},expected{};
- const char* hex="6d9784d7fdd310ebef017168fd90a1bcd176f46a3207a810993d53616090e65a";
+ const char* hex="0a8ebcb0fd38f5dd0fb305fe03f6bf627175793b6481ee7bc3ea408270ae7195";
  if(!ssc_compat::supports(1)||!read_bytes(image_base+0x279d90,code.data(),code.size()))return;
  if(sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr)!=0)return;
  crypto_hash_sha256(hash.data(),code.data(),code.size());bot_layout=sodium_memcmp(hash.data(),expected.data(),32)==0;
@@ -132,7 +132,7 @@ struct Identity {bool local=false,bot=false;std::string account;uintptr_t actor=
 struct CloneSpan {uint32_t rva,size;uint64_t hash;};
 // Reviewed replicated owner-slot decoder, native owner name/level lookup, and
 // reset behavior. This is an extra feature guard, not a regenerated baseline.
-inline constexpr CloneSpan clone_spans[]={{0x8d359e,61,0x9af22c964bcbb43bULL},{0x84c3ba,27,0x335c68ff7021766aULL},{0x84cf64,27,0xcbb89514b22a113dULL},{0x785e65,17,0x11ec0b5da91a1244ULL}};
+inline constexpr CloneSpan clone_spans[]={{0x8d35ce,61,0x8e659e724bdb4abULL},{0x84c3ba,27,0x335c68ff7021766aULL},{0x84cf64,27,0x406e9c9866ee4b0dULL},{0x785e65,17,0x11ec0b5da91a1244ULL}};
 inline bool clone_layout=false;
 inline bool clone_layout_supported(uintptr_t base){
  for(const auto& span:clone_spans){std::array<unsigned char,64> bytes{};if(span.size>bytes.size()||!read_bytes(base+span.rva,bytes.data(),span.size))return false;uint64_t hash=14695981039346656037ULL;for(uint32_t i=0;i<span.size;++i)hash=(hash^bytes[i])*1099511628211ULL;if(hash!=span.hash)return false;}return true;
@@ -570,7 +570,7 @@ inline float modifier_label_draw(void* renderer,float x,float y,void* name,float
 inline bool modifier_layout_supported(){
  std::array<unsigned char,18105> code{};std::array<unsigned char,32> actual{},expected{};
  if(!read_bytes(image_base+0x3be9a0,code.data(),code.size()))return false;
- const char* hex="a809092ef1a1dfe53c9e3de7413d879929867b27c2df0ef2651939a7bb6eb4c0";
+ const char* hex="ff01d85af087d78a9c5d15f2b921a81ac544f1726a25fa4522e08409ef500364";
  if(sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr))return false;
  crypto_hash_sha256(actual.data(),code.data(),code.size());return sodium_memcmp(actual.data(),expected.data(),32)==0;
 }
@@ -582,16 +582,16 @@ inline bool account_surfaces_supported(){
  struct Guard{uint32_t rva,size;const char* hash;};
  const Guard guards[]={
   // Native auto-message/quick-react sender formatter and its reviewed caller.
-  {0x7ddf50,0x220,"af925d5b0702855e7b56e7ac020929ee5e21685547b96ab94aa9d65b79056e0d"},
-  {0x223650,0x333,"bdd5c6bbd05257586c763b32d28ea4d840545891bce132538818758e3ac56045"},
-  {0x3acad0,0x3c4,"872f0a249847489a3b2aca15aecce925dfe6e6d813f552057c69823ce5075921"},
-  {0x608a70,0x17ac,"af1faecf90fae219cfcb13a6ec9d21612d661b7cde53c6b4beb34a4f55d9b2ec"},
-  {0x60a850,0x20fb,"d671ad11e8ccaca2aa898d39ed12e77e7dc2738d401e75655e7532af9d836271"},
-  {0x628830,0x3a3a,"9ec4b0e9d2108f9056d080efe555e3dc64450d8216c817ec829201553a0b1e59"},
-  {0x41ac30,0x1243,"f1077feff1d6959cd7fb97b314d3d02a7d1680aca2abaf948341a527f7286bee"},
-  {0x623670,0x51c0,"5f6f55889776d2a9ed0ab39b189cf5d1adefd055289a1aa72fe3c1d4f55042f2"},
-  {0x63bfb0,0x9468,"b3f77af5888a80958f9d4ffde5deec3eaf65aea55c620622ed9454e84bf117d1"},
-  {0x9e67d6,0x72f,"a386cfdf640733959891961c93f33cdd59ce1014c47cf9c188501ea6d118e4c8"},
+  {0x7ddf50,0x220,"a6275416ce6fd09e540a71f71660a66c440b1697e6fa7b03bbbefdc5dd3c8a95"},
+  {0x223650,0x333,"5320f7a604b1865276907ffd80706747e37136a809d409a59e785fe410638dca"},
+  {0x3acad0,0x3c4,"24646323892ae8e8d138b0df00819ccee4f8e3264f793a0ca5350235a671e197"},
+  {0x608a70,0x17ac,"1e4dd84b89c0c0344afe73b8777d54d7ab35401ac729e96349f382be6d9c071b"},
+  {0x60a850,0x20fb,"84da676a3717b63d9bfef1c9789a1d6d41bf0382d47d1e52ac5d1f89abd688ae"},
+  {0x628830,0x3a3a,"d8d28aa227c7982629e30394e7d882d1b9254703e04e3889a7cbc23c611f53b3"},
+  {0x41ac30,0x1243,"72ae75567c52170fc86a0ead18d2838fc2b9be84fd71e3ea77a1e4a65cdba133"},
+  {0x623670,0x51c0,"ec95562f68ba97511fe7fcf9db0c5574c3b8cce42da1fef94036f41c1ca6b557"},
+  {0x63bfb0,0x9468,"4f8c583270c54ed1b4565b6d22d451a42c791d85ac4449ed60979ce582eb23cc"},
+  {0x9e6806,0x72f,"9774aeb5a5aaaed162a68289245c8e4104891731649f9137fd1312b9e7ff084d"},
  };
  for(const auto& guard:guards){
   std::vector<unsigned char> bytes(guard.size);std::array<unsigned char,32> actual{},expected{};
@@ -606,7 +606,7 @@ inline bool attach(){
     if(!modifier_layout_supported()||!account_surfaces_supported())return false;
     clone_layout=clone_layout_supported(image_base);
     {std::array<unsigned char,12105> code{};std::array<unsigned char,32> actual{},expected{};
-     const char* hex="f989ce165719a2872d0d858c59d2543d1fa14a69b44405fe5ed39682d75c8829";
+     const char* hex="f4e3bb5188d15206ff65af44952aed122dd9d0a9550eb97d417b4f8f477ed539";
      if(!read_bytes(image_base+0x3bba50,code.data(),code.size())||sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr))return false;
      crypto_hash_sha256(actual.data(),code.data(),code.size());if(sodium_memcmp(actual.data(),expected.data(),32))return false;}
     native_predicate=reinterpret_cast<Predicate>(image_base+ssc_compat::resolve(0x3acad0));native_overhead=reinterpret_cast<Overhead>(image_base+ssc_compat::resolve(0x84c0d0));native_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x481790));
@@ -616,7 +616,7 @@ inline bool attach(){
     native_palette=reinterpret_cast<Palette>(image_base+ssc_compat::resolve(0x1558f0));
     native_name_formatter=reinterpret_cast<NameFormatter>(image_base+0x7de170);
     native_sender_formatter=reinterpret_cast<NameFormatter>(image_base+0x7ddf50);
-    native_widget=reinterpret_cast<Widget>(image_base+ssc_compat::resolve(0x99f3a0));
+    native_widget=reinterpret_cast<Widget>(image_base+ssc_compat::resolve(0x99f3d0));
     struct Site{uint32_t call,target;uintptr_t hook;bool exact=false;};
     // Whitelist presentation calls only. Do not hook the predicate globally:
     // 5fb3b0/5fd316/6834a3/6b6db7 also service pass-related UI/cache logic.
@@ -698,8 +698,8 @@ inline bool attach(){
         {0x6c5baf,0x481ab0,reinterpret_cast<uintptr_t>(wide_wrapped)},
         {0x6d7aaa,0x481ab0,reinterpret_cast<uintptr_t>(wide_wrapped)},
         {0x719e5e,0x481ab0,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x9a6bfa,0x4823d0,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x9a6cd0,0x481ab0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x9a6c2a,0x4823d0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x9a6d00,0x481ab0,reinterpret_cast<uintptr_t>(wide_wrapped)},
         // Both glyph palette paths (regular and alternate text rendering).
         {0x48aff1,0x1558f0,reinterpret_cast<uintptr_t>(palette)},
         {0x48b052,0x1558f0,reinterpret_cast<uintptr_t>(palette)},
@@ -710,7 +710,7 @@ inline bool attach(){
         {0x3f7998,0x481790,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
         {0x3f7a53,0x481790,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
 
-        {0x9a16ff,0x481920,reinterpret_cast<uintptr_t>(widget_wrapped)},
+        {0x9a172f,0x481920,reinterpret_cast<uintptr_t>(widget_wrapped)},
         {0x48a939,0x1558f0,reinterpret_cast<uintptr_t>(palette)},
         {0x48a996,0x1558f0,reinterpret_cast<uintptr_t>(palette)},
         {0x41bb05,0x481790,reinterpret_cast<uintptr_t>(account_draw)},
@@ -721,9 +721,9 @@ inline bool attach(){
         {0x6ae32c,0x481790,reinterpret_cast<uintptr_t>(account_draw)},
         {0x6ae5b4,0x481790,reinterpret_cast<uintptr_t>(ssc_chat_name_bridge)},
         {0x6ae7d2,0x481790,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9e6bc3,0x481790,reinterpret_cast<uintptr_t>(ssc_vehicle_name_bridge),true},
-        {0x9b20fb,0x481790,reinterpret_cast<uintptr_t>(event_draw)},
-        {0x9b229f,0x481790,reinterpret_cast<uintptr_t>(event_draw)},
+        {0x9e6bf3,0x481790,reinterpret_cast<uintptr_t>(ssc_vehicle_name_bridge),true},
+        {0x9b212b,0x481790,reinterpret_cast<uintptr_t>(event_draw)},
+        {0x9b22cf,0x481790,reinterpret_cast<uintptr_t>(event_draw)},
 
         {0x33e86c,0x84c0d0,reinterpret_cast<uintptr_t>(overhead)},
         {0x84c586,0x3acad0,reinterpret_cast<uintptr_t>(predicate)},
@@ -732,11 +732,11 @@ inline bool attach(){
         {0x6259cc,0x3acad0,reinterpret_cast<uintptr_t>(predicate)},
         {0x63f2de,0x3acad0,reinterpret_cast<uintptr_t>(predicate)},
         {0x6ac843,0x3acad0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9e6b25,0x3acad0,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9b202d,0x3acad0,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x9b21d7,0x3acad0,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x60b961,0x99f3a0,reinterpret_cast<uintptr_t>(local_widget)},
-        {0x9a1839,0x481790,reinterpret_cast<uintptr_t>(widget_draw)},
+        {0x9e6b55,0x3acad0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x9b205d,0x3acad0,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x9b2207,0x3acad0,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x60b961,0x99f3d0,reinterpret_cast<uintptr_t>(local_widget)},
+        {0x9a1869,0x481790,reinterpret_cast<uintptr_t>(widget_draw)},
         {0x84ce08,0x481790,reinterpret_cast<uintptr_t>(draw)},
         {0x84ce94,0x481790,reinterpret_cast<uintptr_t>(draw)},
         {0x4384cd,0x481790,reinterpret_cast<uintptr_t>(ssc_score_bridge)},

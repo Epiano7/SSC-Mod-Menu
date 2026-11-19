@@ -87,7 +87,7 @@ inline Hook hooks[]={
  // Screen-wide progress strips share the currency function, but are not counters.
  {0x40d876,0x4868e0,-1,128},{0x40d9a3,0x4868e0,-1,128},{0x40dad4,0x487090,-1,120},
  // Local skill readiness and only its icon draw (not health/background).
- {0x410ddb,0x967f10,-4,0},{0x411547,0x488030,-5,80,false,false,false,0x28},
+ {0x410ddb,0x967f40,-4,0},{0x411547,0x488030,-5,80,false,false,false,0x28},
  // Build-list presentation only: preserve native side effects and layout returns.
  {0x3bce24,0x407c00,-6,128,false,false,false,0,24,true,true},
  {0x3da279,0x407c00,-6,128,false,false,false,0,24,false,true},
@@ -173,7 +173,7 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
 using Ready=bool(__cdecl*)(uintptr_t,uintptr_t);
 template<class T> inline T native_field(uintptr_t object,size_t offset){T v;std::memcpy(&v,reinterpret_cast<const void*>(object+offset),sizeof(v));return v;}
 inline bool __cdecl skill_ready_hook(uintptr_t skill,uintptr_t actor){
-    const bool ready=reinterpret_cast<Ready>(game_base+ssc_compat::resolve(0x967f10))(skill,actor);
+    const bool ready=reinterpret_cast<Ready>(game_base+ssc_compat::resolve(0x967f40))(skill,actor);
     skill_pulse=0;skill_icon=-1;
     if(!ssc_cooldown::settings.enabled){ssc_cooldown::tracker.clear();return ready;}
     // Arguments are native-owned records at a fingerprint-validated HUD call site.

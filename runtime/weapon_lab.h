@@ -161,7 +161,7 @@ inline void refresh(){
     if(!ssc_compat::initialized||!ssc_compat::supports(8)){status=L"Unavailable on this game version.";return;}
     auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
     // All consumer functions are fingerprinted, including field layout and formula.
-    const uintptr_t dependencies[]={base+ssc_compat::resolve(0xa097d0),base+ssc_compat::resolve(0x1d1480),base+ssc_compat::resolve(0x5c4e80),base+ssc_compat::resolve(0x5f32d0),base+ssc_compat::resolve(0x3ae350),base+ssc_compat::resolve(0x41c8c0),base+ssc_compat::resolve(0x804343)};
+    const uintptr_t dependencies[]={base+ssc_compat::resolve(0xa097f0),base+ssc_compat::resolve(0x1d1480),base+ssc_compat::resolve(0x5c4e80),base+ssc_compat::resolve(0x5f32d0),base+ssc_compat::resolve(0x3ae350),base+ssc_compat::resolve(0x41c8c0),base+ssc_compat::resolve(0x804343)};
     for(auto address:dependencies)if(address==base){status=L"Weapon definitions unavailable.";return;}
     uintptr_t table=0;
     if(!ssc_names::read(base+ssc_compat::resolve(0xfb3fa8),table)||!read_catalog(table,weapons)){status=L"Weapon data not ready. Try Refresh at the main menu.";return;}
