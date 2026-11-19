@@ -46,13 +46,13 @@ inline void typed_send(uintptr_t world,unsigned char transport,uintptr_t actor,c
 }
 inline bool attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
  if(!ssc_planned_native::commands)return false;
- constexpr uint32_t calls[]={0x223520,0x2ea2ba};
- for(auto rva:calls){std::array<unsigned char,5> bytes{};int32_t rel=0;if(!ssc_names::read_bytes(base+rva,bytes.data(),5)||bytes[0]!=0xe8)return false;std::memcpy(&rel,bytes.data()+1,4);if(base+rva+5+rel!=base+0x223630)return false;}
+ constexpr uint32_t calls[]={0x223540,0x2ea2da};
+ for(auto rva:calls){std::array<unsigned char,5> bytes{};int32_t rel=0;if(!ssc_names::read_bytes(base+rva,bytes.data(),5)||bytes[0]!=0xe8)return false;std::memcpy(&rel,bytes.data()+1,4);if(base+rva+5+rel!=base+0x223650)return false;}
  unsigned char* bridge=nullptr;for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((base+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
  const unsigned char jump[]={0xff,0x25,0,0,0,0};auto target=reinterpret_cast<uintptr_t>(typed_send);std::memcpy(bridge,jump,6);std::memcpy(bridge+6,&target,8);DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,14);
  DWORD protections[2]{};for(int i=0;i<2;++i)if(!VirtualProtect(reinterpret_cast<void*>(base+calls[i]),5,PAGE_EXECUTE_READWRITE,&protections[i])){for(int j=i-1;j>=0;--j){DWORD unused;VirtualProtect(reinterpret_cast<void*>(base+calls[j]),5,protections[j],&unused);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
- original_sender=reinterpret_cast<Sender>(base+0x223630);
+ original_sender=reinterpret_cast<Sender>(base+0x223650);
  for(auto rva:calls){int32_t rel=int32_t(reinterpret_cast<uintptr_t>(bridge)-(base+rva+5));std::memcpy(reinterpret_cast<void*>(base+rva+1),&rel,4);FlushInstructionCache(GetCurrentProcess(),reinterpret_cast<void*>(base+rva),5);}
  for(int i=1;i>=0;--i){DWORD unused;VirtualProtect(reinterpret_cast<void*>(base+calls[i]),5,protections[i],&unused);}return true;
 }
