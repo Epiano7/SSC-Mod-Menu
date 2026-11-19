@@ -74,6 +74,7 @@ inline void apply(){
  std::wstring args=L"--update-download "+quote(root.wstring())+L" "+std::to_wstring(GetCurrentProcessId())+L" "+std::to_wstring(time.QuadPart+504911232000000000ULL)+L" "+quote(job.wstring())+L" "+std::wstring(version.begin(),version.end());
  if(launch(args)){applying=true;message=L"Preparing update...";}else message=L"Could not start the update helper.";
 }
+inline bool request_game_close(HWND window){DWORD pid=0;return window&&GetWindowThreadProcessId(window,&pid)&&pid==GetCurrentProcessId()&&PostMessageW(window,WM_CLOSE,0,0);}
 inline bool poll(HWND window,bool may_restart){
  bool changed=false;
  bool ended=process&&WaitForSingleObject(process,0)==WAIT_OBJECT_0;
@@ -87,21 +88,37 @@ inline bool poll(HWND window,bool may_restart){
   if(line.rfind("error ",0)==0){applying=false;version.clear();}
  }
  if(ended&&applying&&!closing){applying=false;version.clear();if(result.rfind("error ",0)!=0)message=L"Update helper stopped. The game was left open.";}
- if(process&&applying&&!closing&&may_restart&&result.rfind("ready ",0)==0){closing=true;PostMessageW(window,WM_CLOSE,0,0);}
+ if(window&&process&&applying&&!closing&&may_restart&&result.rfind("ready ",0)==0&&request_game_close(window))closing=true;
  return changed;
 }
-// Only used when initialization rejects the executable and no overlay is attached.
-// Never install/restart automatically; offer the official release page instead.
+// Unsupported builds have no overlay; use only OS window/process identity here.
+inline HWND fallback_window(){
+ struct Search{DWORD pid;HWND window=nullptr;bool ambiguous=false;} search{GetCurrentProcessId()};
+ EnumWindows([](HWND window,LPARAM context)->BOOL{
+  auto& found=*reinterpret_cast<Search*>(context);DWORD pid=0;GetWindowThreadProcessId(window,&pid);
+  if(pid!=found.pid||!IsWindowVisible(window)||GetWindow(window,GW_OWNER))return TRUE;
+  wchar_t name[64]{};GetClassNameW(window,name,64);if(std::wstring(name)==L"#32770")return TRUE;
+  RECT client{};if(!GetClientRect(window,&client)||client.right<=0||client.bottom<=0)return TRUE;
+  if(found.window)found.ambiguous=true;else found.window=window;return TRUE;
+ },reinterpret_cast<LPARAM>(&search));
+ return search.ambiguous?nullptr:search.window;
+}
+inline bool fallback_direct_update(){return !linux_install||linux_desktop;}
+inline void begin_fallback_update(){apply();}
 inline DWORD WINAPI fallback_notice(void*){
  const auto started=GetTickCount64();
  do{poll(nullptr,false);if(!process)break;Sleep(250);}while(GetTickCount64()-started<90000);
- if(notification_due(true)){
-  notified=true;
+ if(!process&&notification_due(true)){
+  notified=true;const bool direct=fallback_direct_update();
   const auto text=L"SSC Mod Menu "+std::wstring(version.begin(),version.end())+
-   L" is available. Gameplay modules are unavailable on this game build. Open the official update page?";
+   (direct?L" is available. This build cannot show in-game menus. Download the update, close the game when the installer is ready, and restart through Steam?":
+           L" is available. This build cannot show in-game menus. Open the official Linux download page?");
   if(MessageBoxW(nullptr,text.c_str(),L"SSC Mod Menu update",MB_YESNO|MB_ICONINFORMATION|MB_SETFOREGROUND)==IDYES){
-   const auto url=L"https://github.com/Epiano7/SSC-Mod-Menu/releases/tag/v"+std::wstring(version.begin(),version.end());
-   ShellExecuteW(nullptr,L"open",url.c_str(),nullptr,nullptr,SW_SHOWNORMAL);
+   begin_fallback_update();
+   if(direct){
+    while(process&&applying&&!closing){poll(fallback_window(),true);if(process&&applying&&!closing)Sleep(250);}
+    if(!closing)MessageBoxW(nullptr,message.c_str(),L"SSC Mod Menu update",MB_OK|MB_ICONINFORMATION|MB_SETFOREGROUND);
+   }
   }
  }
  return 0;

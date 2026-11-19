@@ -14,4 +14,4 @@ The mod checks for updates once at the main menu. You can also check manually fr
 
 When an update is available, choose **Update and restart**. The mod downloads and verifies the installer before closing the game, applies the update, and launches the game through Steam. The normal setup window is not shown, although Windows may ask for administrator permission.
 
-If a game update is unsupported, **Right Shift** still opens a compatibility menu with manual update controls. Automatic checks wait until the game state can be recognized.
+When a game update disables individual modules but the menu remains compatible, **Right Shift** still opens the menu and its update controls. If the installed mod cannot load its in-game menu, a Windows fallback prompt offers the same verified download, installation and Steam restart. It uses the normal official-release check for any newer version; it is not tied to a particular mod or Steam build. The fallback does not bypass compatibility checks or install without your acceptance.

@@ -59,9 +59,9 @@
     "docs/shared-cosmetics.md": "02810c22d591f419d385d24fd6af3030206c0ffc59ac77960226da316f1a971a",
     "docs/source-distribution.md": "08a40ce92b255b2c8c5184b901f7e216e7e120e44c9920b305884bf05bd99cb1",
     "installer/Engine.cs": "3fbf46189f55eca8d5ecf85a51ea7dcc46c9f56dfd52709dc097b18025b5b159",
-    "installer/README.md": "1565f69e103df3e5e478e1cfd3897283f8adc06ac750dd03cb7141417c232ca6",
+    "installer/README.md": "99da2f2fdb1e39b1420c8683462dab359ec23fc214d477d5d4cabc06e22ae957",
     "installer/Setup.cs": "cc99d73b91dc838764aaa975266aa052941a24807e9aa8bebe539e9f7e39fd17",
-    "installer/Updater.cs": "e6f71be3f5422d664c7d09ca6028be82a45f3efe6846884af836d22343a01a02",
+    "installer/Updater.cs": "5ab89698a4c56746446cacce9d2ad153007e2433555f636d561fce1434b42318",
     "installer/app.manifest": "f0e3b61f26bd16a13b7a9c62f58661b28a74186fe0acccd7e33cd92c12dab11e",
     "linux/README.md": "a24e1357bd6b015aa00a2663c3b996c2bb70c874de236ebffcd8f67313de53ca",
     "linux/desktop_ui.py": "0da37be48306b3122c3e86b35d8eeb632e4daf95501f1e3f874ae91b0482648c",
@@ -306,7 +306,7 @@
     "runtime/third_party/vorbis/lib/window.h": "9bb736d228deae67699012cc38f81d379e0b077432f162f2dcd1087f7669dc98",
     "runtime/title_logo.h": "e8fc0948749525bb68be5dfe6c7a2d4ab462a7f6d72885b6f8a0f7c2f519d0a9",
     "runtime/tracking_recording.h": "4cf3b415707e7acf2080d07541e6ec9e3d82ba4905aaa600afab0ca454162ccd",
-    "runtime/update_module.h": "e4193a480e9fc914ea0ad25a7be59dcde5cd749ffe94b5627ed7f986225eb551",
+    "runtime/update_module.h": "f0fca0bf3a0b018c942df24c77861f792f065f89d9a16c3181b523e40d38f43f",
     "runtime/vehicle_adapter.h": "a8e8aec7b2f7ebb42429095e94716139f3cf1e41f2cdfdd6b85bde442fba24d1",
     "runtime/vehicle_controls.h": "10a0dd540a68e4e36cde95d93ea9869db7e04091d8388e30efa3419f886fdb71",
     "runtime/weapon_lab.h": "8f5b9c7789c20cc4fa3a905e68a3c9893bd7229b3df40621087cfb87ecb52a40",
@@ -371,7 +371,10 @@
     "scripts/tracking_recording_test.cpp": "99d30b9aed39733e28fb33b839673ac3c08dc0e0628dd880a88405baf207c11c",
     "scripts/vehicle_adapter_test.cpp": "b11708edd6653a1e5d6b29b800c5fe3f19915b1f590bdd76213de8e9f4e30708",
     "scripts/vehicle_controls_test.cpp": "2454c51dfebe981bce7dc324d10c4d779716b79f49e38c46acee65d049d58d76",
-    "scripts/verify_public_source.py": "2abfc33d9c7b398ed85f15b52d8cc64511dd75d8c8470f456c4088191d46140c"
+    "scripts/verify_public_source.py": "2abfc33d9c7b398ed85f15b52d8cc64511dd75d8c8470f456c4088191d46140c",
+    "scripts/test_fallback_update.py": "93bf2f14484f3cea393ea18123bb2b71157394d92e25a1b1e0ebef4ca99bf58a",
+    "scripts/fallback_update_test.cpp": "88f86ecc93cc00214744561c0c47c88c580c98eb3459bd3ae2e6d554712a2310",
+    "scripts/updater_failure_test.cs": "d766b7a663b4f377f7da891db24b3be6cc155b8c4b5d9bccd85bcf71db74ea45"
   },
   "prepared_release": "0.1.40"
 }

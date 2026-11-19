@@ -87,6 +87,21 @@ namespace SSCMods.Setup {
             catch(UnauthorizedAccessException){return true;}
         }
         public static string Quote(string value){if(value.IndexOfAny(new[]{'"','\r','\n'})>=0)throw new IOException("Invalid argument.");return "\""+value.TrimEnd('\\')+"\"";}
+        // Preserve a bounded installer error instead of overwriting it in the parent helper.
+        public static string InstallerFailure(string job) {
+            string fallback="Update was not installed. See the update status.";
+            string path=Path.Combine(Job(job),"status.txt");
+            try {
+                using(var input=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete)) {
+                    byte[] bytes=new byte[4097];int total=0,count;
+                    while(total<bytes.Length&&(count=input.Read(bytes,total,bytes.Length-total))>0)total+=count;
+                    if(total>4096)return fallback;
+                    string status=Encoding.UTF8.GetString(bytes,0,total).Trim();
+                    if(status.StartsWith("error ",StringComparison.Ordinal)&&status.Length>6)return status.Substring(6);
+                }
+            } catch(IOException) {} catch(UnauthorizedAccessException) {}
+            return fallback;
+        }
         // The unelevated helper survives game exit, then launches Steam in the user's session.
         public static void DownloadAndApply(string root,int pid,long started,string job,string acceptedVersion) {
             job=Job(job);
@@ -103,7 +118,7 @@ namespace SSCMods.Setup {
                 var info=new ProcessStartInfo(setup,args){UseShellExecute=true,Verb=NeedsElevation(root)?"runas":"",WindowStyle=ProcessWindowStyle.Hidden};
                 using(var verified=new FileStream(setup,FileMode.Open,FileAccess.Read,FileShare.Read)) {
                     if(!String.Equals(Engine.FileHash(setup),asset.digest.Substring(7),StringComparison.OrdinalIgnoreCase))throw new IOException("Downloaded installer changed.");
-                    using(var installer=Process.Start(info)){installer.WaitForExit();if(installer.ExitCode!=0)throw new IOException("Update was not installed. See the update status.");}
+                    using(var installer=Process.Start(info)){installer.WaitForExit();if(installer.ExitCode!=0)throw new IOException(InstallerFailure(job));}
                 }
                 Report(job,"complete Update installed. Starting Skillshot City...");
                 Process.Start(new ProcessStartInfo("steam://rungameid/308600"){UseShellExecute=true});
