@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "public_base_commit": "75d0bfccaa1fddbf4f871c3d47a3a409078e9b59",
-  "stable_release_commit": "75d0bfccaa1fddbf4f871c3d47a3a409078e9b59",
+  "public_base_commit": "d2c90000a6cb4f6dd166f62be93cbbee5116902b",
+  "stable_release_commit": "d2c90000a6cb4f6dd166f62be93cbbee5116902b",
   "distribution": "mixed-source; private build input required for full runtime",
   "private_component": {
     "files": {
@@ -61,7 +61,7 @@
     "installer/Engine.cs": "3fbf46189f55eca8d5ecf85a51ea7dcc46c9f56dfd52709dc097b18025b5b159",
     "installer/README.md": "99da2f2fdb1e39b1420c8683462dab359ec23fc214d477d5d4cabc06e22ae957",
     "installer/Setup.cs": "cc99d73b91dc838764aaa975266aa052941a24807e9aa8bebe539e9f7e39fd17",
-    "installer/Updater.cs": "5ab89698a4c56746446cacce9d2ad153007e2433555f636d561fce1434b42318",
+    "installer/Updater.cs": "535862e60c29b5d1c0cad511fe08eb8bba0b49cf44a62a47c3e5d2e0a2c7e9d7",
     "installer/app.manifest": "f0e3b61f26bd16a13b7a9c62f58661b28a74186fe0acccd7e33cd92c12dab11e",
     "linux/README.md": "a24e1357bd6b015aa00a2663c3b996c2bb70c874de236ebffcd8f67313de53ca",
     "linux/desktop_ui.py": "0da37be48306b3122c3e86b35d8eeb632e4daf95501f1e3f874ae91b0482648c",
@@ -110,7 +110,7 @@
     "runtime/blind_question_icon.h": "337be12b605e740f03b6386c9ab3aa614ba9c6c532a1965d583c67d3cc91fef7",
     "runtime/blind_render_guards.h": "1247738de9a8a21623b2b6862116b5f2d3911962a85e2ec0ce5a59a6336bb5cc",
     "runtime/build_recording_source.h": "ea27f734f3088bdb1fe4240ed6c545fc2ba48d80c769ec3c6d56117822cb1f86",
-    "runtime/build_version.h": "e07329ff545bb542733fad2d4eef52da98d5ef8cba4b6e72d6d888ad7a167b25",
+    "runtime/build_version.h": "12a8277d822a330d915270f5efb17c8097bea6420bd8a32a90a4d95d2719fb26",
     "runtime/capture_submission.h": "a2fd0dbc290d27765ad307c1e6e618f657ef335c566122eaf71495a1beef8a46",
     "runtime/challenge_guards.h": "448ca2d817d7813ccb8ce25b89890b93a7cca4f1e03ead6ec0a49a8ab4337586",
     "runtime/challenge_modes.h": "df700b864aa852089028ac3c0454613c4adae402aa724eda4c297bd47ac526e8",
@@ -315,7 +315,7 @@
     "scripts/Build-AudioCodec.ps1": "3ee5e929943f2d31d174ad256852f85d5331c84bf5ebbc562fb5dfcc8e2c610f",
     "scripts/Build-AuthCrypto.ps1": "65bed304aa930e788c6c6727477257134bc9e358b4988da5174cb2b6aa61faa4",
     "scripts/Build-CompatibilityProbe.ps1": "13d001f6c637949804e794e8513a7b281114a3191fa48adfffe99b3c3be2bbdd",
-    "scripts/Build-Installer.ps1": "2699cb7b5e4d771bb20c6cc46e8482e3755c0656ad3bf20477d8a41cd61eca8d",
+    "scripts/Build-Installer.ps1": "9032a0ebab41d6264c9ee80d070e940702343487cef0df08627392a022e016e6",
     "scripts/Build-Linux-Launcher.ps1": "4a03586bb0ee6ede15a741e349d2c47571b237ccf48c5461ec556107139f1dfc",
     "scripts/Build-Linux.py": "1932f17db7d1ec82866503063a563269340cf4eaf7f40172a4ead80d7ccf9640",
     "scripts/Build-Release.ps1": "7d29c1e6932be33acd2fb7c9dd7c33bd5239030e03791479315d4113d14a9ccc",
@@ -343,6 +343,7 @@
     "scripts/creator_controls_test.cpp": "c959e2bb1e278b86cebe8818fb858590e24cde2c564d544d329c0541398d1a5b",
     "scripts/disabled_hud_test.cpp": "43706b213c958bd76a5a8025b9e74c376d49f4f42cbed37d2d554b1d43fba37d",
     "scripts/embed_title_logo.py": "3d1eb91bd22ad3434b4759995fd1bbf2d674a0353c0bc35af8f36bf432c90214",
+    "scripts/fallback_update_test.cpp": "88f86ecc93cc00214744561c0c47c88c580c98eb3459bd3ae2e6d554712a2310",
     "scripts/freecam_capture_geometry_test.cpp": "d96d9b8df8ef6587d683115e0509aebde44829a63bb3dbc34b01b5edce7a4e22",
     "scripts/freecam_capture_test.cpp": "4f2c8b3ee8f434e96a3cce2c87770d90086fd3e4266a83102047f30fe06a6960",
     "scripts/freecam_session_fixture.h": "47cdefcd12e6225d3cb65cf8b48dbc72c765971634338bae97c745e630b711f9",
@@ -364,17 +365,16 @@
     "scripts/statistics_core_test.cpp": "55918521cf70ef6e85f599fab85dceaa509d3ce0e725cb79f8b60d4221e5b180",
     "scripts/statistics_menu_test.cpp": "4f14188fdaaf6f970ab89d5bc07fad78866e903257cf22690172677f5645f873",
     "scripts/test_consolidate_recordings.py": "4ff358456c7016ab2f52db87f707faba6f150ad6e1b2b9e917ff5885a94d931b",
+    "scripts/test_fallback_update.py": "93bf2f14484f3cea393ea18123bb2b71157394d92e25a1b1e0ebef4ca99bf58a",
     "scripts/test_linux_recovery.py": "ae03249c804e6c7db990959df4731675935d9133ee26b171c1eba91373811f26",
     "scripts/test_private_storage.py": "c55f0f906bb9d6a373830407da6382575fa07a4d5928c2b2083135b04c41fd76",
     "scripts/test_recording_statistics.py": "b616fe3b5ac7517ae76d632a1a9b177ee85ac92360cf32d8ba6fd78cd933a0ff",
     "scripts/title_logo_test.cpp": "cf8dcb73cc09ada2d0ddddb76b1fa1074b4578e58d3b05c60458eb2a7278fb19",
     "scripts/tracking_recording_test.cpp": "99d30b9aed39733e28fb33b839673ac3c08dc0e0628dd880a88405baf207c11c",
+    "scripts/updater_failure_test.cs": "d766b7a663b4f377f7da891db24b3be6cc155b8c4b5d9bccd85bcf71db74ea45",
     "scripts/vehicle_adapter_test.cpp": "b11708edd6653a1e5d6b29b800c5fe3f19915b1f590bdd76213de8e9f4e30708",
     "scripts/vehicle_controls_test.cpp": "2454c51dfebe981bce7dc324d10c4d779716b79f49e38c46acee65d049d58d76",
-    "scripts/verify_public_source.py": "2abfc33d9c7b398ed85f15b52d8cc64511dd75d8c8470f456c4088191d46140c",
-    "scripts/test_fallback_update.py": "93bf2f14484f3cea393ea18123bb2b71157394d92e25a1b1e0ebef4ca99bf58a",
-    "scripts/fallback_update_test.cpp": "88f86ecc93cc00214744561c0c47c88c580c98eb3459bd3ae2e6d554712a2310",
-    "scripts/updater_failure_test.cs": "d766b7a663b4f377f7da891db24b3be6cc155b8c4b5d9bccd85bcf71db74ea45"
+    "scripts/verify_public_source.py": "2abfc33d9c7b398ed85f15b52d8cc64511dd75d8c8470f456c4088191d46140c"
   },
-  "prepared_release": "0.1.40"
+  "prepared_release": "0.1.41"
 }
