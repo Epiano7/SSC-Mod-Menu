@@ -1,6 +1,6 @@
 #pragma once
 namespace ssc_version {
-inline constexpr char number[]="0.1.42";
-inline constexpr wchar_t label[]=L"v0.1.42";
-inline constexpr char startup[]="SSC Mod Menu 0.1.42 startup";
+inline constexpr char number[]="0.1.43";
+inline constexpr wchar_t label[]=L"v0.1.43";
+inline constexpr char startup[]="SSC Mod Menu 0.1.43 startup";
 }

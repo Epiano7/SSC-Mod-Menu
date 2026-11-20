@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "public_base_commit": "f4fdd717430c2e4d88bacbbbf26dd1891e75280f",
-  "stable_release_commit": "70dc66860588403aadbfd223128dd9e992a33de4",
+  "public_base_commit": "3cc2a52c1d62050b92cd8c6cf449c26dee90d627",
+  "stable_release_commit": "3cc2a52c1d62050b92cd8c6cf449c26dee90d627",
   "distribution": "mixed-source; private build input required for full runtime",
   "private_component": {
     "files": {
@@ -60,8 +60,8 @@
     "docs/source-distribution.md": "08a40ce92b255b2c8c5184b901f7e216e7e120e44c9920b305884bf05bd99cb1",
     "installer/Engine.cs": "3fbf46189f55eca8d5ecf85a51ea7dcc46c9f56dfd52709dc097b18025b5b159",
     "installer/README.md": "99da2f2fdb1e39b1420c8683462dab359ec23fc214d477d5d4cabc06e22ae957",
-    "installer/Setup.cs": "dd3f35e7391bac74ae17b9edb0cabf37fda0035965986b3a1e740f4b0868eab7",
-    "installer/Updater.cs": "1c903245aca58add82ecf5d6571bddaea43fe7d256357aa549ef930924b17439",
+    "installer/Setup.cs": "4bc450ac55ed9801650ed17d4c2c3cb3a3e144891eaac19327dbf0d2d73bbb38",
+    "installer/Updater.cs": "6ce9c5aa8db4a8271b781d29dbc0d256a609eee6b85166d4baf5ac4af4bd74f8",
     "installer/app.manifest": "f0e3b61f26bd16a13b7a9c62f58661b28a74186fe0acccd7e33cd92c12dab11e",
     "linux/README.md": "a24e1357bd6b015aa00a2663c3b996c2bb70c874de236ebffcd8f67313de53ca",
     "linux/desktop_ui.py": "0da37be48306b3122c3e86b35d8eeb632e4daf95501f1e3f874ae91b0482648c",
@@ -110,7 +110,7 @@
     "runtime/blind_question_icon.h": "337be12b605e740f03b6386c9ab3aa614ba9c6c532a1965d583c67d3cc91fef7",
     "runtime/blind_render_guards.h": "05c3cc67157f4a13c385b3357e874724db2572566b5c93938df07d71a992df92",
     "runtime/build_recording_source.h": "b68263c2498edecf5e8545e46a1d8ad1a8415b7c222d31520f6c8adc10523b3d",
-    "runtime/build_version.h": "a06f64d963a93176592e52cc75cc2eff48e90c47a5e08618633bfb9dd43f1a20",
+    "runtime/build_version.h": "3ca9275b4f6e8c15c448b8d7d3a9533744598503d845540206104b73878a48f4",
     "runtime/capture_submission.h": "a2fd0dbc290d27765ad307c1e6e618f657ef335c566122eaf71495a1beef8a46",
     "runtime/challenge_guards.h": "f013fcd7cc8fb5c89cc477b93c0366738dc04098a3a79b90d1f79926363940b0",
     "runtime/challenge_modes.h": "df700b864aa852089028ac3c0454613c4adae402aa724eda4c297bd47ac526e8",
@@ -315,7 +315,7 @@
     "scripts/Build-AudioCodec.ps1": "3ee5e929943f2d31d174ad256852f85d5331c84bf5ebbc562fb5dfcc8e2c610f",
     "scripts/Build-AuthCrypto.ps1": "65bed304aa930e788c6c6727477257134bc9e358b4988da5174cb2b6aa61faa4",
     "scripts/Build-CompatibilityProbe.ps1": "13d001f6c637949804e794e8513a7b281114a3191fa48adfffe99b3c3be2bbdd",
-    "scripts/Build-Installer.ps1": "c9a7845538750d2d27e1d33e199367aab11fd1b4e7858e9e025bd7f3d4f10485",
+    "scripts/Build-Installer.ps1": "a5ac13693354c6c5ddbabec14975d92b6f3f2828fd31811617c6f7f2f0e61012",
     "scripts/Build-Linux-Launcher.ps1": "4a03586bb0ee6ede15a741e349d2c47571b237ccf48c5461ec556107139f1dfc",
     "scripts/Build-Linux.py": "1932f17db7d1ec82866503063a563269340cf4eaf7f40172a4ead80d7ccf9640",
     "scripts/Build-Release.ps1": "7d29c1e6932be33acd2fb7c9dd7c33bd5239030e03791479315d4113d14a9ccc",
@@ -376,5 +376,5 @@
     "scripts/vehicle_controls_test.cpp": "2454c51dfebe981bce7dc324d10c4d779716b79f49e38c46acee65d049d58d76",
     "scripts/verify_public_source.py": "2abfc33d9c7b398ed85f15b52d8cc64511dd75d8c8470f456c4088191d46140c"
   },
-  "prepared_release": "0.1.42"
+  "prepared_release": "0.1.43"
 }
