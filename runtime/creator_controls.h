@@ -6,7 +6,7 @@ namespace ssc_creator {
 inline std::atomic<bool> hide_crosshair{false};
 inline std::atomic<bool> freecam_hide{false};
 inline bool attached=false;
-using AimDraw=void(*)(uintptr_t,unsigned char);
+using AimDraw=void(*)(uintptr_t,unsigned char,uintptr_t,unsigned char);
 inline AimDraw original=nullptr;
 // Retain native aim/collision calculations and balanced matrix operations.
 // Only this world-space aim pass is masked; UI cursors and input are untouched.
@@ -16,18 +16,18 @@ struct WriteMask {
  WriteMask(){auto proc=wglGetProcAddress("glStencilMaskSeparate");auto address=reinterpret_cast<uintptr_t>(proc);if(address>3&&address!=~uintptr_t(0))separate=reinterpret_cast<StencilSeparate>(proc);glGetBooleanv(GL_COLOR_WRITEMASK,color);glGetBooleanv(GL_DEPTH_WRITEMASK,&depth);glGetIntegerv(GL_STENCIL_WRITEMASK,&stencil);if(separate)glGetIntegerv(0x8ca5,&back);glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);glDepthMask(GL_FALSE);glStencilMask(0);}
  ~WriteMask(){glColorMask(color[0],color[1],color[2],color[3]);glDepthMask(depth);if(separate){separate(GL_FRONT,GLuint(stencil));separate(GL_BACK,GLuint(back));}else glStencilMask(GLuint(stencil));}
 };
-inline void draw(uintptr_t actor,unsigned char mode){
+inline void draw(uintptr_t actor,unsigned char mode,uintptr_t native_arg,unsigned char world_pass){
  if(!original)return;
- if(hide_crosshair.load(std::memory_order_relaxed)||freecam_hide.load(std::memory_order_relaxed)){WriteMask mask;original(actor,mode);}
- else original(actor,mode);
+ if(hide_crosshair.load(std::memory_order_relaxed)||freecam_hide.load(std::memory_order_relaxed)){WriteMask mask;original(actor,mode,native_arg,world_pass);}
+ else original(actor,mode,native_arg,world_pass);
 }
 inline uint64_t hash(const unsigned char* bytes,size_t count){uint64_t h=14695981039346656037ULL;for(size_t i=0;i<count;++i)h=(h^bytes[i])*1099511628211ULL;return h;}
 inline bool matches(const unsigned char* base,size_t size){
- // Independently reviewed Windows build 25847950. Unknown native code leaves
- // this optional visual feature unavailable without affecting public modules.
- if(size<0x84b228||hash(base+0x847580,0x3ca8)!=0x6e595fbe51d2dcc8ULL||hash(base+0x3b99b0,0x6e)!=0xc6fb3cd6ee4e4981ULL)return false;
- int32_t relative=0;std::memcpy(&relative,base+0x3b9a07,4);
- return base[0x3b9a06]==0xe8&&int64_t(0x3b9a0b)+relative==0x847580;
+ // Build 26816945 adds a world-pass flag in R9B. Keep the guard on both
+ // the draw function and its caller, which sets that flag before dispatch.
+ if(size<0x84b8f8||hash(base+0x847c20,0x3cd8)!=0xcd355e86d02df03cULL||hash(base+0x3b9bc0,0x80)!=0x0f3591c2ea91f60bULL)return false;
+ int32_t relative=0;std::memcpy(&relative,base+0x3b9c1a,4);
+ return base[0x3b9c19]==0xe8&&int64_t(0x3b9c1e)+relative==0x847c20;
 }
 inline bool attach(){
  auto base=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));
@@ -41,9 +41,9 @@ inline bool attach(){
  const unsigned char jump[]={0xff,0x25,0,0,0,0};auto target=reinterpret_cast<uintptr_t>(draw);
  std::memcpy(bridge,jump,6);std::memcpy(bridge+6,&target,8);DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=base+0x3b9a06;
+ FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=base+0x3b9c19;
  if(!VirtualProtect(site,5,PAGE_EXECUTE_READWRITE,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- original=reinterpret_cast<AimDraw>(base+0x847580);
+ original=reinterpret_cast<AimDraw>(base+0x847c20);
  auto displacement=int32_t(bridge-(site+5));std::memcpy(site+1,&displacement,4);
  FlushInstructionCache(GetCurrentProcess(),site,5);DWORD ignored=0;VirtualProtect(site,5,old,&ignored);return true;
 }

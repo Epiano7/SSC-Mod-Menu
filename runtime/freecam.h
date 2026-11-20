@@ -239,38 +239,38 @@ inline void scene(){
 using DebugDraw=void(*)(uintptr_t,uintptr_t,uintptr_t,int);inline DebugDraw native_debug=nullptr;
 inline void debug_draw(uintptr_t a,uintptr_t b,uintptr_t c,int d){if(clean_view()||(state.active&&hide_diagnostics)){ssc_creator::WriteMask mask;native_debug(a,b,c,d);}else native_debug(a,b,c,d);}
 inline bool matches(const unsigned char* b,size_t size){
- if(size<0x8692bc)return false;
- const unsigned char caller[]={0x0,0xf,0x28,0xc2,0xf2,0xf,0x59,0xd8,0xf2,0xf,0x11,0x1d,0xdc,0x17,0x75,0x0,0xe8,0x8f,0x66,0x98,0xff,0x40,0x32,0xff,0xf2,0xf,0x11,0x35,0xcc,0x17,0x75,0x0};
- if(std::memcmp(b+0x86929c,caller,sizeof caller)!=0)return false;
- if(ssc_creator::hash(b+0x858c30,0x1b36)!=0x446451ed8ff911edULL)return false;
- if(ssc_creator::hash(b+0x1aaf50,0x7e7)!=0x11eab9ed03d9feb8ULL)return false;
- {int32_t d=0;std::memcpy(&d,b+0x1efade,4);if(b[0x1efadc]!=0xff||b[0x1efadd]!=0x15||int64_t(0x1efae2)+d!=0xb8ab30)return false;}
- if(ssc_creator::hash(b+0x2b7c50,0x355)!=0x4a02e04400f4e889ULL||ssc_creator::hash(b+0x215659,0x30)!=0x8d58e2dd8436d09aULL)return false;
- if(ssc_creator::hash(b+0x853dd0,0x49fe)!=0x203be7a11d9587e1ULL||ssc_creator::hash(b+0x850490,0x393b)!=0xe2dbac90d948a7eaULL||ssc_creator::hash(b+0x84d420,0xdb4)!=0x75e0f1f6f7ee6efeULL)return false;
- for(auto function:{std::pair<uint32_t,uint64_t>{0x589d80,0x22e1b5b84b867301ULL},{0x58f3a0,0x38fdb736953ff8f2ULL},{0x84c0d0,0xa379709a9e947113ULL}}){size_t length=function.first==0x589d80?0x1e09:function.first==0x58f3a0?0xa3e:0x1344;if(ssc_creator::hash(b+function.first,length)!=function.second)return false;}
- for(uint32_t site:{0x589ecau,0x589ee4u,0x58f4efu,0x58f508u,0x84cbecu,0x84cc06u,0x8544c1u,0x8544dbu,0x853985u,0x85399eu,0x84d548u,0x84d562u,0x8590a6u,0x8590c0u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdf3878)return false;}
- if(ssc_creator::hash(b+0x433070,0x2e5)!=0xae287a651b8d8c69ULL)return false;
- if(ssc_creator::hash(b+0x1f1a40,0x1d1)!=0x837cf3680161973ULL)return false;
- for(uint32_t site:{0x1f0cabu,0x1f0f4fu,0x1f1b71u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdf3870)return false;}
- if(ssc_creator::hash(b+0x4515d0,0x490)!=0x9dd5ce6f64a4e2c2ULL||ssc_creator::hash(b+0x1ef940,6566)!=0xa803487928055b5dULL||ssc_creator::hash(b+0x3b9b50,7554)!=0x3ca2aa35827e5c2ULL)return false;
- for(auto pair:{std::pair<uint32_t,uint32_t>{0x1f00e1,0x4515d0},{0x1f1223,0x3b9b50},{0x215660,0x2b7c50},{0x1aae93,0x1aaf50}}){int32_t d=0;std::memcpy(&d,b+pair.first+1,4);if(b[pair.first]!=0xe8||int64_t(pair.first)+5+d!=pair.second)return false;}return true;
+ if(size<0x86997c)return false;
+ const unsigned char caller[]={0x0,0xf,0x28,0xc2,0xf2,0xf,0x59,0xd8,0xf2,0xf,0x11,0x1d,0x1c,0x11,0x75,0x0,0xe8,0xff,0x60,0x98,0xff,0x40,0x32,0xff,0xf2,0xf,0x11,0x35,0xc,0x11,0x75,0x0};
+ if(std::memcmp(b+0x86995c,caller,sizeof caller)!=0)return false;
+ if(ssc_creator::hash(b+0x8592f0,0x1b36)!=0x852908f174d555c5ULL)return false;
+ if(ssc_creator::hash(b+0x1ab040,0x7e7)!=0x825680b6acb98ce7ULL)return false;
+ {int32_t d=0;std::memcpy(&d,b+0x1efc0e,4);if(b[0x1efc0c]!=0xff||b[0x1efc0d]!=0x15||int64_t(0x1efc12)+d!=0xb8ab30)return false;}
+ if(ssc_creator::hash(b+0x2b7d70,0x355)!=0xfc90c3b8c2dd5e38ULL||ssc_creator::hash(b+0x215789,0x30)!=0xfcfccf371363f000ULL)return false;
+ if(ssc_creator::hash(b+0x854490,0x49fe)!=0x57fba263b771887bULL||ssc_creator::hash(b+0x850b60,0x392b)!=0x61b4cb4d8683d2cbULL||ssc_creator::hash(b+0x84daf0,0xdb4)!=0x6ccb9c7ab8256d0eULL)return false;
+ for(auto function:{std::pair<uint32_t,uint64_t>{0x589fa0,0x98a743b6d3e53509ULL},{0x58f5c0,0x2f465a34d221344dULL},{0x84c7a0,0xddab31f92c3fe45aULL}}){size_t length=function.first==0x589fa0?0x1e09:function.first==0x58f5c0?0xa3e:0x1344;if(ssc_creator::hash(b+function.first,length)!=function.second)return false;}
+ for(uint32_t site:{0x58a0eau,0x58a104u,0x58f70fu,0x58f728u,0x84d2bcu,0x84d2d6u,0x854b81u,0x854b9bu,0x854045u,0x85405eu,0x84dc18u,0x84dc32u,0x859766u,0x859780u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdf3878)return false;}
+ if(ssc_creator::hash(b+0x433290,0x2e5)!=0x8fdcca4f7c81b58eULL)return false;
+ if(ssc_creator::hash(b+0x1f1b70,0x1d1)!=0x2155199403e598a0ULL)return false;
+ for(uint32_t site:{0x1f0ddbu,0x1f107fu,0x1f1ca1u}){int32_t d=0;std::memcpy(&d,b+site+2,4);if(b[site]!=0xff||b[site+1]!=0x15||int64_t(site)+6+d!=0xdf3870)return false;}
+ if(ssc_creator::hash(b+0x4517f0,0x490)!=0xa93ea8a94d47825cULL||ssc_creator::hash(b+0x1efa70,6566)!=0x9692c6ffe16f7dcdULL||ssc_creator::hash(b+0x3b9d70,7554)!=0x4b0e502368a8f7cfULL)return false;
+ for(auto pair:{std::pair<uint32_t,uint32_t>{0x1f0211,0x4517f0},{0x1f1353,0x3b9d70},{0x215790,0x2b7d70},{0x1aaf83,0x1ab040}}){int32_t d=0;std::memcpy(&d,b+pair.first+1,4);if(b[pair.first]!=0xe8||int64_t(pair.first)+5+d!=pair.second)return false;}return true;
 }
 inline bool attach(){
  auto b=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));if(!b)return false;auto dos=reinterpret_cast<IMAGE_DOS_HEADER*>(b);if(dos->e_magic!=IMAGE_DOS_SIGNATURE)return false;auto nt=reinterpret_cast<IMAGE_NT_HEADERS*>(b+dos->e_lfanew);if(nt->Signature!=IMAGE_NT_SIGNATURE||!matches(b,nt->OptionalHeader.SizeOfImage))return false;
- base=reinterpret_cast<uintptr_t>(b);ground_supported=ssc_creator::hash(b+0x582a00,0x229)==0xecc747826be110feULL;unsigned char* bridge=nullptr;
- native_time_scale=reinterpret_cast<TimeScale>(b+0x2b7c50);
- native_scene=reinterpret_cast<Scene>(b+0x1ef940);
- native_debug=reinterpret_cast<DebugDraw>(b+0x1aaf50);
+ base=reinterpret_cast<uintptr_t>(b);ground_supported=ssc_creator::hash(b+0x582c20,0x229)==0x8f0c090dd8a0d13eULL;unsigned char* bridge=nullptr;
+ native_time_scale=reinterpret_cast<TimeScale>(b+0x2b7d70);
+ native_scene=reinterpret_cast<Scene>(b+0x1efa70);
+ native_debug=reinterpret_cast<DebugDraw>(b+0x1ab040);
  native_listener=*reinterpret_cast<Listener3f*>(b+0xb8ab30);
- native_spectator_request=reinterpret_cast<SpectatorRequest>(b+0x433070);
+ native_spectator_request=reinterpret_cast<SpectatorRequest>(b+0x433290);
  for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((base+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));
  if(!bridge)return false;
  uintptr_t hooks[]={reinterpret_cast<uintptr_t>(center),reinterpret_cast<uintptr_t>(hud),reinterpret_cast<uintptr_t>(view),reinterpret_cast<uintptr_t>(view),reinterpret_cast<uintptr_t>(view),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(time_scale),reinterpret_cast<uintptr_t>(listener),reinterpret_cast<uintptr_t>(billboard_yaw),reinterpret_cast<uintptr_t>(billboard_pitch),reinterpret_cast<uintptr_t>(scene)};const unsigned char jump[]={0xff,0x25,0,0,0,0};
  for(int i=0;i<22;++i){std::memcpy(bridge+16*i,jump,6);std::memcpy(bridge+16*i+6,&hooks[i],8);}DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,352);
- unsigned char* sites[]={b+0x1f00e1,b+0x1f1223,b+0x1f0cab,b+0x1f0f4f,b+0x1f1b71,b+0x589eca,b+0x589ee4,b+0x58f4ef,b+0x58f508,b+0x84cbec,b+0x84cc06,b+0x8544c1,b+0x8544db,b+0x853985,b+0x85399e,b+0x84d548,b+0x84d562,b+0x215660,b+0x1efadc,b+0x8590a6,b+0x8590c0,b+0x8692ac};DWORD protection[22]{};const size_t lengths[]={5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,6,6,6,5};
+ unsigned char* sites[]={b+0x1f0211,b+0x1f1353,b+0x1f0ddb,b+0x1f107f,b+0x1f1ca1,b+0x58a0ea,b+0x58a104,b+0x58f70f,b+0x58f728,b+0x84d2bc,b+0x84d2d6,b+0x854b81,b+0x854b9b,b+0x854045,b+0x85405e,b+0x84dc18,b+0x84dc32,b+0x215790,b+0x1efc0c,b+0x859766,b+0x859780,b+0x86996c};DWORD protection[22]{};const size_t lengths[]={5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,6,6,6,5};
  for(int i=0;i<22;++i)if(!VirtualProtect(sites[i],lengths[i],PAGE_EXECUTE_READWRITE,&protection[i])){for(int j=0;j<i;++j){DWORD ignored;VirtualProtect(sites[j],lengths[j],protection[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
- original_center=reinterpret_cast<Center>(b+0x4515d0);original_hud=reinterpret_cast<Hud>(b+0x3b9b50);
+ original_center=reinterpret_cast<Center>(b+0x4517f0);original_hud=reinterpret_cast<Hud>(b+0x3b9d70);
  for(int i=0;i<22;++i){int32_t d=int32_t(reinterpret_cast<uintptr_t>(bridge+16*i)-reinterpret_cast<uintptr_t>(sites[i]+5));sites[i][0]=0xe8;std::memcpy(sites[i]+1,&d,4);if(lengths[i]==6)sites[i][5]=0x90;FlushInstructionCache(GetCurrentProcess(),sites[i],lengths[i]);}
  for(int i=21;i>=0;--i){DWORD ignored;VirtualProtect(sites[i],lengths[i],protection[i],&ignored);}return true;
 }

@@ -3,8 +3,8 @@
 #include <filesystem>
 #include <iostream>
 static int calls=0;
-static void native_draw(uintptr_t actor,unsigned char mode){
- assert(actor==123&&mode==7);++calls;
+static void native_draw(uintptr_t actor,unsigned char mode,uintptr_t native_arg,unsigned char world_pass){
+ assert(actor==123&&mode==7&&native_arg==0xace5&&world_pass==1);++calls;
  glColor3f(1,1,1);glBegin(GL_QUADS);glVertex2f(-1,-1);glVertex2f(1,-1);glVertex2f(1,1);glVertex2f(-1,1);glEnd();
 }
 int main(int argc,char** argv){
@@ -12,12 +12,12 @@ int main(int argc,char** argv){
  HANDLE file=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);assert(file!=INVALID_HANDLE_VALUE);
  HANDLE mapping=CreateFileMappingW(file,nullptr,PAGE_READONLY|SEC_IMAGE_NO_EXECUTE,0,0,nullptr);assert(mapping);
  auto view=static_cast<const unsigned char*>(MapViewOfFile(mapping,FILE_MAP_READ,0,0,0));assert(view);
- assert(ssc_creator::matches(view,0x84b228));assert(!ssc_creator::matches(view,0x84b227));
- std::vector<unsigned char> changed(view,view+0x84b228);
+ assert(ssc_creator::matches(view,0x84b8f8));assert(!ssc_creator::matches(view,0x84b8f7));
+ std::vector<unsigned char> changed(view,view+0x84b8f8);
  // Tamper with each actual current guarded body and the guarded call opcode.
- for(auto at:{0x847580,0x3b99b0,0x3b9a06}){changed[size_t(at)]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));changed[size_t(at)]^=1;assert(ssc_creator::matches(changed.data(),changed.size()));}
+ for(auto at:{0x847c20,0x3b9bc0,0x3b9c19}){changed[size_t(at)]^=1;assert(!ssc_creator::matches(changed.data(),changed.size()));changed[size_t(at)]^=1;assert(ssc_creator::matches(changed.data(),changed.size()));}
  // An unrelated old test location is outside this feature guard.
- changed[0x3b9c97]^=1;assert(ssc_creator::matches(changed.data(),changed.size()));
+ changed[0x3b9c40]^=1;assert(ssc_creator::matches(changed.data(),changed.size()));
  UnmapViewOfFile(view);CloseHandle(mapping);CloseHandle(file);
  WNDCLASSW wc{};wc.style=CS_OWNDC;wc.lpfnWndProc=DefWindowProcW;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"SSCCreatorTest";assert(RegisterClassW(&wc));
  HWND window=CreateWindowW(wc.lpszClassName,L"SSC creator test",WS_OVERLAPPEDWINDOW,0,0,64,64,nullptr,nullptr,wc.hInstance,nullptr);assert(window);
@@ -31,12 +31,12 @@ int main(int argc,char** argv){
  HDC dc=GetDC(window);PIXELFORMATDESCRIPTOR pfd{};pfd.nSize=sizeof pfd;pfd.nVersion=1;pfd.dwFlags=PFD_DRAW_TO_WINDOW|PFD_SUPPORT_OPENGL;pfd.iPixelType=PFD_TYPE_RGBA;pfd.cColorBits=24;pfd.cDepthBits=24;pfd.cStencilBits=8;
  int format=ChoosePixelFormat(dc,&pfd);assert(format&&SetPixelFormat(dc,format,&pfd));HGLRC rc=wglCreateContext(dc);assert(rc&&wglMakeCurrent(dc,rc));
  glViewport(0,0,16,16);glDisable(GL_DEPTH_TEST);glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT);ssc_creator::original=native_draw;
- ssc_creator::hide_crosshair=true;ssc_creator::draw(123,7);unsigned char pixel[4]{};glReadPixels(8,8,1,1,GL_RGBA,GL_UNSIGNED_BYTE,pixel);assert(pixel[0]==0&&calls==1);
+ ssc_creator::hide_crosshair=true;ssc_creator::draw(123,7,0xace5,1);unsigned char pixel[4]{};glReadPixels(8,8,1,1,GL_RGBA,GL_UNSIGNED_BYTE,pixel);assert(pixel[0]==0&&calls==1);
  GLboolean color[4]{},depth=0;GLint stencil=0;glGetBooleanv(GL_COLOR_WRITEMASK,color);glGetBooleanv(GL_DEPTH_WRITEMASK,&depth);glGetIntegerv(GL_STENCIL_WRITEMASK,&stencil);assert(color[0]&&color[1]&&color[2]&&color[3]&&depth);
- ssc_creator::hide_crosshair=false;ssc_creator::draw(123,7);glReadPixels(8,8,1,1,GL_RGBA,GL_UNSIGNED_BYTE,pixel);assert(pixel[0]==255&&calls==2);
+ ssc_creator::hide_crosshair=false;ssc_creator::draw(123,7,0xace5,1);glReadPixels(8,8,1,1,GL_RGBA,GL_UNSIGNED_BYTE,pixel);assert(pixel[0]==255&&calls==2);
  glColorMask(GL_TRUE,GL_FALSE,GL_TRUE,GL_FALSE);glDepthMask(GL_FALSE);glStencilMask(5);
  auto separate=reinterpret_cast<ssc_creator::WriteMask::StencilSeparate>(wglGetProcAddress("glStencilMaskSeparate"));if(separate)separate(GL_BACK,7);
- ssc_creator::hide_crosshair=true;ssc_creator::draw(123,7);
+ ssc_creator::hide_crosshair=true;ssc_creator::draw(123,7,0xace5,1);
  glGetBooleanv(GL_COLOR_WRITEMASK,color);glGetBooleanv(GL_DEPTH_WRITEMASK,&depth);glGetIntegerv(GL_STENCIL_WRITEMASK,&stencil);assert(color[0]&&!color[1]&&color[2]&&!color[3]&&!depth&&stencil==5&&calls==3);assert(glGetError()==GL_NO_ERROR);
  if(separate){glGetIntegerv(0x8ca5,&stencil);assert(stencil==7);}
 

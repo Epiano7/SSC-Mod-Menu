@@ -51,7 +51,7 @@ template<class Read>bool validate_spam_layout(uintptr_t base,Read read){
  std::array<unsigned char,8> load{},store{};std::array<unsigned char,10> lock{};double cost=0;float threshold=0;
  const std::array<unsigned char,8> expected_load={0xf3,0x0f,0x10,0x83,0xf0,0x26,0,0},expected_store={0xf3,0x0f,0x11,0x8b,0xf0,0x26,0,0};
  const std::array<unsigned char,10> expected_lock={0xc7,0x83,0xf4,0x26,0,0,0,0,0,0x41};
- return read(base+0x8149c7,load)&&load==expected_load&&read(base+0x8149e5,store)&&store==expected_store&&read(base+0x8149ef,lock)&&lock==expected_lock&&read(base+0xc7e2c8,cost)&&cost==double(ssc_chat_limit::stock_cost)&&read(base+0xc7eaa0,threshold)&&threshold==ssc_chat_limit::threshold;
+ return read(base+0x815017,load)&&load==expected_load&&read(base+0x815035,store)&&store==expected_store&&read(base+0x81503f,lock)&&lock==expected_lock&&read(base+0xc7e3a8,cost)&&cost==double(ssc_chat_limit::stock_cost)&&read(base+0xc7eb80,threshold)&&threshold==ssc_chat_limit::threshold;
 }
 inline bool local_actor(uintptr_t actor){uintptr_t world=0,first=0,last=0,steam=0;int slot=-1;return ssc_names::read(image_base+ssc_compat::resolve(0xded5d0),world)&&world&&ssc_names::read(world+0xa658,first)&&ssc_names::read(world+0xa660,last)&&ssc_names::read(image_base+ssc_compat::resolve(0xe25138),steam)&&first==steam&&ssc_names::read(image_base+ssc_compat::resolve(0xe21678),slot)&&slot>=0&&first&&last>=first&&(last-first)%0x34b8==0&&uintptr_t(slot)<(last-first)/0x34b8&&actor==first+uintptr_t(slot)*0x34b8;}
 inline bool native_spam_meter(uintptr_t actor,ssc_chat_limit::Meter& value){
@@ -140,7 +140,7 @@ inline void split_chat(uintptr_t font,uintptr_t text,float width,int limit,uintp
 }
 inline bool attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
  if(!ssc_compat::supports(17)||!validate_spam_layout(base,[](uintptr_t p,auto& value){return ssc_names::read(p,value);}))return false;
- struct Hook{uint32_t call,target,reserved;};Hook hooks[]={{0x814a3f,0x80fdf0,0},{0x3cbe25,0x80fdf0,0},{0x3cc553,0x488030,0},{0x3cc6a4,0x481920,0},{0x80fdb1,0x245b0,0},{0x8149c2,0x223650,0},{0x6aca3f,0x3a9220,0},{0x6accb8,0x3a9220,0}};
+ struct Hook{uint32_t call,target,reserved;};Hook hooks[]={{0x81508f,0x810440,0},{0x3cc045,0x810440,0},{0x3cc773,0x488250,0},{0x3cc8c4,0x481b40,0},{0x810401,0x245e0,0},{0x815012,0x223780,0},{0x6acc4f,0x3a9430,0},{0x6acec8,0x3a9430,0}};
  constexpr int hook_count=int(std::size(hooks));
  for(auto& h:hooks){h.call=ssc_compat::resolve(h.call);h.target=ssc_compat::resolve(h.target);auto p=reinterpret_cast<const unsigned char*>(base+h.call);int32_t rel;std::memcpy(&rel,p+1,4);if(p[0]!=0xe8||base+h.call+5+rel!=base+h.target)return false;}
  unsigned char* bridge=nullptr;for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((base+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
@@ -149,11 +149,11 @@ inline bool attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(n
  std::memcpy(bridge+192,jump,6);std::memcpy(bridge+198,&split_entry,8);
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,4096);
  DWORD protections[hook_count]{};for(int i=0;i<hook_count;++i)if(!VirtualProtect(reinterpret_cast<void*>(base+hooks[i].call),5,PAGE_EXECUTE_READWRITE,&protections[i])){for(int j=i-1;j>=0;--j){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(base+hooks[j].call),5,protections[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
- image_base=base;original=reinterpret_cast<Builder>(base+ssc_compat::resolve(0x80fdf0));assign=reinterpret_cast<Assign>(base+ssc_compat::resolve(0x245b0));
- original_send=reinterpret_cast<Sender>(base+ssc_compat::resolve(0x223650));
- original_label=reinterpret_cast<LabelDraw>(base+ssc_compat::resolve(0x481920));
- original_chat_split=reinterpret_cast<ChatSplit>(base+ssc_compat::resolve(0x3a9220));
- ssc_wheel_images::original=reinterpret_cast<ssc_wheel_images::Draw>(base+ssc_compat::resolve(0x488030));
+ image_base=base;original=reinterpret_cast<Builder>(base+ssc_compat::resolve(0x810440));assign=reinterpret_cast<Assign>(base+ssc_compat::resolve(0x245e0));
+ original_send=reinterpret_cast<Sender>(base+ssc_compat::resolve(0x223780));
+ original_label=reinterpret_cast<LabelDraw>(base+ssc_compat::resolve(0x481b40));
+ original_chat_split=reinterpret_cast<ChatSplit>(base+ssc_compat::resolve(0x3a9430));
+ ssc_wheel_images::original=reinterpret_cast<ssc_wheel_images::Draw>(base+ssc_compat::resolve(0x488250));
  for(int i=0;i<hook_count;++i){int32_t rel=int32_t(reinterpret_cast<uintptr_t>(bridge+(i>=2?(i-1)*32:0))-(base+hooks[i].call+5));std::memcpy(reinterpret_cast<void*>(base+hooks[i].call+1),&rel,4);FlushInstructionCache(GetCurrentProcess(),reinterpret_cast<void*>(base+hooks[i].call),5);}
  // Hooks may share a page: finish every write before restoring protection,
  // then unwind in reverse so the original RX protection wins.
