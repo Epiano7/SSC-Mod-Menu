@@ -5,14 +5,14 @@ struct Guard {uint32_t rva,size;uint64_t hash;};
 // Reviewed against Steam build 26346222. These feature guards are checked before
 // any name/chat hooks; the existing compatibility manifest remains unchanged.
 inline constexpr Guard guards[]={
-{0x7de740,1281,0xfd024aeb18dc4526ULL},
-{0x2232c0,1204,0x8502c39c1a2d4a50ULL},
-{0x2ea320,5775,0xe5744646925e55f4ULL},
-{0x223780,819,0x243ba381daa24dacULL},
-{0x9b14d0,808,0xf03bb8abbe3f92b3ULL},
-{0x31b5f0,4492,0x1b79995b487f9cedULL},
-{0x31c780,242,0x8466ffec7a0b40fcULL},
-{0x343af0,182,0xcf83c330bb640c9cULL}
+{0x7dfa30,1281,0xefc9bbfc73b65d3cULL},
+{0x223810,1204,0xa6a85af5b5fa860bULL},
+{0x2ea870,5775,0x802350272f8da40eULL},
+{0x223cd0,819,0x75c391c182cab580ULL},
+{0x9b2650,808,0x8f31f75a25460397ULL},
+{0x31bb40,4492,0xfbef61dc09bfe650ULL},
+{0x31ccd0,242,0x22f449ace0cefee3ULL},
+{0x344040,182,0xcf83c330bb640c9cULL}
 };
 inline bool kos=false,commands=false,tts=false;
 inline bool check(uintptr_t base,const Guard& g){std::vector<unsigned char> bytes(g.size);if(!ssc_names::read_bytes(base+g.rva,bytes.data(),bytes.size()))return false;uint64_t h=14695981039346656037ULL;for(auto c:bytes)h=(h^c)*1099511628211ULL;return h==g.hash;}

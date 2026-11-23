@@ -7,13 +7,13 @@ namespace ssc_record {
 // Do not use draft candidates or equipped account presets as acquired skills.
 struct BuildSpan {uint32_t rva,length;uint64_t hash;};
 inline constexpr BuildSpan build_spans[]={
- {0x2e0170,452,0x4e0753133b4a8d35ULL},
- {0x8fd350,8108,0x332fa109344a9383ULL},
- {0x3e02e0,4174,0x5f5f0d071ec54293ULL},
+ {0x2e06c0,452,0xfc49a7fa8f8b0d24ULL},
+ {0x8fe650,8108,0x6a10e2483ebed40aULL},
+ {0x3e0830,4174,0x3e479ce51515e13dULL},
 
- {0x93d720,1666,0xb7b36549ca4980d8ULL},
- {0x956f90,26388,0x93fd0c94edccf285ULL},
- {0x95d6b0,35020,0xc2dcb202020ea1e4ULL},
+ {0x93e8a0,1666,0x4ca500e88b92cf44ULL},
+ {0x958110,26388,0xeafde8ba47cdf179ULL},
+ {0x95e830,35020,0xecff1219edd8ae2bULL},
 };
 template<class Read> bool validate_build_code(uintptr_t base,Read read){
  for(const auto& span:build_spans){uint64_t hash=14695981039346656037ULL;

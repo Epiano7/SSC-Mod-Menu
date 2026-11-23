@@ -5,14 +5,14 @@ namespace ssc_challenge {
 // skill-view gates and the existing action request path for build 26668384.
 // Existing compatibility fingerprints are unchanged.
 inline constexpr Guard choice_guards[]={
-{0x7d7b70,271,0xb8fe2145ed9584fcULL},
-{0x3b8f90,56,0x2d0aa75eb0c35b09ULL},
-{0x1d7af0,92,0x57ee248e0dc66511ULL},
-{0x3e02e0,360,0xcda42f54d23137cbULL},
-{0x3e0706,278,0x4d05acab00a25282ULL},
-{0x3b9105,27,0xbfa7620f34e221dULL},
-{0x3da624,43,0x9d7523c031207e46ULL},
-{0x815728,26,0x53ab4e3b487d7229ULL},
-{0x7ddb50,124,0x8bc318664f7fedf9ULL},
+{0x7d8e60,271,0x0ae9591306980675ULL},
+{0x3b94e0,56,0xbed81c602345d523ULL},
+{0x1d8040,92,0x82a48f673028ac40ULL},
+{0x3e0830,360,0x873b8c932762d777ULL},
+{0x3e0c56,278,0x38a5e1db3dc6a83cULL},
+{0x3b9655,27,0x2dce79bb6614c300ULL},
+{0x3dab74,43,0x074ebf38877832e3ULL},
+{0x816a18,26,0x53ab4e3b487d7229ULL},
+{0x7dee40,124,0x6a75490522b7b837ULL},
 };
 }

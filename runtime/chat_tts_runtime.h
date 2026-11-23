@@ -79,7 +79,7 @@ inline void tick(uintptr_t base,uint64_t now){
  if(now-sampled_at<150)return;
  sampled_at=now;
  uintptr_t world=0,first=0,last=0,capacity=0;
- if(!ssc_names::read(base+ssc_compat::resolve(0xded5d0),world)||!world){stop_observation();source_state("Chat: waiting for match");return;}
+ if(!ssc_names::read(base+ssc_compat::resolve(0xdef5d0),world)||!world){stop_observation();source_state("Chat: waiting for match");return;}
  if(!ssc_names::read(world+0xecc0,first)||!ssc_names::read(world+0xecc8,last)||!ssc_names::read(world+0xecd0,capacity)||last<first||capacity<last||(last-first)%0x70||(last-first)/0x70>4096||(!first&&(last||capacity))){stop_observation();source_state("Chat: history unavailable");return;}
  const uint64_t count=(last-first)/0x70;
  const bool seed=!observing||world!=last_world||count<last_count;

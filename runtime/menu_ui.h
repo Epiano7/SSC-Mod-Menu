@@ -1222,7 +1222,7 @@ bool preview_stock_tile(int index,int x,int y,int size){static ReportAtlasCache 
 bool preview_skill_tile(int index,int x,int y,int size){
  static ReportAtlasCache cache;
  // Use the same validated native skill atlas as recorded build images.
- const auto record=ssc_advisor::attached?ssc_advisor::game+0xe2c370:0;
+ const auto record=ssc_advisor::attached?ssc_advisor::game+0xe2e370:0;
  return preview_native_tile(record,index,x,y,size,cache);
 }
 

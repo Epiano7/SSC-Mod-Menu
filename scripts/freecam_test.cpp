@@ -31,11 +31,11 @@ int main(int argc,char** argv){
  {State smooth;smooth.observe(1,2,100,100,1000,1000,1000);assert(smooth.start(1000));for(int i=0;i<10;++i)smooth.tick(1000,1,0,false,.001f);assert(std::abs(smooth.x-101.2f)<.001f);}
  {state.active=false;auto p=listening_position(1,2,3);assert(p.x==1&&p.z==3);state.active=true;fly=false;state.x=100;state.y=200;p=listening_position(1,2,3);assert(p.x==100&&p.y==200&&p.z==3);fly=true;camera.seeded=true;camera.eye={400,500,600};p=listening_position(1,2,3);assert(p.x==400&&p.z==600);stop();}
  // Render-scoped shadow suppression preserves the user's native setting.
- {std::vector<unsigned char> memory(0xfb4a05+1);auto previous_base=base;base=reinterpret_cast<uintptr_t>(memory.data());memory[0xfb4a05]=1;
-  state.active=true;hide_shadows=true;native_scene=+[]{assert(*reinterpret_cast<unsigned char*>(base+0xfb4a05)==0);state.active=false;};scene();assert(memory[0xfb4a05]==1);
-  native_scene=+[]{assert(*reinterpret_cast<unsigned char*>(base+0xfb4a05)==1);};scene();assert(memory[0xfb4a05]==1);
-  state.active=true;hide_shadows=false;scene();assert(memory[0xfb4a05]==1);
-  memory[0xfb4a05]=0;hide_shadows=true;native_scene=+[]{assert(*reinterpret_cast<unsigned char*>(base+0xfb4a05)==0);};scene();assert(memory[0xfb4a05]==0);
+ {std::vector<unsigned char> memory(0xfb6a05+1);auto previous_base=base;base=reinterpret_cast<uintptr_t>(memory.data());memory[0xfb6a05]=1;
+  state.active=true;hide_shadows=true;native_scene=+[]{assert(*reinterpret_cast<unsigned char*>(base+0xfb6a05)==0);state.active=false;};scene();assert(memory[0xfb6a05]==1);
+  native_scene=+[]{assert(*reinterpret_cast<unsigned char*>(base+0xfb6a05)==1);};scene();assert(memory[0xfb6a05]==1);
+  state.active=true;hide_shadows=false;scene();assert(memory[0xfb6a05]==1);
+  memory[0xfb6a05]=0;hide_shadows=true;native_scene=+[]{assert(*reinterpret_cast<unsigned char*>(base+0xfb6a05)==0);};scene();assert(memory[0xfb6a05]==0);
   stop();hide_shadows=false;native_scene=nullptr;base=previous_base;}
  // Slow movement is camera-only, with repeat-safe hold/toggle controls.
  state={};state.observe(1,2,100,200,1000,1000,1000);assert(start(1000));fly=false;slow_key=VK_F6;slow_toggle=false;
@@ -72,7 +72,7 @@ int main(int argc,char** argv){
  for(int i=0;i<1000;++i){c.look(17,-13);c.wheel(i%2?1:-1,true,true);assert(std::abs(c.right.z)<.0001f);}
  identity[0]=NAN;assert(!c.seed(identity));identity[0]=2;assert(!c.seed(identity));
  assert(argc==2);auto path=std::filesystem::path(argv[1]);HANDLE file=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);assert(file!=INVALID_HANDLE_VALUE);HANDLE mapping=CreateFileMappingW(file,nullptr,PAGE_READONLY|SEC_IMAGE_NO_EXECUTE,0,0,nullptr);assert(mapping);auto view=static_cast<const unsigned char*>(MapViewOfFile(mapping,FILE_MAP_READ,0,0,0));assert(view);
- assert(matches(view,0x86997c));assert(!matches(view,0x86997b));std::vector<unsigned char> changed(view,view+0x86997c);for(size_t off:{size_t(0x4517f0),size_t(0x1f0212),size_t(0x3b9d80),size_t(0x58a0ea),size_t(0x58f728),size_t(0x84d2d6),size_t(0x854b81),size_t(0x85405e),size_t(0x84dc32),size_t(0x859766),size_t(0x859780),size_t(0x86996c)}){changed[off]^=1;assert(!matches(changed.data(),changed.size()));changed[off]^=1;}
+ assert(matches(view,0x86ac6c));assert(!matches(view,0x86ac6b));std::vector<unsigned char> changed(view,view+0x86ac6c);for(size_t off:{size_t(0x451d40),size_t(0x1f0762),size_t(0x3ba2d0),size_t(0x58a63a),size_t(0x58fc78),size_t(0x84e5c6),size_t(0x855e71),size_t(0x85534e),size_t(0x84ef22),size_t(0x85aa56),size_t(0x85aa70),size_t(0x86ac5c)}){changed[off]^=1;assert(!matches(changed.data(),changed.size()));changed[off]^=1;}
  UnmapViewOfFile(view);CloseHandle(mapping);CloseHandle(file);
  std::cout<<"PASS: independent camera position, normalized motion, pause, bounds, reset, actor/world change, clock/gap, invalid data, held-key release, focus loss, view-relative motion, fixed-eye look, inverted projection, unrestricted rotations, native guards, offline entry without player changes, campaign co-op gating, dead/spectator gating, photo freeze offline-only, rejection/session changes and changed-code rejection\n";
 }

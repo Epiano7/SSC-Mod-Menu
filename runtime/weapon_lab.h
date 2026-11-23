@@ -161,14 +161,14 @@ inline void refresh(){
     if(!ssc_compat::initialized||!ssc_compat::supports(8)){status=L"Unavailable on this game version.";return;}
     auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
     // All consumer functions are fingerprinted, including field layout and formula.
-    const uintptr_t dependencies[]={base+ssc_compat::resolve(0xa09ed0),base+ssc_compat::resolve(0x1d15b0),base+ssc_compat::resolve(0x5c50a0),base+ssc_compat::resolve(0x5f34e0),base+ssc_compat::resolve(0x3ae560),base+ssc_compat::resolve(0x41cae0),base+ssc_compat::resolve(0x804913)};
+    const uintptr_t dependencies[]={base+ssc_compat::resolve(0xa0b050),base+ssc_compat::resolve(0x1d1b00),base+ssc_compat::resolve(0x5c55f0),base+ssc_compat::resolve(0x5f3a30),base+ssc_compat::resolve(0x3aeab0),base+ssc_compat::resolve(0x41d030),base+ssc_compat::resolve(0x805c03)};
     for(auto address:dependencies)if(address==base){status=L"Weapon definitions unavailable.";return;}
     uintptr_t table=0;
-    if(!ssc_names::read(base+ssc_compat::resolve(0xfb3fa8),table)||!read_catalog(table,weapons)){status=L"Weapon data not ready. Try Refresh at the main menu.";return;}
+    if(!ssc_names::read(base+ssc_compat::resolve(0xfb5fa8),table)||!read_catalog(table,weapons)){status=L"Weapon data not ready. Try Refresh at the main menu.";return;}
     // Read balance globals only when both the damage implementation and its
     // address bindings match. Never substitute guessed shield constants.
-    if(ssc_compat::resolve(0x804913)&&ssc_names::read(base+ssc_compat::resolve(0xfb8294),shield_rules.low)
-        &&ssc_names::read(base+ssc_compat::resolve(0xfb8298),shield_rules.high))
+    if(ssc_compat::resolve(0x805c03)&&ssc_names::read(base+ssc_compat::resolve(0xfba29c),shield_rules.low)
+        &&ssc_names::read(base+ssc_compat::resolve(0xfba2a0),shield_rules.high))
         shield_rules.ready=std::isfinite(shield_rules.low)&&std::isfinite(shield_rules.high)&&shield_rules.low>=0&&shield_rules.high>=0&&shield_rules.low<=100&&shield_rules.high<=100;
     for(int i=0;i<4;++i)column(i)=std::min(column(i),weapons.size()-1);
     if(left==0&&right==1){auto a=std::find_if(weapons.begin(),weapons.end(),[](const Weapon& w){return w.name=="USP Tactical";});auto b=std::find_if(weapons.begin(),weapons.end(),[](const Weapon& w){return w.name=="Deagle";});if(a!=weapons.end())left=size_t(a-weapons.begin());if(b!=weapons.end())right=size_t(b-weapons.begin());}

@@ -50,52 +50,52 @@ template<int Index> void __cdecl draw(uintptr_t object){
 // Hook only validated call sites. Renderer hooks forward 14/20 native arguments.
 struct Hook {uintptr_t call,target;int item;unsigned stack_bytes;bool map_root=false;bool fade=false;bool skills_root=false;unsigned blind_alpha=0,blind_registers=0;bool blind_local=false,exact=false;};
 inline Hook hooks[]={
- {0x3bb3ab,0x43c3e0,1,0},
- {0x3baf37,0x426610,2,0,true},{0x3bb28e,0x426610,2,0,true},
- {0x1aaf83,0x1ab040,3,0},
- {0x42c32a,0x3bbc70,5,0},
- {0x3bb760,0x40d5f0,6,0,true},
- {0x3bb721,0x41cae0,7,0},
- {0x3bb6ef,0x3ed450,8,0},{0x3bb705,0x410750,8,0,false,false,true},
+ {0x3bb8fb,0x43c930,1,0},
+ {0x3bb487,0x426b60,2,0,true},{0x3bb7de,0x426b60,2,0,true},
+ {0x1ab4d3,0x1ab590,3,0},
+ {0x42c87a,0x3bc1c0,5,0},
+ {0x3bbcb0,0x40db40,6,0,true},
+ {0x3bbc71,0x41d030,7,0},
+ {0x3bbc3f,0x3ed9a0,8,0},{0x3bbc55,0x410ca0,8,0,false,false,true},
  // These draws are called from the map routine but are not part of the map.
- {0x42c2cc,0x418fb0,-1,0},{0x42c308,0x41ae50,-1,0},
- {0x42c31a,0x3ec8c0,-1,0},{0x42c33f,0x41c0a0,-1,0},
+ {0x42c81c,0x419500,-1,0},{0x42c858,0x41b3a0,-1,0},
+ {0x42c86a,0x3ece10,-1,0},{0x42c88f,0x41c5f0,-1,0},
  // Timer icon and its three text branches inside the round/player renderer.
- {0x3be75a,0x486b00,4,128},{0x3be983,0x4819b0,4,80},
- {0x3bea2e,0x4819b0,4,80},{0x3beac4,0x4819b0,4,80},
- {0x43c502,0x44a1b0,-2,32,false,true},
- {0x3ed551,0x44a1b0,-2,32,false,true},
- {0x40d6fb,0x44a1b0,-2,32,false,true},
- {0x410d49,0x44a1b0,-2,32,false,true},
- {0x41cbd3,0x44a1b0,-2,32,false,true},
- {0x426722,0x44a1b0,-2,32,false,true},
- {0x3bbe97,0x44a1b0,-2,32,false,true},
- {0x3bd164,0x44a1b0,-2,32,false,true},
- {0x3ec9d3,0x44a1b0,-2,32,false,true},
- {0x419219,0x44a1b0,-2,32,false,true},
- {0x41b024,0x44a1b0,-2,32,false,true},
- {0x41c23a,0x44a1b0,-2,32,false,true},
- {0x1c611f,0x1c3760,-3,112},
- {0x1c621a,0x1c3760,-3,112},
- {0x1c775c,0x1c3760,-3,112},
- {0x1c78b5,0x1c3760,-3,112},
- {0x1c79db,0x1c3760,-3,112},
- {0x1c8aa2,0x1c3760,-3,112},
- {0x1c8b8f,0x1c3760,-3,112},
- {0x486c1f,0x1c3760,-3,112},
- {0x4883bf,0x1c3760,-3,112},
+ {0x3becaa,0x487050,4,128},{0x3beed3,0x481f00,4,80},
+ {0x3bef7e,0x481f00,4,80},{0x3bf014,0x481f00,4,80},
+ {0x43ca52,0x44a700,-2,32,false,true},
+ {0x3edaa1,0x44a700,-2,32,false,true},
+ {0x40dc4b,0x44a700,-2,32,false,true},
+ {0x411299,0x44a700,-2,32,false,true},
+ {0x41d123,0x44a700,-2,32,false,true},
+ {0x426c72,0x44a700,-2,32,false,true},
+ {0x3bc3e7,0x44a700,-2,32,false,true},
+ {0x3bd6b4,0x44a700,-2,32,false,true},
+ {0x3ecf23,0x44a700,-2,32,false,true},
+ {0x419769,0x44a700,-2,32,false,true},
+ {0x41b574,0x44a700,-2,32,false,true},
+ {0x41c78a,0x44a700,-2,32,false,true},
+ {0x1c666f,0x1c3cb0,-3,112},
+ {0x1c676a,0x1c3cb0,-3,112},
+ {0x1c7cac,0x1c3cb0,-3,112},
+ {0x1c7e05,0x1c3cb0,-3,112},
+ {0x1c7f2b,0x1c3cb0,-3,112},
+ {0x1c8ff2,0x1c3cb0,-3,112},
+ {0x1c90df,0x1c3cb0,-3,112},
+ {0x48716f,0x1c3cb0,-3,112},
+ {0x48890f,0x1c3cb0,-3,112},
  // Screen-wide progress strips share the currency function, but are not counters.
- {0x40da96,0x486b00,-1,128},{0x40dbc3,0x486b00,-1,128},{0x40dcf4,0x4872b0,-1,120},
+ {0x40dfe6,0x487050,-1,128},{0x40e113,0x487050,-1,128},{0x40e244,0x487800,-1,120},
  // Local skill readiness and only its icon draw (not health/background).
- {0x410ffb,0x9685e0,-4,0},{0x411767,0x488250,-5,80,false,false,false,0x28},
+ {0x41154b,0x969760,-4,0},{0x411cb7,0x4887a0,-5,80,false,false,false,0x28},
  // Build-list presentation only: preserve native side effects and layout returns.
- {0x3bd044,0x407e20,-6,128,false,false,false,0,24,true,true},
- {0x3da499,0x407e20,-6,128,false,false,false,0,24,false,true},
- {0x3f87df,0x407e20,-6,128,false,false,false,0,24,true,true},
- {0x404990,0x407e20,-6,128,false,false,false,0,24,true,true},
- {0x3da61f,0x3e1330,-6,32,false,false,false,0,4,false,true},
+ {0x3bd594,0x408370,-6,128,false,false,false,0,24,true,true},
+ {0x3da9e9,0x408370,-6,128,false,false,false,0,24,false,true},
+ {0x3f8d2f,0x408370,-6,128,false,false,false,0,24,true,true},
+ {0x404ee0,0x408370,-6,128,false,false,false,0,24,true,true},
+ {0x3dab6f,0x3e1880,-6,32,false,false,false,0,4,false,true},
  // Ctrl-only active-skill name; key labels and cooldown numbers use other calls.
- {0x4116f2,0x4819b0,-6,80,false,false,false,0x20,0,false,true}
+ {0x411c42,0x481f00,-6,80,false,false,false,0x20,0,false,true}
 };
 inline uintptr_t game_base=0;
 // One owner for the version/FPS call; Freecam can wrap its native target.
@@ -150,11 +150,11 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
  // Native mouse coordinates use the game's logical canvas, not the GL viewport.
  int width=fade_w?fade_w:view_w,height=fade_h?fade_h:view_h;
  if(game_base==reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
-  width=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfb4ae8));height=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfb4aec));
+  width=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfb6ae8));height=*reinterpret_cast<const int*>(game_base+ssc_compat::resolve(0xfb6aec));
  }
  if(width<=0||height<=0){width=view_w;height=view_h;}
  if(editing&&active_item>=0)return std::abs(alpha);
- const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+ssc_compat::resolve(0x44a1b0));
+ const float native_feather=feather;auto original=reinterpret_cast<Fade>(game_base+ssc_compat::resolve(0x44a700));
  // Move only the proximity test away; preserve native global/status opacity.
  if(!hover_fade)return original(object,alpha,-1000000.f,-1000000.f,0,0,std::max(1.f,feather),global);
  if(enabled&&active_item>=0&&width>0&&height>0){const auto& a=items[active_item];
@@ -173,12 +173,12 @@ inline float __cdecl fade_hook(uintptr_t object,float alpha,float x,float y,floa
 using Ready=bool(__cdecl*)(uintptr_t,uintptr_t);
 template<class T> inline T native_field(uintptr_t object,size_t offset){T v;std::memcpy(&v,reinterpret_cast<const void*>(object+offset),sizeof(v));return v;}
 inline bool __cdecl skill_ready_hook(uintptr_t skill,uintptr_t actor){
-    const bool ready=reinterpret_cast<Ready>(game_base+ssc_compat::resolve(0x9685e0))(skill,actor);
+    const bool ready=reinterpret_cast<Ready>(game_base+ssc_compat::resolve(0x969760))(skill,actor);
     skill_pulse=0;skill_icon=-1;
     if(!ssc_cooldown::settings.enabled){ssc_cooldown::tracker.clear();return ready;}
     // Arguments are native-owned records at a fingerprint-validated HUD call site.
     // Preserve the game's result; only observe the local living player's cooldown.
-    const int local=native_field<int>(game_base+ssc_compat::resolve(0xe21678),0);
+    const int local=native_field<int>(game_base+ssc_compat::resolve(0xe23678),0);
     if(!skill||!actor||local<0||native_field<int>(actor,0x78)!=local||native_field<unsigned char>(actor,0)!=0||
        !native_field<unsigned char>(actor,0x81)){ssc_cooldown::tracker.clear();return ready;}
     ssc_cooldown::Sample sample{actor,native_field<int>(skill,0),native_field<float>(skill,0x220),native_field<float>(skill,0x224),ready};
@@ -196,12 +196,12 @@ extern "C" void ssc_hud_bridge();
 extern "C" __attribute__((used,noinline)) uintptr_t ssc_hud_before(unsigned index,Scope* scope,const unsigned char* stack,uintptr_t actor=0){
     const auto& hook=hooks[index];begin(*scope,hook);
     if(ssc_challenge::blind()&&(hook.blind_alpha||hook.blind_registers)){
-      bool conceal=!hook.blind_local;if(hook.blind_local){int local=-1,slot=-2;conceal=actor&&ssc_names::read(actor+0x78,slot)&&ssc_names::read(game_base+ssc_compat::resolve(0xe21678),local)&&local>=0&&slot==local;}
+      bool conceal=!hook.blind_local;if(hook.blind_local){int local=-1,slot=-2;conceal=actor&&ssc_names::read(actor+0x78,slot)&&ssc_names::read(game_base+ssc_compat::resolve(0xe23678),local)&&local>=0&&slot==local;}
       if(conceal){scope->alpha_offset=hook.blind_alpha;scope->alpha=0;scope->zero_registers=hook.blind_registers;if(hook.blind_registers&16)scope->replacement_vector=reinterpret_cast<uintptr_t>(concealed_build.data());}
     }
     if(hook.item==-5&&ssc_challenge::blind()){
       static thread_local uintptr_t checked_base=0;static thread_local uint64_t checked_at=0;static thread_local bool valid=false;auto now=GetTickCount64();
-      if(checked_base!=game_base||!checked_at||now<checked_at||now-checked_at>=1000){checked_base=game_base;checked_at=now;const auto record=game_base+0xe2c370;int width=0,height=0,columns=0,rows=0,tile=0;
+      if(checked_base!=game_base||!checked_at||now<checked_at||now-checked_at>=1000){checked_base=game_base;checked_at=now;const auto record=game_base+0xe2e370;int width=0,height=0,columns=0,rows=0,tile=0;
         valid=ssc_names::read(record+0x24,width)&&ssc_names::read(record+0x28,height)&&ssc_names::read(record+0x2c,columns)&&ssc_names::read(record+0x30,rows)&&ssc_names::read(record+0x34,tile)&&ssc_blind::question_frame(ssc_rpc::native_string(record),width,height,columns,rows,tile)==807;
       }
       if(valid){scope->alpha_offset=0;scope->zero_registers|=32;}
