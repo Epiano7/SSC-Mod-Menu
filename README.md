@@ -30,36 +30,36 @@ The installer runs natively; the game and mod use Proton. The native Linux game 
 
 ## Modules
 
-- **Sound Replacer:** use random sound lists for related events, including human kills and vehicle engines, or a shared music list. Existing event replacements migrate automatically; ambience groups are optional. Effect changes require a restart; music edits apply at the next track change. Preview clips and adjust individual volume
-- **Cosmetics:** customize your name with a solid color, animated rainbow, or a custom gradient with up to three colors. Colors are client-side by default and can be shared to other mod menu users if you have bought the DLC or you currently have the Acid Pass active in SSC. [Details and supported displays](docs/shared-cosmetics.md)
+- **Sound Replacer:** Use random sound lists for related events, including human kills and vehicle engines, or a shared music list. Existing event replacements migrate automatically; ambience groups are optional. Effect changes require a restart; music edits apply at the next track change. Preview clips and adjust individual volume
+- **Cosmetics:** Customize your name with a solid color, animated rainbow, or a custom gradient with up to three colors. Colors are client-side by default and can be shared to other mod menu users if you have bought the DLC or you currently have the Acid Pass active in SSC. [Details and supported displays](docs/shared-cosmetics.md)
 - **Discord Presence:** shows game status, available round and level details, elapsed time, and SSC rating. Only works on the discord app (windows and linux) as the web one does not support a custom rpc.
-- **HUD Editor:** move and resize most HUD elements, save layouts, and reset individual elements
-- **Custom Quick Chat:** customize the quick-react wheel with up to 12 messages per slot. The first message labels the wheel, and each use sends a randomly chosen message from that slot's list. Importing images is supported as well
-- **Driving:** available in **All Modules**, with an optional Quick Menu pin. Camera-relative controls remap your movement keys at 45-degree heading boundaries while retaining native steering and braking. With the car facing left, A drives forward, D reverses, and W/S steer. Off by default. Currently singleplayer-only.
-- **Freecam:** a separate module that adds a freecam to both singleplayer and multiplayer rounds. Currently it is only available in multiplayer if you are in spectator mode. You can choose between a 2D pan mode (keeps the camera facing the game and allows you to adjust the X and Z on one plane) or the 3D camera (all 3 axis supported with an optional setting to turn down the render distance). There are lots of other small QoL settings under the module menu as well that are not listed.
-- **Auto Messages:** message rules using events, conditions, variables, and repeat counts. Choose **Conditions are met** to watch your conditions continuously, or use a round/level/health event. Under **Edit rule → Timing / Cancellation**, require conditions to stay true for up to 60 seconds, delay sending for up to 60 seconds, and optionally cancel if you die. Each rule triggers at most once per round, and pending messages cancel on round changes, disconnects, or rule edits. Existing rules retain their previous timing. Rule sharing uses `SSC-AM3` (a custom sharing system), older versions of the menu used `SSC-AM1` and `SSC-AM2` which are still supported.
+- **HUD Editor:** Move and resize most HUD elements, save layouts, and reset individual elements
+- **Custom Quick Chat:** Customize the quick-react wheel with up to 12 messages per slot. The first message labels the wheel, and each use sends a randomly chosen message from that slot's list. Importing images is supported as well
+- **Driving:** Available in **All Modules**, with an optional Quick Menu pin. Camera-relative controls remap your movement keys at 45-degree heading boundaries while retaining native steering and braking. With the car facing left, A drives forward, D reverses, and W/S steer. Off by default. Currently singleplayer-only.
+- **Freecam:** A separate module that adds a freecam to both singleplayer and multiplayer rounds. Currently it is only available in multiplayer if you are in spectator mode. You can choose between a 2D pan mode (keeps the camera facing the game and allows you to adjust the X and Z on one plane) or the 3D camera (all 3 axis supported with an optional setting to turn down the render distance). There are lots of other small QoL settings under the module menu as well that are not listed.
+- **Auto Messages:** Message rules using events, conditions, variables, and repeat counts. Choose **Conditions are met** to watch your conditions continuously, or use a round/level/health event. Under **Edit rule → Timing / Cancellation**, require conditions to stay true for up to 60 seconds, delay sending for up to 60 seconds, and optionally cancel if you die. Each rule triggers at most once per round, and pending messages cancel on round changes, disconnects, or rule edits. Existing rules retain their previous timing. Rule sharing uses `SSC-AM3` (a custom sharing system), older versions of the menu used `SSC-AM1` and `SSC-AM2` which are still supported.
 
-- **Match Summary:** experimental post-match scoring, build history, comparisons and Level/XP graphs. Enable Recording before the match; press **F7** after the final round or open the last summary from the module. Scores are calculated on your PC.
-- **Flashbang:** choose an inverted black flash or a fully opaque custom image, with the original strength and fade timing.
+- **Match Summary:** Experimental post-match scoring, build history, comparisons and Level/XP graphs. Enable Recording before the match; press **F7** after the final round or open the last summary from the module. Scores are calculated on your PC.
+- **Flashbang:** Choose an inverted black flash or a fully opaque custom image in place of the standard white flash.
 - **Map Capture Submissions:** optional F9 still and panorama contributions from single-player 3D Freecam. Get an upload code from [Skillshot Guesser](https://ssg.epiano7.dev/contribute), paste it in Location Capture settings and enable sending. Submissions require review before inclusion.
 
-- **Random Drafts:** automatically reroll and choose skills and available stim mutations. Paid rerolls spend in-game cash. Enable Blind Drafts to hide your build until the final round ends. The enabled setting and options persist across restarts.
-- **Chaos Mode:** combine weighted HUD, camera, color, pixelation and mirrored-movement effects. Off by default, with motion and visual warnings.
-- **KOS:** mark public player names locally with a customizable color. Use the settings list or `/kos NAME`; anonymous players stay unmarked.
-- **Chat Commands:** press **/** for local commands and suggestions. `/help` lists commands; `/team` and `/all` select the chat audience. JARVIS replies stay local in normal chat history. Start a public message with `./` to send a leading slash.
-- **Chat Speech:** local TTS, Windows / David by default, with an optional Piper Norman download or custom Piper model import. Includes announcement, own-message and sender-name filters, per-name muting, and volume up to 200%. No sign-in is required.
+- **Random Drafts:** Automatically reroll and choose skills and available stim mutations. Paid rerolls spend in-game cash. Enable Blind Drafts to hide your build until the final round ends. The enabled setting and options persist across restarts.
+- **Chaos Mode:** Combine weighted HUD, camera, color, pixelation and mirrored-movement effects. Off by default, with motion and visual warnings.
+- **KOS:** Mark public player names locally with a customizable color. Use the settings list or `/kos NAME`; anonymous players stay unmarked.
+- **Chat Commands:** Press **/** for local commands and suggestions. `/help` lists commands; `/team` and `/all` select the chat audience. JARVIS replies stay local in normal chat history. Start a public message with `./` to send a leading slash.
+- **Chat Speech:** Local TTS, Windows / David by default, with an optional Piper Norman download or custom Piper model import. Includes announcement, own-message and sender-name filters, per-name muting, and volume up to 200%. No sign-in is required.
 
 ## Other features
 
-- **Cosmetic Animation:** forward, reverse or ping-pong movement, adjustable speed and optional breathing; animation is client-side.
-- **Loading Tips:** community tips are on by default and can be disabled in Misc.
+- **Cosmetic Animation:** Forward, reverse or ping-pong movement, adjustable speed and optional breathing
+- **Loading Tips:** Community tips are on by default and can be disabled in Misc.
 
-- **Weapon Lab:** search weapons by name, tier, or type. Compare up to four weapons with stronger values highlighted; adjust health, shields, and miss chance; and watch a timed duel with reloads. Simulations are estimates and do not account for skills or other round perks like shop purchases 
-- **Match Recording:** optionally save observed Battle Royale rounds together in a local match file, including class, level, XP, cash, health, weapons, selected skills, skill levels and any mutations if applicable.
-- **Personal Statistics:** browse local recordings by class and date, view summary statistics, and inspect larger level, XP and cash graphs with grid options and hover values. Late joins and unavailable fields are distinguished from complete observations.
-- **Interface:** adjust UI scale, choose which modules appear in the quick menu, and customize animation and HUD display preferences.
-- **Geri Challenge:** hide the skill-draft and syringe selection panel from **All Modules > Misc**. Disabled by default; switch it off to restore the panel. This hides the UI and does not enforce challenge rules. [Details and testing limits](docs/geri-challenge.md)
-- **Updates:** check for releases through the in-game prompt. Once every game boot, the mod will automatically check and prompt the user to update if any are avaliable
+- **Weapon Lab:** Search weapons by name, tier, or type. Compare up to four weapons with stronger values highlighted; adjust health, shields, and miss chance; and watch a timed duel with reloads. Simulations are estimates and do not account for skills or other round perks like shop purchases 
+- **Match Recording:** Optionally save observed Battle Royale rounds together in a local match file, including class, level, XP, cash, health, weapons, selected skills, skill levels and any mutations if applicable.
+- **Personal Statistics:** Browse local recordings by class and date, view summary statistics, and inspect larger level, XP and cash graphs with grid options and hover values. Late joins and unavailable fields are distinguished from complete observations.
+- **Interface:** Adjust UI scale, choose which modules appear in the quick menu, and customize animation and HUD display preferences.
+- **Geri Challenge:** Hide the skill-draft and syringe selection panel from **All Modules > Misc**. Disabled by default; switch it off to restore the panel. This hides the UI and does not enforce challenge rules. [Details and testing limits](docs/geri-challenge.md)
+- **Updates:** Check for releases through the in-game prompt. Once every game boot, the mod will automatically check and prompt to update if there is one.
 
 For version-by-version changes, see the [GitHub releases](https://github.com/Epiano7/SSC-Mod-Menu/releases)
 
@@ -82,7 +82,7 @@ A custom HUD layout in game:
 
 The menu will install into your Skillshot City Steam folder. Each native module checks its dependencies at startup for compatibility issues. Game updates might break some modules depending on the update, in which a hotfix will be released. Larger game changes may still require a mod update.
 
-If something goes wrong, open **All Modules > About > Open logs**, and dm them to Epiano7 or make an issue here with them included. Startup checks are recorded in `runtime.log`; crash reports are saved under `diagnostics` when Windows allows the crash handler to run. These reports are not automatically uploaded to any servers and stay local. Minidumps can contain process data, so review them before sharing.
+If something goes wrong, open **All Modules > About > Open logs**, and dm them to Epiano7 or make an issue here with them included. Startup checks are recorded in `runtime.log`; crash reports are saved under `diagnostics` when Windows allows the crash handler to run. These reports are not automatically uploaded to any servers and stay local.
 
 ## Credits
 - bencelot (dev of SSC) for giving feedback before this released and for making the game!
@@ -91,8 +91,7 @@ If something goes wrong, open **All Modules > About > Open logs**, and dm them t
   - yari_check for testing out the Linux build and helping me suffer through an Arch VM install
   - jyxalag for reviewing and testing early builds
   - alsamandal for resisting against the Manga Recruit monopoly!
-  - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk), and for putting up with me 
-  joining his lobbies in the last 2 minutes and winning
+  - ironmonkey808 for giving great feedback and making a really cool [SSC Starter Guide!](https://www.youtube.com/watch?v=2uc2Ax52kMk)
   - chill for being a chill guy (and for giving some great suggestions)
   - geri, founder of the Geri Challenge (fan-made challenge where you aren't allowed to draft skills)
   - mang for answering a ton of questions I had as a new player and for their work on a synergy chart
