@@ -48,7 +48,7 @@ inline void sample_rating(uintptr_t base,Snapshot& snapshot,ssc_review_context::
     float profile_rating=-1,profile_matches=-1;int profile_required=0,profile_loaded=0;
     const bool profile_valid=read(base+ssc_compat::resolve(0xe091f8),profile_loaded)&&profile_loaded&&
         read(base+ssc_compat::resolve(0xe09a9c),profile_rating)&&read(base+ssc_compat::resolve(0xe09a98),profile_matches)&&
-        read(base+ssc_compat::resolve(0xfbba88),profile_required)&&ssc_review_context::valid_rating(profile_rating,profile_matches,profile_required);
+        read(base+ssc_compat::resolve(0xfbba90),profile_required)&&ssc_review_context::valid_rating(profile_rating,profile_matches,profile_required);
     if(observation&&profile_valid)*observation={true,false,profile_matches<profile_required,profile_rating,profile_matches,profile_required};
     // The actor login field is an authentication state (often 3), not a user ID.
     // Read the loaded account profile's public game ID independently of actors.
@@ -65,7 +65,7 @@ inline void sample_rating(uintptr_t base,Snapshot& snapshot,ssc_review_context::
         ||!read(actor+0x81,f.active)||!read(actor+0x7dc,f.kind)||!read(actor+0x700,f.name_length)||!read(actor+0x6e0,f.login)
         ||!read(actor+0x6e4,f.authenticated)||!read(actor+0x270,f.committed)||!read(actor+0xf98,f.bonus)
         ||!read(actor+0xab4,f.account_level)||!read(actor+0x204,f.eligibility)
-        ||!read(base+ssc_compat::resolve(0xfbbab4),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfbbab8),f.bonus_threshold))return;
+        ||!read(base+ssc_compat::resolve(0xfbbabc),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfbbac0),f.bonus_threshold))return;
     if(observation&&profile_valid){observation->rank_blockers=ranked_blockers(f);}
     if(!ranked(f))return;
     add_rating(snapshot,true,profile_rating,profile_matches,profile_required);

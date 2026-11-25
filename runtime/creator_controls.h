@@ -25,9 +25,9 @@ inline uint64_t hash(const unsigned char* bytes,size_t count){uint64_t h=1469598
 inline bool matches(const unsigned char* base,size_t size){
  // Build 26816945 adds a world-pass flag in R9B. Keep the guard on both
  // the draw function and its caller, which sets that flag before dispatch.
- if(size<0x84cbe8||hash(base+0x848f10,0x3cd8)!=0x1f8301b34ff0f780ULL||hash(base+0x3ba110,0x80)!=0x21e878b7a96ef25dULL)return false;
- int32_t relative=0;std::memcpy(&relative,base+0x3ba16a,4);
- return base[0x3ba169]==0xe8&&int64_t(0x3ba16e)+relative==0x848f10;
+ if(size<0x84cc88||hash(base+0x848fb0,0x3cd8)!=0xcce6b2b4ee22570eULL||hash(base+0x3ba190,0x80)!=0x5fa16421a632673bULL)return false;
+ int32_t relative=0;std::memcpy(&relative,base+0x3ba1ea,4);
+ return base[0x3ba1e9]==0xe8&&int64_t(0x3ba1ee)+relative==0x848fb0;
 }
 inline bool attach(){
  auto base=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));
@@ -41,9 +41,9 @@ inline bool attach(){
  const unsigned char jump[]={0xff,0x25,0,0,0,0};auto target=reinterpret_cast<uintptr_t>(draw);
  std::memcpy(bridge,jump,6);std::memcpy(bridge+6,&target,8);DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=base+0x3ba169;
+ FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=base+0x3ba1e9;
  if(!VirtualProtect(site,5,PAGE_EXECUTE_READWRITE,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- original=reinterpret_cast<AimDraw>(base+0x848f10);
+ original=reinterpret_cast<AimDraw>(base+0x848fb0);
  auto displacement=int32_t(bridge-(site+5));std::memcpy(site+1,&displacement,4);
  FlushInstructionCache(GetCurrentProcess(),site,5);DWORD ignored=0;VirtualProtect(site,5,old,&ignored);return true;
 }

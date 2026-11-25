@@ -18,7 +18,7 @@ inline Draw native_draw=nullptr;
 inline std::atomic<bool> cosmetics{false};
 // Local rendering does not publish the selected palette or identify the user to peers.
 inline bool local_cosmetics(){return cosmetics.load();}
-inline bool rainbow=true;inline unsigned solid_rgb=0x55e75f;
+inline bool rainbow=true;inline unsigned solid_rgb=0x55e7bf;
 inline bool gradient=false;inline int gradient_count=3;
 inline ssc_cosmetic_animation::Settings animation;
 inline float local_brightness(){return ssc_cosmetic_animation::brightness(double(GetTickCount64())/1000.,animation);}
@@ -111,8 +111,8 @@ inline bool bot_range(int slot,int kind,int start,int offset,int count,size_t to
 // generated-player range from the world start, offset and count fields.
 inline void validate_bot_layout(){
  bot_layout=false;std::array<unsigned char,13124> code{};std::array<unsigned char,32> hash{},expected{};
- const char* hex="a9d6d08a900b35347f50bc8440d7a2564d6230dad0c78704a0ef53fc621de94e";
- if(!ssc_compat::supports(1)||!read_bytes(image_base+0x27a400,code.data(),code.size()))return;
+ const char* hex="8abb1c4119558ef4473f5e71c98dfdd337adfc9c873c74ed1f7005320aea2dd0";
+ if(!ssc_compat::supports(1)||!read_bytes(image_base+0x27a430,code.data(),code.size()))return;
  if(sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr)!=0)return;
  crypto_hash_sha256(hash.data(),code.data(),code.size());bot_layout=sodium_memcmp(hash.data(),expected.data(),32)==0;
 }
@@ -132,7 +132,7 @@ struct Identity {bool local=false,bot=false;std::string account;uintptr_t actor=
 struct CloneSpan {uint32_t rva,size;uint64_t hash;};
 // Reviewed replicated owner-slot decoder, native owner name/level lookup, and
 // reset behavior. This is an extra feature guard, not a regenerated baseline.
-inline constexpr CloneSpan clone_spans[]={{0x8d4f7e,61,0x8ac56277dada7d96ULL},{0x84dd7a,27,0x3e1d91ff76cf7e71ULL},{0x84e924,27,0xc35812e62526e613ULL},{0x787525,17,0x11ec0b5da91a1244ULL}};
+inline constexpr CloneSpan clone_spans[]={{0x8d501e,61,0xabb7ac80ef5868b8ULL},{0x84de1a,27,0x41260fe9ead2c831ULL},{0x84e9c4,27,0xddd7652ffb0edb03ULL},{0x7875f5,17,0x11ec0b5da91a1244ULL}};
 inline bool clone_layout=false;
 inline bool clone_layout_supported(uintptr_t base){
  for(const auto& span:clone_spans){std::array<unsigned char,64> bytes{};if(span.size>bytes.size()||!read_bytes(base+span.rva,bytes.data(),span.size))return false;uint64_t hash=14695981039346656037ULL;for(uint32_t i=0;i<span.size;++i)hash=(hash^bytes[i])*1099511628211ULL;if(hash!=span.hash)return false;}return true;
@@ -171,7 +171,7 @@ inline Identity identify_direct(uintptr_t actor,bool allow_inactive=false){
     answer.actor=actor;
     if(kind==1&&render_private_active()){
         int start=0,offset=0,count=0;
-        if(read(image_base+0xfb9904,start)&&read(world+0x190,offset)&&read(world+0x28c,count))answer.bot=bot_range(slot,kind,start,offset,count,(last-first)/0x34b8);
+        if(read(image_base+0xfb990c,start)&&read(world+0x190,offset)&&read(world+0x28c,count))answer.bot=bot_range(slot,kind,start,offset,count,(last-first)/0x34b8);
     }
     // e03370 is used by the native own-player formatter; bf48 may be spectated.
     answer.local=kind==0&&read(image_base+ssc_compat::resolve(0xe23678),local_slot)&&slot==local_slot&&
@@ -569,8 +569,8 @@ inline float modifier_label_draw(void* renderer,float x,float y,void* name,float
 }
 inline bool modifier_layout_supported(){
  std::array<unsigned char,18105> code{};std::array<unsigned char,32> actual{},expected{};
- if(!read_bytes(image_base+0x3bf110,code.data(),code.size()))return false;
- const char* hex="304c0f26d342d71932c04c9d283813ca0ccffbf86856eff92c8ef637bdacab39";
+ if(!read_bytes(image_base+0x3bf190,code.data(),code.size()))return false;
+ const char* hex="ba635d50972b93611e794847dec0af87e9bed461c4bcf0dcacd66a93e8939be7";
  if(sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr))return false;
  crypto_hash_sha256(actual.data(),code.data(),code.size());return sodium_memcmp(actual.data(),expected.data(),32)==0;
 }
@@ -582,16 +582,16 @@ inline bool account_surfaces_supported(){
  struct Guard{uint32_t rva,size;const char* hash;};
  const Guard guards[]={
   // Native auto-message/quick-react sender formatter and its reviewed caller.
-  {0x7df810,0x220,"f290ab0a563628b14ab2f6a390dd8174c5e107511475834664ffb8daf39d0352"},
-  {0x223cd0,0x333,"d3d76bd074711b711c157bc2c52e72c4153bd3f8a9cdc2e0d668f819c8a80bac"},
-  {0x3ad230,0x3c4,"7b3c8c31f47ee5463a2e93641344056b28166b33703ec207d2026bb6ff8f126a"},
-  {0x6091d0,0x17ac,"aab3e56d3f840cd92416d35158b3a502256cdf9780a5d7807f0bf2346b1e1189"},
-  {0x60afb0,0x20fb,"fbc5e2117318be98c86401c2ee844f277c23f8e90e2d0eed637c7668b9d4bdfb"},
-  {0x628f90,0x3a3a,"e0551510b5ba532e9efd8e425d84ba3f40dc1b7160f41338e70d505db1dba925"},
-  {0x41b3a0,0x1243,"53e0f369c843259729fab9b0c04b0833405ff189640bc2d81d5e7ed76a7f382b"},
-  {0x623dd0,0x51c0,"a58fb5cb528837f9c06fc135df297dcb1df0487c24df5a18e6f20267b9f99acc"},
-  {0x63c710,0x9468,"61dfe0e8dbac52467ec03253ae4e39f2627cd92f3bc8f0b227ed6e1a6aa52b2e"},
-  {0x9e8066,0x72f,"7cfe95ad8b7ef31aab8e6992129b3f415a516ed9a9c87047ec11a524620b3be7"},
+  {0x7df870,0x220,"9d13a0e4f7f3c775c60992098b0218904788874065bf9e15232c91f0ddace805"},
+  {0x223d10,0x333,"bb475b520aad830c04865e5c0d72ec47731842e3ffe1720e0dc0336873631b04"},
+  {0x3ad2b0,0x3c4,"96c16b5d3c966326c05cd20ae99c0496374c914f0f720c82e7a39e1c164d1026"},
+  {0x609250,0x17ac,"21128cc4dea5ce870bc3a01b7cd18899d4bc51be09b27d4edfc55810cea608c1"},
+  {0x60b030,0x20fb,"0ec20ad826a324954eb05536a8ad645a1e1c2ef96b012a368c221ad44c745177"},
+  {0x629010,0x3a3a,"684b5731ecbc89e6bd9a2727c6dc6b5d7c8389b4f906dc846deda813516b73be"},
+  {0x41b430,0x1243,"c03000a8459acf5ec4f7292ce908124b0060e0ee1f7b465282de9d0afc1824eb"},
+  {0x623e50,0x51c0,"27ab1c2e39e9214201de3a2625fd1df154b30d1d313feca5bd2e017952668e2e"},
+  {0x63c790,0x9468,"f37c5d8e9f97cdaf570009d207bbcba68258bfda19f4f2d4adb044f5f67ede7a"},
+  {0x9e8196,0x72f,"19c2d4405b304346ac226550e8faed9cae9edaf72da65b2516f3588a2ab70c6b"},
  };
  for(const auto& guard:guards){
   std::vector<unsigned char> bytes(guard.size);std::array<unsigned char,32> actual{},expected{};
@@ -606,141 +606,141 @@ inline bool attach(){
     if(!modifier_layout_supported()||!account_surfaces_supported())return false;
     clone_layout=clone_layout_supported(image_base);
     {std::array<unsigned char,12105> code{};std::array<unsigned char,32> actual{},expected{};
-     const char* hex="65fe459c171b7b1dbb20219065a6325fcdb8d02574f49939fd6ad2afe9854718";
-     if(!read_bytes(image_base+0x3bc1c0,code.data(),code.size())||sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr))return false;
+     const char* hex="b6ea5867b2effa38dd92fe4507cc35d08c9003f7e3687fb999212f5f53aa6096";
+     if(!read_bytes(image_base+0x3bc240,code.data(),code.size())||sodium_hex2bin(expected.data(),expected.size(),hex,64,nullptr,nullptr,nullptr))return false;
      crypto_hash_sha256(actual.data(),code.data(),code.size());if(sodium_memcmp(actual.data(),expected.data(),32))return false;}
-    native_predicate=reinterpret_cast<Predicate>(image_base+ssc_compat::resolve(0x3ad230));native_overhead=reinterpret_cast<Overhead>(image_base+ssc_compat::resolve(0x84da90));native_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x481f00));
-    native_wrapped=reinterpret_cast<Wrapped>(image_base+ssc_compat::resolve(0x482090));
-    native_wide_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x482b40));
-    native_wide_wrapped=reinterpret_cast<Wrapped>(image_base+ssc_compat::resolve(0x482220));
-    native_palette=reinterpret_cast<Palette>(image_base+ssc_compat::resolve(0x155f30));
-    native_name_formatter=reinterpret_cast<NameFormatter>(image_base+0x7dfa30);
-    native_sender_formatter=reinterpret_cast<NameFormatter>(image_base+0x7df810);
-    native_widget=reinterpret_cast<Widget>(image_base+ssc_compat::resolve(0x9a0bf0));
+    native_predicate=reinterpret_cast<Predicate>(image_base+ssc_compat::resolve(0x3ad2b0));native_overhead=reinterpret_cast<Overhead>(image_base+ssc_compat::resolve(0x84db30));native_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x481f90));
+    native_wrapped=reinterpret_cast<Wrapped>(image_base+ssc_compat::resolve(0x482120));
+    native_wide_draw=reinterpret_cast<Draw>(image_base+ssc_compat::resolve(0x482bd0));
+    native_wide_wrapped=reinterpret_cast<Wrapped>(image_base+ssc_compat::resolve(0x4822b0));
+    native_palette=reinterpret_cast<Palette>(image_base+ssc_compat::resolve(0x155f50));
+    native_name_formatter=reinterpret_cast<NameFormatter>(image_base+0x7dfa90);
+    native_sender_formatter=reinterpret_cast<NameFormatter>(image_base+0x7df870);
+    native_widget=reinterpret_cast<Widget>(image_base+ssc_compat::resolve(0x9a0d20));
     struct Site{uint32_t call,target;uintptr_t hook;bool exact=false;};
     // Whitelist presentation calls only. Do not hook the predicate globally:
     // 5fb3b0/5fd316/6834a3/6b6db7 also service pass-related UI/cache logic.
     Site sites[]={
-        {0x223d1b,0x7df810,reinterpret_cast<uintptr_t>(sender_name_formatter),true},
-        {0x609e2f,0x3ad230,reinterpret_cast<uintptr_t>(native_pass_probe),true},
-        {0x60bd96,0x3ad230,reinterpret_cast<uintptr_t>(native_pass_probe),true},
+        {0x223d5b,0x7df870,reinterpret_cast<uintptr_t>(sender_name_formatter),true},
+        {0x609eaf,0x3ad2b0,reinterpret_cast<uintptr_t>(native_pass_probe),true},
+        {0x60be16,0x3ad2b0,reinterpret_cast<uintptr_t>(native_pass_probe),true},
         // Native formatter constructs the cached participant label from RBX actor.
-        {0x3bc70e,0x7dfa30,reinterpret_cast<uintptr_t>(list_name_formatter),true},
+        {0x3bc78e,0x7dfa90,reinterpret_cast<uintptr_t>(list_name_formatter),true},
         // Showdown participant name, including native eliminated/score suffixes; RDI is its actor.
-        {0x3bd097,0x481f00,reinterpret_cast<uintptr_t>(ssc_showdown_name_bridge),true},
+        {0x3bd117,0x481f90,reinterpret_cast<uintptr_t>(ssc_showdown_name_bridge),true},
         // Modifier owner is formatted by 0x7de740; RBX retains its actor.
-        {0x3c2ee4,0x481f00,reinterpret_cast<uintptr_t>(modifier_label_draw),true},
-        {0x3c2fcd,0x481f00,reinterpret_cast<uintptr_t>(modifier_label_draw),true},
-        {0x3c311b,0x481f00,reinterpret_cast<uintptr_t>(modifier_label_draw),true},
+        {0x3c2f64,0x481f90,reinterpret_cast<uintptr_t>(modifier_label_draw),true},
+        {0x3c304d,0x481f90,reinterpret_cast<uintptr_t>(modifier_label_draw),true},
+        {0x3c319b,0x481f90,reinterpret_cast<uintptr_t>(modifier_label_draw),true},
         // Shared narrow-to-wide conversion and direct UTF-16 text paths.
-        {0x430fd2,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x43163c,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x431963,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x43c80d,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x482026,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x4821bb,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x485db0,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x53060f,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x531c70,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x53216a,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x534e32,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x536ad8,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x536f75,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x53773c,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x537b91,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x537e68,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x538108,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x5383a8,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x5388a8,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x5394ad,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x539991,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x544c14,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x544eca,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x546163,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x5466e6,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x546cc6,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x548040,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x54844e,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x54891c,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6368f4,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x652b7c,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x652ce9,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x652e40,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x652f89,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x653036,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x6531cf,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65337b,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x6535bf,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65b166,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65b302,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65b495,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65b88d,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65ba3e,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65bbe6,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x65bd84,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x6614d8,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x66282e,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x665929,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x6659db,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x668c1d,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x6c2208,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c23c0,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c2995,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c2a78,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c2f1d,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c324b,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c356d,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c388f,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c5f29,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c6244,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c655f,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c68d2,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6c6c8f,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x6d8dca,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x71b51e,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
-        {0x9a844a,0x482b40,reinterpret_cast<uintptr_t>(wide_draw)},
-        {0x9a8520,0x482220,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x431062,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x4316cc,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x4319f3,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x43c89d,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x4820b6,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x48224b,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x485e40,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x53066f,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x531cd0,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5321ca,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x534e92,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x536b38,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x536fd5,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x53779c,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x537bf1,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x537ec8,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x538168,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x538408,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x538908,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x53950d,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5399f1,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x544c74,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x544f2a,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5461c3,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x546746,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x546d26,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5480a0,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x5484ae,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x54897c,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x636974,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x652bfc,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x652d69,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x652ec0,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x653009,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6530b6,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65324f,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6533fb,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65363f,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65b1e6,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65b382,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65b515,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65b90d,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65babe,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65bc66,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x65be04,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x661558,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6628ae,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6659a9,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x665a5b,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x668c9d,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x6c2288,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c2440,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c2a15,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c2af8,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c2f9d,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c32cb,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c35ed,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c390f,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c5fa9,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c62c4,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c65df,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c6952,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6c6d0f,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x6d8e4a,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x71b59e,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
+        {0x9a857a,0x482bd0,reinterpret_cast<uintptr_t>(wide_draw)},
+        {0x9a8650,0x4822b0,reinterpret_cast<uintptr_t>(wide_wrapped)},
         // Both glyph palette paths (regular and alternate text rendering).
-        {0x48b761,0x155f30,reinterpret_cast<uintptr_t>(palette)},
-        {0x48b7c2,0x155f30,reinterpret_cast<uintptr_t>(palette)},
-        {0x3f7e4c,0x481f00,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
-        {0x3f7f05,0x481f00,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
-        {0x3f7f98,0x481f00,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
-        {0x3f806c,0x481f00,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
-        {0x3f8108,0x481f00,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
-        {0x3f81c3,0x481f00,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x48b7f1,0x155f50,reinterpret_cast<uintptr_t>(palette)},
+        {0x48b852,0x155f50,reinterpret_cast<uintptr_t>(palette)},
+        {0x3f7edc,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f7f95,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f8028,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f80fc,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f8198,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
+        {0x3f8253,0x481f90,reinterpret_cast<uintptr_t>(ssc_actor_name_bridge)},
 
-        {0x9a2f4f,0x482090,reinterpret_cast<uintptr_t>(widget_wrapped)},
-        {0x48b0a9,0x155f30,reinterpret_cast<uintptr_t>(palette)},
-        {0x48b106,0x155f30,reinterpret_cast<uintptr_t>(palette)},
-        {0x41c275,0x481f00,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x41c2fa,0x481f00,reinterpret_cast<uintptr_t>(ssc_modifier_name_bridge),true},
-        {0x628c5a,0x481f00,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
-        {0x62b398,0x481f00,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
-        {0x64287b,0x481f00,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
-        {0x6aea9c,0x481f00,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x6aed24,0x481f00,reinterpret_cast<uintptr_t>(ssc_chat_name_bridge)},
-        {0x6aef42,0x481f00,reinterpret_cast<uintptr_t>(account_draw)},
-        {0x9e8453,0x481f00,reinterpret_cast<uintptr_t>(ssc_vehicle_name_bridge),true},
-        {0x9b394b,0x481f00,reinterpret_cast<uintptr_t>(event_draw)},
-        {0x9b3aef,0x481f00,reinterpret_cast<uintptr_t>(event_draw)},
+        {0x9a307f,0x482120,reinterpret_cast<uintptr_t>(widget_wrapped)},
+        {0x48b139,0x155f50,reinterpret_cast<uintptr_t>(palette)},
+        {0x48b196,0x155f50,reinterpret_cast<uintptr_t>(palette)},
+        {0x41c305,0x481f90,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x41c38a,0x481f90,reinterpret_cast<uintptr_t>(ssc_modifier_name_bridge),true},
+        {0x628cda,0x481f90,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
+        {0x62b418,0x481f90,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
+        {0x6428fb,0x481f90,reinterpret_cast<uintptr_t>(canonical_account_draw),true},
+        {0x6aeb1c,0x481f90,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x6aeda4,0x481f90,reinterpret_cast<uintptr_t>(ssc_chat_name_bridge)},
+        {0x6aefc2,0x481f90,reinterpret_cast<uintptr_t>(account_draw)},
+        {0x9e8583,0x481f90,reinterpret_cast<uintptr_t>(ssc_vehicle_name_bridge),true},
+        {0x9b3a7b,0x481f90,reinterpret_cast<uintptr_t>(event_draw)},
+        {0x9b3c1f,0x481f90,reinterpret_cast<uintptr_t>(event_draw)},
 
-        {0x33efcc,0x84da90,reinterpret_cast<uintptr_t>(overhead)},
-        {0x84df46,0x3ad230,reinterpret_cast<uintptr_t>(predicate)},
-        {0x41c08c,0x3ad230,reinterpret_cast<uintptr_t>(predicate)},
-        {0x43c198,0x3ad230,reinterpret_cast<uintptr_t>(predicate)},
-        {0x62612c,0x3ad230,reinterpret_cast<uintptr_t>(predicate)},
-        {0x63fa3e,0x3ad230,reinterpret_cast<uintptr_t>(predicate)},
-        {0x6acfb3,0x3ad230,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9e83b5,0x3ad230,reinterpret_cast<uintptr_t>(predicate)},
-        {0x9b387d,0x3ad230,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x9b3a27,0x3ad230,reinterpret_cast<uintptr_t>(event_predicate)},
-        {0x60c0c1,0x9a0bf0,reinterpret_cast<uintptr_t>(local_widget)},
-        {0x9a3089,0x481f00,reinterpret_cast<uintptr_t>(widget_draw)},
-        {0x84e7c8,0x481f00,reinterpret_cast<uintptr_t>(draw)},
-        {0x84e854,0x481f00,reinterpret_cast<uintptr_t>(draw)},
-        {0x438c3d,0x481f00,reinterpret_cast<uintptr_t>(ssc_score_bridge)},
-        {0x438cc2,0x481f00,reinterpret_cast<uintptr_t>(ssc_score_bridge)}};
+        {0x33f04c,0x84db30,reinterpret_cast<uintptr_t>(overhead)},
+        {0x84dfe6,0x3ad2b0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x41c11c,0x3ad2b0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x43c228,0x3ad2b0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x6261ac,0x3ad2b0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x63fabe,0x3ad2b0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x6ad033,0x3ad2b0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x9e84e5,0x3ad2b0,reinterpret_cast<uintptr_t>(predicate)},
+        {0x9b39ad,0x3ad2b0,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x9b3b57,0x3ad2b0,reinterpret_cast<uintptr_t>(event_predicate)},
+        {0x60c141,0x9a0d20,reinterpret_cast<uintptr_t>(local_widget)},
+        {0x9a31b9,0x481f90,reinterpret_cast<uintptr_t>(widget_draw)},
+        {0x84e868,0x481f90,reinterpret_cast<uintptr_t>(draw)},
+        {0x84e8f4,0x481f90,reinterpret_cast<uintptr_t>(draw)},
+        {0x438ccd,0x481f90,reinterpret_cast<uintptr_t>(ssc_score_bridge)},
+        {0x438d52,0x481f90,reinterpret_cast<uintptr_t>(ssc_score_bridge)}};
     for(auto& site:sites){if(site.exact)continue;site.call=ssc_compat::resolve(uint32_t(site.call));site.target=ssc_compat::resolve(uint32_t(site.target));}
     for(auto site:sites){auto p=reinterpret_cast<unsigned char*>(image_base+site.call);int32_t relative;std::memcpy(&relative,p+1,4);if(p[0]!=0xe8||image_base+site.call+5+relative!=image_base+site.target)return false;}
     unsigned char* bridge=nullptr;

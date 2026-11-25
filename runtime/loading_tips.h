@@ -72,11 +72,11 @@ inline int wrapped(uintptr_t renderer,float x,float y,float width,float height,v
 }
 inline bool attach(){
  image=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));if(!validate(image,[](uintptr_t p,auto& v){return ssc_names::read(p,v);}))return false;
- auto site=reinterpret_cast<unsigned char*>(image+0x74659c);int32_t before=0;std::memcpy(&before,site+1,4);if(site[0]!=0xe8||uintptr_t(site+5+before)!=image+0x482090)return false;
+ auto site=reinterpret_cast<unsigned char*>(image+0x74661c);int32_t before=0;std::memcpy(&before,site+1,4);if(site[0]!=0xe8||uintptr_t(site+5+before)!=image+0x482120)return false;
  unsigned char* bridge=nullptr;for(uintptr_t d=0x10000;d<0x60000000&&!bridge;d+=0x10000)bridge=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>((image+d)&~uintptr_t(0xffff)),4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!bridge)return false;
  const unsigned char jump[]={0xff,0x25,0,0,0,0};std::memcpy(bridge,jump,6);auto target=reinterpret_cast<uintptr_t>(wrapped);std::memcpy(bridge+6,&target,8);DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,14);
  if(!VirtualProtect(site,5,PAGE_EXECUTE_READWRITE,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- original=reinterpret_cast<ssc_names::Wrapped>(image+0x482090);int32_t relative=int32_t(bridge-(site+5));std::memcpy(site+1,&relative,4);FlushInstructionCache(GetCurrentProcess(),site,5);DWORD ignored;VirtualProtect(site,5,old,&ignored);return true;
+ original=reinterpret_cast<ssc_names::Wrapped>(image+0x482120);int32_t relative=int32_t(bridge-(site+5));std::memcpy(site+1,&relative,4);FlushInstructionCache(GetCurrentProcess(),site,5);DWORD ignored;VirtualProtect(site,5,old,&ignored);return true;
 }
 }
