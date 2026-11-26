@@ -47,10 +47,31 @@ inline void observe(uintptr_t world,bool valid,bool playing,bool ending,int roun
 template<class Next> bool uniform(size_t count,Next next,size_t& choice){if(!count||count>54)return false;uint32_t n=uint32_t(count),threshold=uint32_t(0-n)%n;for(int i=0;i<16;++i){uint32_t word=0;if(!next(word))return false;if(word>=threshold){choice=word%n;return true;}}return false;}
 inline bool random_word(uint32_t& word){return BCryptGenRandom(nullptr,reinterpret_cast<PUCHAR>(&word),sizeof(word),BCRYPT_USE_SYSTEM_PREFERRED_RNG)>=0;}
 struct Offer {bool offline=false;uintptr_t actor=0,world=0;int round=0,points=0,syringes=0,generation=0;bool reroll_known=false,reroll_available=false;std::vector<int> skills;std::vector<uintptr_t> stims;std::array<int,54> acquired{};std::array<bool,54> mutated{};bool owned_known=false;int class_id=-1;std::array<bool,54> present{};std::array<int,54> allocated{};};
-struct Picker {bool pending=false,rejected=false;uint64_t sent=0;Offer before;bool last_skill=false;uintptr_t last_choice=0;void reset(){pending=false;rejected=false;before={};sent=0;last_skill=false;last_choice=0;}
+struct Picker {
+ bool pending=false,rejected=false;
+ uint64_t sent=0;
+ Offer before;
+ bool last_skill=false;
+ uintptr_t last_choice=0;
+ int expected_stim_levels=0;
+ void reset(){pending=false;rejected=false;before={};sent=0;last_skill=false;last_choice=0;expected_stim_levels=0;}
  bool settled(const Offer& o,uint64_t now){
-  if(pending){if(o.actor!=before.actor||o.world!=before.world||o.round!=before.round||o.class_id!=before.class_id||(last_skill?o.points<before.points:o.syringes<before.syringes)||(last_choice<54&&o.owned_known&&before.owned_known&&(last_skill?(!before.present[last_choice]&&o.present[last_choice])||o.acquired[last_choice]>before.acquired[last_choice]||o.allocated[last_choice]>before.allocated[last_choice]:o.mutated[last_choice]&&!before.mutated[last_choice])))pending=false;else {if(now>=sent&&now-sent>15000){status=L"Waiting for game confirmation; Random Drafts is still on";}return false;}}
-  return true;
+  if(!pending)return true;
+  const bool changed=o.actor!=before.actor||o.world!=before.world||o.round!=before.round||o.class_id!=before.class_id;
+  bool confirmed=last_skill?o.points<before.points:o.syringes<before.syringes;
+  if(last_choice<o.acquired.size()&&o.owned_known&&before.owned_known){
+   const size_t id=last_choice;
+   if(last_skill)confirmed=confirmed||(!before.present[id]&&o.present[id])||
+     o.acquired[id]>before.acquired[id]||o.allocated[id]>before.allocated[id];
+   else if(expected_stim_levels>0){
+    const bool level_applied=o.acquired[id]>=before.acquired[id]+expected_stim_levels||
+      o.allocated[id]>=before.allocated[id]+expected_stim_levels;
+    confirmed=o.mutated[id]&&!before.mutated[id]&&level_applied;
+   }else confirmed=confirmed||(o.mutated[id]&&!before.mutated[id]);
+  }
+  if(changed||confirmed){pending=false;return true;}
+  if(now>=sent&&now-sent>15000)status=L"Waiting for game confirmation; Random Drafts is still on";
+  return false;
  }
  template<class Choose,class Send>void tick(const Offer& o,uint64_t now,Choose choose,Send send){
   if(!settled(o,now))return;
@@ -58,7 +79,7 @@ struct Picker {bool pending=false,rejected=false;uint64_t sent=0;Offer before;bo
   const bool skill=o.points>0&&!o.skills.empty();const bool stim=!skill&&random.stims&&o.syringes>0&&!o.stims.empty();if(!skill&&!stim)return;
   size_t index=0;if(!choose(skill?o.skills.size():o.stims.size(),index)){status=L"Random source unavailable; selection paused";return;}
   if(index>=(skill?o.skills.size():o.stims.size()))return;
-  before=o;last_skill=skill;last_choice=skill?uintptr_t(o.skills[index]):o.stims[index];sent=now;if(send(skill,skill?uintptr_t(o.skills[index]):o.stims[index])){pending=true;rejected=false;status=skill?L"Waiting for the selected skill to apply":L"Waiting for the selected stim to apply";}else {status=L"Selection unavailable; waiting to retry";pending=false;rejected=true;}
+  before=o;last_skill=skill;expected_stim_levels=0;last_choice=skill?uintptr_t(o.skills[index]):o.stims[index];sent=now;if(send(skill,skill?uintptr_t(o.skills[index]):o.stims[index])){pending=true;rejected=false;status=skill?L"Waiting for the selected skill to apply":L"Waiting for the selected stim to apply";}else {status=L"Selection unavailable; waiting to retry";pending=false;rejected=true;}
  }
 };inline Picker picker;
 struct Placement {float x,y,scale;};

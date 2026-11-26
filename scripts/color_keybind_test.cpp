@@ -7,6 +7,13 @@ static float fake_draw(void*,float,float,void*,float,float r,float g,float b,flo
 template<class T> void put(uintptr_t address,T value){std::memcpy(reinterpret_cast<void*>(address),&value,sizeof(value));}
 static void small(uintptr_t p,const char* text){size_t n=std::strlen(text);assert(n<16);std::memcpy(reinterpret_cast<void*>(p),text,n+1);put(p+16,n);put(p+24,size_t(15));}
 static unsigned char consume_account(void*,int,void* p){small(reinterpret_cast<uintptr_t>(p),"consumed");return 0;}
+static GLfloat last_flash=0;
+static GLint next_flash_index=11;
+static void APIENTRY capture_uniform(GLint,GLfloat value){last_flash=value;}
+static GLint APIENTRY capture_location(GLuint,const char*){return next_flash_index;}
+static void APIENTRY capture_use(GLuint){}
+static void APIENTRY capture_attach(GLuint,GLuint){}
+static void APIENTRY capture_remove(GLuint){}
 static bool shared_fixture(const std::string& key,ssc_shared::Style& s){s.mode=ssc_shared::Mode::solid;s.count=1;s.colors[0]=0x123456;return key=="remote";}
 int main(){
  // Cosmetic attribution is tested independently of anonymous-mode detection.
@@ -44,8 +51,8 @@ int main(){
  // then native code consumes it before the formatted label is drawn.
  std::vector<unsigned char> image(0x1000000),world(0xb000),actors(0x34b8*2);
  image_base=reinterpret_cast<uintptr_t>(image.data());auto w=reinterpret_cast<uintptr_t>(world.data()),a=reinterpret_cast<uintptr_t>(actors.data());
- put(image_base+0xdef5d0,w);put(w+0xa658,a);put(w+0xa660,a+actors.size());put(image_base+0xe27138,a);put(image_base+0xe23678,0);
- small(image_base+0xe091e8,"owner");put(a+0x78,0);put(a+0x7dc,0);put(a+0x81,(unsigned char)1);small(a+0x6f0,"owner");small(a+0x798,"owner");
+ put(image_base+ssc_compat::resolve(0xdef5d0),w);put(w+0xa658,a);put(w+0xa660,a+actors.size());put(image_base+ssc_compat::resolve(0xe27138),a);put(image_base+ssc_compat::resolve(0xe23678),0);
+ small(image_base+ssc_compat::resolve(0xe091e8),"owner");put(a+0x78,0);put(a+0x7dc,0);put(a+0x81,(unsigned char)1);small(a+0x6f0,"owner");small(a+0x798,"owner");
  auto bot=a+0x34b8;put(bot+0x78,1);put(bot+0x7dc,1);put(bot+0x81,(unsigned char)1);small(bot+0x798,"robot");
  put(image_base+0xfb990c,1);put(w+0x190,0);put(w+0x28c,1);
  shared_label_world=w;shared_label_index["robot"]=bot;render_access=true;render_access_at=GetTickCount64();native_predicate=consume_account;lookup_shared=shared_fixture;receive_colors=true;
@@ -56,14 +63,14 @@ int main(){
  small(rawaddr,"owner");event_predicate(nullptr,0,raw.data());assert(event_appearance.own);draw_event();assert(scope_seen==1);
  small(rawaddr,"unknown");event_predicate(nullptr,0,raw.data());draw_event();assert(scope_seen==0&&phase_seen==.8f);
  // Canonical UI rows work without a world, and override native rainbow or friend green.
- put(image_base+0xdef5d0,uintptr_t(0));frame_styles.clear();
+ put(image_base+ssc_compat::resolve(0xdef5d0),uintptr_t(0));frame_styles.clear();
  auto row=[&](){return canonical_account_draw(nullptr,0,0,raw.data(),12,0,1,0,.4f,0,0,0,0,.8f);};
  small(rawaddr,"remote");assert(row()==42&&scope_seen==3&&phase_seen==0&&alpha_seen==.4f);
  small(rawaddr,"owner");row();assert(scope_seen==1&&red>.19f&&red<.21f);
  small(rawaddr,"unknown");row();assert(scope_seen==0&&red==0&&green==1&&phase_seen==.8f);
  assert(identity_scope==-1&&color_scope==0);
  // Vehicle attribution uses its actual occupant, including prefixed/renamed bot labels.
- put(image_base+0xdef5d0,w);std::array<unsigned char,0x400> vehicle{};std::array<unsigned char,0x70> seats{};
+ put(image_base+ssc_compat::resolve(0xdef5d0),w);std::array<unsigned char,0x400> vehicle{};std::array<unsigned char,0x70> seats{};
  auto v=reinterpret_cast<uintptr_t>(vehicle.data()),seat=reinterpret_cast<uintptr_t>(seats.data());put(v+0x368,seat);put(seat+0x60,bot);
  auto car=[&](){return ssc_vehicle_name_draw(nullptr,0,0,raw.data(),12,1,1,1,.5f,0,0,0,0,.8f,v);};
  small(rawaddr,"not-account");render_access=true;render_access_at=GetTickCount64();car();assert(green>.73f&&green<.74f&&phase_seen==-1);
@@ -71,7 +78,43 @@ int main(){
  put(bot+0x7dc,0);small(bot+0x6f0,"remote");put(seat+0x60,bot);car();assert(scope_seen==3);
  put(seat+0x60,uintptr_t(0));car();assert(scope_seen==0&&phase_seen==.8f);
  assert(identity_scope==-1&&color_scope==0);
+ std::array<unsigned char,32> wide{};
+ auto wide_name=[&](const wchar_t* value){
+  const size_t size=std::wcslen(value);assert(size<8);
+  std::memcpy(wide.data(),value,(size+1)*sizeof(wchar_t));
+  auto p=reinterpret_cast<uintptr_t>(wide.data());put(p+16,size);put(p+24,size_t(7));return p;
+ };
+ begin_render_frame(true,true);
+ assert(wide_appearance(wide_name(L"OwNeR")).own);
+ auto remote_caption=wide_appearance(wide_name(L"robot"));
+ assert(remote_caption.remote&&!remote_caption.own&&remote_caption.style.colors[0]==0x123456);
+ identity_scope=0;
+ assert(!wide_appearance(wide_name(L"owner")).own);
+ identity_scope=-1;
+ small(image_base+ssc_compat::resolve(0xe091e8),"updated");
+ begin_render_frame(true,true);
+ assert(!wide_appearance(wide_name(L"owner")).own&&wide_appearance(wide_name(L"updated")).own);
  receive_colors=false;frame_styles.clear();ssc_shared::Style disabled_style;assert(!frame_shared("remote",disabled_style));
  image_base=0;
+ {
+  using namespace ssc_dark_flash;
+  original_use=capture_use;original_uniform=capture_uniform;original_location=capture_location;
+  original_attach=capture_attach;original_delete_program=capture_remove;
+  ssc_dark_flash::enabled=true;
+  shaders.insert(7);attach_shader(9,7);assert(location(9,"flashIntensity")==11);
+  use_program(9);uniform(11,.25f);assert(last_flash==-.25f);
+  {
+   // A warmed program must remain usable while the registry lock is held.
+   std::lock_guard<std::mutex> lock(mutex);
+   assert(location(9,"flashIntensity")==11);
+   uniform(11,.75f);assert(last_flash==-.75f);
+   uniform(10,.75f);assert(last_flash==.75f);
+  }
+  next_flash_index=14;assert(location(9,"flashIntensity")==14);
+  uniform(11,.5f);assert(last_flash==.5f);
+  uniform(14,.5f);assert(last_flash==-.5f);
+  delete_program(9);uniform(14,.5f);assert(last_flash==.5f);
+  ssc_dark_flash::enabled=false;
+ }
  std::cout<<"PASS: menu binding capture, persistence, reset, modifiers, focus; event tint isolation and bot/remote colors\n";
 }

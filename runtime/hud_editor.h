@@ -6,8 +6,14 @@
 #include "blind_question_icon.h"
 #include <array>
 namespace ssc_hud {
-struct Item {const wchar_t* name;const char* key;float home_x,home_y,w,h,x,y,scale;};
-inline std::array<Item,9> items={{{L"","team",.76f,.02f,.23f,.13f,.76f,.02f,1},
+struct Item {
+    const wchar_t* name;const char* key;float home_x,home_y,w,h,x,y,scale;
+    float min_scale=.25f,max_scale=6.f,default_scale=1.f;
+};
+inline constexpr float popup_max_scale=2.f;
+inline constexpr float popup_default_x=.874609f,popup_default_y=.952811f,popup_default_scale=.751315f;
+inline constexpr int achievement_popup=9;
+inline std::array<Item,10> items={{{L"","team",.76f,.02f,.23f,.13f,.76f,.02f,1},
 {L"Event feed","events",.76f,.18f,.23f,.23f,.76f,.18f,1},
 {L"Minimap","map",.032f,.724f,.13f,.25f,.032f,.724f,1},
 {L"Version / FPS","fps",.032f,.005f,.14f,.025f,.032f,.005f,1},
@@ -15,7 +21,9 @@ inline std::array<Item,9> items={{{L"","team",.76f,.02f,.23f,.13f,.76f,.02f,1},
 {L"Round / players","round",.032f,.084f,.115f,.032f,.032f,.084f,1},
 {L"Money / syringes","currency",.91f,.022f,.085f,.07f,.91f,.022f,1},
 {L"Weapons / ammo","weapons",.83f, .78f,.16f,.19f,.83f,.78f,1},
-{L"Health / skills","health",.38f,.81f,.24f,.17f,.38f,.81f,1}}};
+{L"Health / skills","health",.38f,.81f,.24f,.17f,.38f,.81f,1},
+{L"Achievement popup","achievement_popup",popup_default_x,popup_default_y,.166895f,.0628092f,
+ popup_default_x,popup_default_y,popup_default_scale,.5f,popup_max_scale,popup_default_scale}}};
 inline bool enabled=false,attached=false,hover_fade=true;
 // Slot zero is retained only for legacy saved layouts; v0.992 removed its panel.
 inline bool available(int index){return index>0&&index<int(items.size());}
@@ -24,15 +32,18 @@ inline int next_item(int index,int direction){
  return 1;
 }
 inline int selected=1;
+inline float bounded_scale(const Item& item){
+    return std::clamp(std::isfinite(item.scale)?item.scale:1.f,item.min_scale,item.max_scale);
+}
 inline void constrain(Item& item){
-    if(!std::isfinite(item.scale))item.scale=1;
-    item.scale=std::clamp(item.scale,.25f,6.f);
+    item.scale=bounded_scale(item);
     if(!std::isfinite(item.x))item.x=item.home_x;
     if(!std::isfinite(item.y))item.y=item.home_y;
     float right=1-item.w*item.scale,bottom=1-item.h*item.scale;
     item.x=std::clamp(item.x,std::min(0.f,right),std::max(0.f,right));item.y=std::clamp(item.y,std::min(0.f,bottom),std::max(0.f,bottom));
 }
-inline void reset(){for(auto& item:items){item.x=item.home_x;item.y=item.home_y;item.scale=1;}}
+inline void reset_item(Item& item){item.x=item.home_x;item.y=item.home_y;item.scale=item.default_scale;}
+inline void reset(){for(auto& item:items)reset_item(item);}
 inline std::array<float,16> transform(const Item& item){
     float ax=2*item.home_x-1,ay=1-2*item.home_y,bx=2*item.x-1,by=1-2*item.y;
     return {item.scale,0,0,0,0,item.scale,0,0,0,0,1,0,bx-item.scale*ax,by-item.scale*ay,0,1};

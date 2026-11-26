@@ -2,7 +2,7 @@
 #include "privacy.h"
 #include "cosmetic_animation.h"
 #include "compatibility.h"
-#include "performance_metrics.h"
+#include "roster_sweep.h"
 #include "private_auth.h"
 #include "shared_cosmetics.h"
 #include <atomic>
@@ -143,16 +143,30 @@ inline bool account_string(uintptr_t object,std::string& value){
     if(!read_bytes(object,header.data(),header.size()))return false;
     std::memcpy(&length,header.data()+16,8);std::memcpy(&capacity,header.data()+24,8);
     if(!length||length>256||capacity<length)return false;
-    std::array<unsigned char,256> characters{};
+    std::array<unsigned char,256> characters;
     if(capacity>15){std::memcpy(&data,header.data(),8);if(!read_bytes(data,characters.data(),length))return false;}
     else {if(length>15)return false;std::memcpy(characters.data(),header.data(),length);}
     value.clear();value.reserve(length);
     for(size_t i=0;i<length;++i){auto c=characters[i];if(c<32)return false;value.push_back(c>='A'&&c<='Z'?char(c+32):char(c));}
     return true;
 }
+// Snapshot only the checked local account string for the next render frame.
+inline thread_local std::string render_local_account;
+inline thread_local uintptr_t render_account_image=0;
+inline thread_local uint64_t render_account_at=0;
+inline thread_local bool render_account_read=false;
+inline bool local_account_key(const std::string& candidate){
+    if(candidate.empty())return false;
+    if(render_account_image&&render_account_image==image_base&&render_account_at&&GetTickCount64()-render_account_at<100){
+        if(!render_account_read)render_account_read=account_string(image_base+ssc_compat::resolve(0xe091e8),render_local_account);
+        return render_account_read&&render_local_account==candidate;
+    }
+    std::string own;
+    return account_string(image_base+ssc_compat::resolve(0xe091e8),own)&&own==candidate;
+}
 inline bool local_account(uintptr_t account){
-    std::string own,candidate;
-    return account_string(image_base+ssc_compat::resolve(0xe091e8),own)&&account_string(account,candidate)&&own==candidate;
+    std::string candidate;
+    return account_string(account,candidate)&&local_account_key(candidate);
 }
 inline bool native_phase(float& phase){
     float speed=0,time=0;
@@ -164,56 +178,99 @@ inline bool local_phase(float& phase){
  if(!read(image_base+ssc_compat::resolve(0xfb61a4),speed)||!read(image_base+ssc_compat::resolve(0xfb6bf8),time)||!std::isfinite(time)||!std::isfinite(speed))return false;
  phase=ssc_cosmetic_animation::phase(double(time)*speed,animation);return true;
 }
-inline Identity identify_direct(uintptr_t actor,bool allow_inactive=false){
-    Identity answer;uintptr_t world=0,first=0,last=0,registry=0;int slot=-1,kind=-1,local_slot=-1;unsigned char active=0;
-    if(!read(image_base+ssc_compat::resolve(0xdef5d0),world)||!world||!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048)return answer;
-    if(actor<first||actor>=last||(actor-first)%0x34b8||!read(actor+0x78,slot)||slot<0||uintptr_t(slot)!=(actor-first)/0x34b8||!read(actor+0x7dc,kind)||!read(actor+0x81,active)||(!active&&!allow_inactive))return answer;
+inline ActorRange actor_range(){
+ ActorRange range;
+ if(!read(image_base+ssc_compat::resolve(0xdef5d0),range.world)||!range.world||
+    !read(range.world+0xa658,range.first)||!read(range.world+0xa660,range.last)||!range)return {};
+ return range;
+}
+inline Identity identify_direct(uintptr_t actor,const ActorRange& range,bool allow_inactive){
+    Identity answer;const auto first=range.first,world=range.world;uintptr_t registry=0;int slot=-1,kind=-1,local_slot=-1;unsigned char active=0;
+    if(!range.contains(actor)||!read(actor+0x78,slot)||slot<0||uintptr_t(slot)!=(actor-first)/0x34b8||!read(actor+0x7dc,kind)||!read(actor+0x81,active)||(!active&&!allow_inactive))return answer;
     answer.actor=actor;
     if(kind==1&&render_private_active()){
         int start=0,offset=0,count=0;
-        if(read(image_base+0xfb990c,start)&&read(world+0x190,offset)&&read(world+0x28c,count))answer.bot=bot_range(slot,kind,start,offset,count,(last-first)/0x34b8);
+        if(read(image_base+0xfb990c,start)&&read(world+0x190,offset)&&read(world+0x28c,count))answer.bot=bot_range(slot,kind,start,offset,count,range.size());
     }
     // e03370 is used by the native own-player formatter; bf48 may be spectated.
-    answer.local=kind==0&&read(image_base+ssc_compat::resolve(0xe23678),local_slot)&&slot==local_slot&&
-        read(image_base+ssc_compat::resolve(0xe27138),registry)&&registry==first&&local_account(actor+0x6f0);
+    std::string account;
+    bool account_read=false;
+    if(kind==0&&read(image_base+ssc_compat::resolve(0xe23678),local_slot)&&slot==local_slot&&
+        read(image_base+ssc_compat::resolve(0xe27138),registry)&&registry==first){
+        account_read=account_string(actor+0x6f0,account);
+        answer.local=account_read&&local_account_key(account);
+    }
     // A hidden remote identity must not be recovered for shared name styling.
     unsigned char anonymous=2;
-    if(kind==0&&(answer.local||(read(actor+0x209,anonymous)&&anonymous==0))){std::string key;if(account_string(actor+0x6f0,key)&&ssc_shared::account_valid(key))answer.account=key;}
+    if(kind==0&&(answer.local||(read(actor+0x209,anonymous)&&anonymous==0))&&
+       (account_read||account_string(actor+0x6f0,account))&&ssc_shared::account_valid(account))answer.account=std::move(account);
     return answer;
 }
-inline Identity identify(uintptr_t actor,bool allow_inactive=false){
- auto answer=identify_direct(actor,allow_inactive);if(!answer.actor||!clone_layout)return answer;
+inline Identity identify_direct(uintptr_t actor,bool allow_inactive=false){
+ return identify_direct(actor,actor_range(),allow_inactive);
+}
+inline Identity identify(uintptr_t actor,const ActorRange& range,bool allow_inactive){
+ auto answer=identify_direct(actor,range,allow_inactive);if(!answer.actor||!clone_layout)return answer;
  int kind=-1;uintptr_t owner=0;
  if(!read(actor+0x7dc,kind)||kind!=1||!read(actor+0x2e8,owner)||!owner)return answer;
  // Native ownership is one actor pointer into the current actor vector. Never
  // infer it from names and never follow recursive/stale/foreign owner chains.
  answer.local=false;answer.bot=false;answer.account.clear();
- auto parent=identify_direct(owner);uintptr_t grandparent=0;int owner_kind=-1;unsigned char anonymous=2;
+ auto parent=identify_direct(owner,range,false);uintptr_t grandparent=0;int owner_kind=-1;unsigned char anonymous=2;
  if(owner==actor||!parent.actor||!read(owner+0x7dc,owner_kind)||(owner_kind!=0&&owner_kind!=1)||!read(owner+0x2e8,grandparent)||grandparent)return answer;
  if(owner_kind==0&&!parent.local&&(!read(owner+0x209,anonymous)||anonymous!=0))return answer;
  answer.local=parent.local;answer.bot=parent.bot;answer.account=std::move(parent.account);answer.style_actor=owner;return answer;
 }
-inline bool (*lookup_shared)(const std::string&,ssc_shared::Style&)=+[](const std::string& key,ssc_shared::Style& value){return ssc_shared::service().get(key,value);};
-struct FrameStyle {bool found=false;ssc_shared::Style style;};
-inline std::map<std::string,FrameStyle> frame_styles;
+inline Identity identify(uintptr_t actor,bool allow_inactive=false){
+ return identify(actor,actor_range(),allow_inactive);
+}
+// The service worker publishes immutable, expiring style data. Rendering never
+// waits for its mutex, and only refreshes observations once per account per second.
+inline bool (*lookup_shared)(const std::string&,ssc_shared::Style&)=nullptr;
+inline std::shared_ptr<const ssc_shared::Cache::View> shared_frame_view;
+inline std::map<std::string,uint64_t> frame_styles;
+inline uint64_t shared_frame_at=0,shared_view_at=0,shared_frame_privacy=0;
 inline void begin_render_frame(bool receive,bool active){
+ const auto tick=GetTickCount64(),privacy=ssc_privacy::generation.load();
+ if(!receive||receive!=receive_colors||privacy!=shared_frame_privacy){
+  shared_frame_view.reset();
+  frame_styles.clear();
+  shared_view_at=0;
+ }
+ shared_frame_privacy=privacy;
  receive_colors=receive;
- frame_styles.clear();render_access=active;render_access_at=GetTickCount64();
+ render_account_image=attached&&(receive||local_cosmetics())?image_base:0;
+ render_account_at=tick;
+ render_account_read=false;
+ shared_frame_at=tick;
+ if(receive&&!lookup_shared){
+  if(ssc_shared::service().render_view(shared_frame_view))shared_view_at=tick;
+  else if(tick-shared_view_at>=100)shared_frame_view.reset();
+ }
+ render_access=active;
+ render_access_at=tick;
 }
 inline void begin_render_frame(bool receive){begin_render_frame(receive,private_active());}
 inline bool frame_shared(const std::string& key,ssc_shared::Style& style){
  if(ssc_privacy::blocked()||!receive_colors)return false;
  ssc_perf::Scope timing(ssc_perf::sharing);
- auto found=frame_styles.find(key);
- if(found==frame_styles.end()){
-  FrameStyle result;result.found=lookup_shared(key,result.style);
-  if(frame_styles.size()<128)found=frame_styles.emplace(key,result).first;
-  else {style=result.style;return result.found;}
+ if(lookup_shared)return lookup_shared(key,style);
+ auto seen=frame_styles.find(key);
+ if(seen==frame_styles.end()&&frame_styles.size()>=128){
+  for(auto it=frame_styles.begin();it!=frame_styles.end();){
+   if(shared_frame_at-it->second>=30000)it=frame_styles.erase(it);else ++it;
+  }
  }
- style=found->second.style;return found->second.found;
+ if((seen==frame_styles.end()?frame_styles.size()<128:shared_frame_at-seen->second>=1000)&&
+    ssc_shared::service().observe_render(key,shared_frame_at))frame_styles[key]=shared_frame_at;
+ return shared_frame_view&&shared_frame_view->get(key,shared_frame_at,style);
+}
+inline bool shared_account(const std::string& key,ssc_shared::Style& style){
+ return receive_colors&&attached&&ssc_shared::account_valid(key)&&!local_account_key(key)&&frame_shared(key,style);
 }
 inline bool shared_account(uintptr_t string,ssc_shared::Style& style){
- std::string key;return receive_colors&&attached&&account_string(string,key)&&ssc_shared::account_valid(key)&&!local_account(string)&&frame_shared(key,style);
+ std::string key;
+ return receive_colors&&attached&&account_string(string,key)&&shared_account(key,style);
 }
 inline void shared_tint(ColorScope& scope,const ssc_shared::Style& value,float& r,float& g,float& b,float& phase){
  scope.remote(value);if(value.mode==ssc_shared::Mode::solid){auto c=value.colors[0];r=float((c>>16)&255)/255;g=float((c>>8)&255)/255;b=float(c&255)/255;phase=0;}
@@ -289,21 +346,50 @@ inline uintptr_t label_actor(const std::string& label){
  }
  return entry.actor;
 }
-inline Identity generated_label_identity(uintptr_t text){
- std::string label;if(!attached||!account_string(text,label))return {};
- auto actor=label_actor(label);return actor?identify(actor,true):Identity{};
+inline Identity generated_label_identity(const std::string& label){
+ if(!attached||label.empty())return {};
+ auto actor=label_actor(label);
+ return actor?identify(actor,true):Identity{};
 }
+inline Identity generated_label_identity(uintptr_t text){
+ std::string label;
+ return attached&&account_string(text,label)?generated_label_identity(label):Identity{};
+}
+inline RosterSweep label_sweep;
+inline std::map<std::string,uintptr_t> pending_labels;
+inline bool labels_readable=true;
 inline void refresh_shared_labels(uint64_t now,bool receive){
- if(!attached||(!receive&&!local_cosmetics())){shared_label_index.clear();formatted_labels.clear();shared_label_world=0;shared_label_refresh=0;return;}
- uintptr_t world=0,first=0,last=0;
- if(!read(image_base+ssc_compat::resolve(0xdef5d0),world)||!world){shared_label_index.clear();shared_label_world=0;return;}
- if(world==shared_label_world&&shared_label_refresh&&now>=shared_label_refresh&&now-shared_label_refresh<250)return;
- if(world!=shared_label_world)formatted_labels.clear();
- shared_label_index.clear();shared_label_world=world;shared_label_refresh=now;++shared_label_scans;
- if(!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048)return;
- auto add=[](const std::string& label,uintptr_t actor){if(label.empty())return;auto result=shared_label_index.emplace(label,actor);if(!result.second&&result.first->second!=actor)result.first->second=0;};
- for(auto actor=first;actor<last;actor+=0x34b8){int kind=-1;if(!read(actor+0x7dc,kind)){shared_label_index.clear();return;}if(kind!=0&&kind!=1)continue;
-  std::string key,display;if(account_string(actor+0x6f0,key))add(key,actor);if(account_string(actor+0x798,display))add(display,actor);
+ if(!attached||(!receive&&!local_cosmetics())){
+  shared_label_index.clear();formatted_labels.clear();shared_label_world=0;shared_label_refresh=0;
+  label_sweep={};pending_labels.clear();return;
+ }
+ const auto range=actor_range();
+ if(range.world!=shared_label_world)formatted_labels.clear();
+ if(!shared_label_refresh&&label_sweep.started){label_sweep={};pending_labels.clear();}
+ if(label_sweep.synchronize(range)){pending_labels.clear();shared_label_index.clear();}
+ shared_label_world=range.world;
+ const bool beginning=!label_sweep.next;
+ auto add=[](const std::string& label,uintptr_t actor){
+  if(label.empty())return;
+  auto result=pending_labels.emplace(label,actor);
+  if(!result.second&&result.first->second!=actor)result.first->second=0;
+ };
+ const bool ready=label_sweep.step(now,250,.28,[&](uintptr_t actor){
+  if(beginning&&actor==range.first){labels_readable=true;pending_labels.clear();}
+  if(!labels_readable)return;
+  int kind=-1;
+  if(!read(actor+0x7dc,kind)){labels_readable=false;shared_label_index.clear();return;}
+  if(kind!=0&&kind!=1)return;
+  std::string key,display;
+  if(account_string(actor+0x6f0,key))add(key,actor);
+  if(account_string(actor+0x798,display))add(display,actor);
+ });
+ if(!shared_label_refresh&&label_sweep.started)shared_label_refresh=now?now:1;
+ if(ready){
+  ++shared_label_scans;shared_label_refresh=now?now:1;
+  if(labels_readable)shared_label_index.swap(pending_labels);
+  else shared_label_index.clear();
+  pending_labels.clear();
  }
 }
 inline bool shared_text(const std::string& label,ssc_shared::Style& value){
@@ -324,26 +410,49 @@ inline bool bot_text(const std::string& label){
  std::string current;return (account_string(actor+0x798,current)&&current==label)||(account_string(actor+0x6f0,current)&&current==label)||formatted_labels.find(label)!=formatted_labels.end();
 }
 inline bool bot_narrow_text(uintptr_t object){std::string label;return render_private_active()&&account_string(object,label)&&bot_text(label);}
-inline bool shared_narrow_text(uintptr_t object,ssc_shared::Style& value){std::string label;return receive_colors&&account_string(object,label)&&shared_text(label,value);}
 inline bool wide_label(uintptr_t object,std::string& label){
  std::array<unsigned char,32> header{};size_t length=0,capacity=0;uintptr_t data=object;
  if(!read_bytes(object,header.data(),header.size()))return false;
  std::memcpy(&length,header.data()+16,8);std::memcpy(&capacity,header.data()+24,8);
  if(!length||length>256||capacity<length)return false;
- std::array<wchar_t,256> text{};
+ std::array<wchar_t,256> text;
  if(capacity>7){std::memcpy(&data,header.data(),8);if(!read_bytes(data,text.data(),length*sizeof(wchar_t)))return false;}
  else {if(length>7)return false;std::memcpy(text.data(),header.data(),length*sizeof(wchar_t));}
- std::array<char,1024> bytes{};int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text.data(),int(length),bytes.data(),int(bytes.size()),nullptr,nullptr);if(n<=0)return false;
+ std::array<char,1024> bytes;int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text.data(),int(length),bytes.data(),int(bytes.size()),nullptr,nullptr);if(n<=0)return false;
  label.assign(bytes.data(),size_t(n));for(auto& c:label)if(c>='A'&&c<='Z')c+=32;
  return true;
 }
-inline bool shared_wide_text(uintptr_t object,ssc_shared::Style& value){std::string label;return receive_colors&&wide_label(object,label)&&shared_text(label,value);}
-inline bool bot_wide_text(uintptr_t object){std::string label;return render_private_active()&&wide_label(object,label)&&bot_text(label);}
+inline RosterSweep account_sweep;
+inline std::map<std::string,uintptr_t> pending_accounts,observed_accounts;
+inline uint64_t account_privacy_revision=0;
+inline void refresh_shared_accounts(uint64_t now,bool receive,uint64_t privacy_revision){
+ if(!attached||!receive||privacy_revision!=account_privacy_revision){
+  account_sweep={};pending_accounts.clear();observed_accounts.clear();
+  account_privacy_revision=privacy_revision;
+  if(!attached||!receive)return;
+ }
+ const auto range=actor_range();
+ if(account_sweep.synchronize(range)){pending_accounts.clear();observed_accounts.clear();}
+ const bool ready=account_sweep.step(now,1000,.28,[&](uintptr_t actor){
+  int kind=-1;
+  if(pending_accounts.size()>=128||!read(actor+0x7dc,kind)||(kind!=0&&kind!=1))return;
+  auto identity=identify(actor,range,false);
+  if(!identity.account.empty()&&!identity.local)pending_accounts.emplace(std::move(identity.account),actor);
+ });
+ if(ready){observed_accounts.swap(pending_accounts);pending_accounts.clear();}
+}
 inline std::vector<std::string> shared_accounts(){
- std::set<std::string> keys;uintptr_t world=0,first=0,last=0;
- if(!attached||!read(image_base+ssc_compat::resolve(0xdef5d0),world)||!world||!read(world+0xa658,first)||!read(world+0xa660,last)||!first||last<first||(last-first)%0x34b8||(last-first)/0x34b8>2048)return {};
- for(auto actor=first;actor<last&&keys.size()<128;actor+=0x34b8){auto identity=identify(actor);if(!identity.account.empty()&&!identity.local)keys.insert(identity.account);}
- return {keys.begin(),keys.end()};
+ std::vector<std::string> keys;
+ const auto current=actor_range();
+ if(!current||!(current==account_sweep.range)||ssc_privacy::blocked())return keys;
+ keys.reserve(observed_accounts.size());
+ // Recheck before handing identities to the worker. An actor may leave,
+ // become anonymous, or reuse a slot during a multi-frame scan.
+ for(const auto& entry:observed_accounts){
+  const auto identity=identify(entry.second,current,false);
+  if(!identity.local&&identity.account==entry.first)keys.push_back(entry.first);
+ }
+ return keys;
 }
 // Observe the original game result, never the cosmetic override returned below.
 inline std::string native_pass_account;
@@ -440,9 +549,12 @@ extern "C" float __cdecl ssc_score_draw(void* renderer,float x,float y,void* nam
 }
 inline float __cdecl account_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
  if(!appearance_enabled())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
-    const auto text=reinterpret_cast<uintptr_t>(name);const bool own=local_account(text)||generated_label_identity(text).local;ColorScope scope(own);
-    if(!own&&bot_narrow_text(reinterpret_cast<uintptr_t>(name)))bot_tint(r,g,b,alpha,phase);
-    ssc_shared::Style remote;if(!own&&shared_narrow_text(reinterpret_cast<uintptr_t>(name),remote))shared_tint(scope,remote,r,g,b,phase);
+    std::string label;
+    const bool valid=account_string(reinterpret_cast<uintptr_t>(name),label);
+    const bool own=valid&&(local_account_key(label)||generated_label_identity(label).local);
+    ColorScope scope(own);
+    if(valid&&!own&&render_private_active()&&bot_text(label))bot_tint(r,g,b,alpha,phase);
+    ssc_shared::Style remote;if(valid&&!own&&receive_colors&&shared_text(label,remote))shared_tint(scope,remote,r,g,b,phase);
     if(local_cosmetics()&&own){if(rainbow||gradient){if(!local_phase(phase))phase=0;}solid(r,g,b,phase);}
     return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
@@ -450,8 +562,11 @@ inline float __cdecl account_draw(void* renderer,float x,float y,void* name,floa
 // not its rank, display-name approximation, or the current match roster.
 inline float canonical_account_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
  if(!appearance_enabled())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
- const auto account=reinterpret_cast<uintptr_t>(name);const bool own=local_account(account);ColorScope scope(own);
- ssc_shared::Style remote;if(!own&&shared_account(account,remote))shared_tint(scope,remote,r,g,b,phase);
+ std::string key;
+ const bool valid=account_string(reinterpret_cast<uintptr_t>(name),key);
+ const bool own=valid&&local_account_key(key);
+ ColorScope scope(own);
+ ssc_shared::Style remote;if(valid&&!own&&shared_account(key,remote))shared_tint(scope,remote,r,g,b,phase);
  if(own&&local_cosmetics()){if(rainbow||gradient){if(!local_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
@@ -473,8 +588,11 @@ extern "C" void ssc_chat_name_bridge();
 extern "C" void ssc_actor_name_bridge();
 extern "C" float ssc_chat_name_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase,uintptr_t sender){
  if(!appearance_enabled())return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
- const bool own=local_account(sender)||generated_label_identity(sender).local;ColorScope scope(own);
- ssc_shared::Style remote;if(!own&&shared_account(sender,remote))shared_tint(scope,remote,r,g,b,phase);
+ std::string key;
+ const bool valid=account_string(sender,key);
+ const bool own=valid&&(local_account_key(key)||generated_label_identity(key).local);
+ ColorScope scope(own);
+ ssc_shared::Style remote;if(valid&&!own&&shared_account(key,remote))shared_tint(scope,remote,r,g,b,phase);
  if(own&&local_cosmetics()){if(rainbow||gradient){if(!local_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  return native_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
 }
@@ -512,35 +630,37 @@ inline int widget_wrapped(uintptr_t renderer,float x,float y,float width,float h
 // UTF-8 account name; never strip punctuation or recolor matching substrings.
 // This is presentation matching, not private-module authorization. Explicit
 // actor/sender ownership always wins, including an explicit non-local result.
-inline bool local_wide_label(uintptr_t object){
- std::array<unsigned char,32> header{};size_t length=0,capacity=0;uintptr_t data=object;
- if(!read_bytes(object,header.data(),header.size()))return false;
- std::memcpy(&length,header.data()+16,8);std::memcpy(&capacity,header.data()+24,8);
- if(!length||length>256||capacity<length)return false;
- std::string account;if(!account_string(image_base+ssc_compat::resolve(0xe091e8),account))return false;
- std::array<wchar_t,256> expected{},candidate{};
- const int count=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,account.data(),int(account.size()),expected.data(),int(expected.size()));
- if(count<=0||size_t(count)!=length)return false;
- if(capacity>7){std::memcpy(&data,header.data(),8);if(!read_bytes(data,candidate.data(),length*sizeof(wchar_t)))return false;}
- else{if(length>7)return false;std::memcpy(candidate.data(),header.data(),length*sizeof(wchar_t));}
- for(size_t i=0;i<length;++i){auto c=candidate[i];if(c>=L'A'&&c<=L'Z')c+=L'a'-L'A';if(c!=expected[i])return false;}
- return true;
-}
-inline bool shared_label_local(void* text){
- if(!local_cosmetics())return false;
- if(identity_scope>=0)return identity_scope==1;
- std::string label;if(wide_label(reinterpret_cast<uintptr_t>(text),label)){auto actor=label_actor(label);if(actor)return identify(actor,true).local;}
- return local_wide_label(reinterpret_cast<uintptr_t>(text));
+struct WideAppearance {
+ bool own=false,bot=false,remote=false;
+ ssc_shared::Style style;
+};
+inline WideAppearance wide_appearance(uintptr_t text){
+ WideAppearance value;
+ const bool own_enabled=local_cosmetics();
+ if(identity_scope>=0){
+  value.own=own_enabled&&identity_scope==1;
+  return value;
+ }
+ const bool indexed=!shared_label_index.empty()||!formatted_labels.empty();
+ if(!own_enabled&&!indexed)return value;
+ std::string label;
+ if(!wide_label(text,label))return value;
+ const auto actor=indexed?label_actor(label):0;
+ if(own_enabled)value.own=actor?identify(actor,true).local:local_account_key(label);
+ if(actor){
+  if(render_private_active())value.bot=bot_text(label);
+  if(!value.own&&receive_colors)value.remote=shared_text(label,value.style);
+ }
+ return value;
 }
 inline Draw native_wide_draw=nullptr;
 inline float wide_draw(void* renderer,float x,float y,void* name,float size,float r,float g,float b,float alpha,int align,float width,unsigned char depth,unsigned char shadow,float phase){
  if(!appearance_enabled())return native_wide_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
- const bool bot=identity_scope<0&&bot_wide_text(reinterpret_cast<uintptr_t>(name));
- const bool own=shared_label_local(name);ssc_shared::Style remote;const bool remote_label=identity_scope<0&&!own&&shared_wide_text(reinterpret_cast<uintptr_t>(name),remote);ColorScope scope(own);
+ const auto appearance=wide_appearance(reinterpret_cast<uintptr_t>(name));ColorScope scope(appearance.own);
  scope.inherit_remote();
- if(remote_label)shared_tint(scope,remote,r,g,b,phase);
- if(bot)bot_tint(r,g,b,alpha,phase);
- if(own){if(rainbow||gradient){if(!local_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
+ if(appearance.remote)shared_tint(scope,appearance.style,r,g,b,phase);
+ if(appearance.bot)bot_tint(r,g,b,alpha,phase);
+ if(appearance.own){if(rainbow||gradient){if(!local_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  // The native callee consumes this MSVC string. Inspect before calling and
  // forward exactly once; do not free it or substitute a MinGW string object.
  return native_wide_draw(renderer,x,y,name,size,r,g,b,alpha,align,width,depth,shadow,phase);
@@ -548,12 +668,11 @@ inline float wide_draw(void* renderer,float x,float y,void* name,float size,floa
 inline Wrapped native_wide_wrapped=nullptr;
 inline int wide_wrapped(uintptr_t renderer,float x,float y,float width,float height,void* name,float size,float r,float g,float b,float alpha,int align,int vertical,int first,unsigned char flags,int limit,float start,float end,float phase){
  if(!appearance_enabled())return native_wide_wrapped(renderer,x,y,width,height,name,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
- const bool bot=identity_scope<0&&bot_wide_text(reinterpret_cast<uintptr_t>(name));
- const bool own=shared_label_local(name);ssc_shared::Style remote;const bool remote_label=identity_scope<0&&!own&&shared_wide_text(reinterpret_cast<uintptr_t>(name),remote);ColorScope scope(own);
+ const auto appearance=wide_appearance(reinterpret_cast<uintptr_t>(name));ColorScope scope(appearance.own);
  scope.inherit_remote();
- if(remote_label)shared_tint(scope,remote,r,g,b,phase);
- if(bot)bot_tint(r,g,b,alpha,phase);
- if(own){if(rainbow||gradient){if(!local_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
+ if(appearance.remote)shared_tint(scope,appearance.style,r,g,b,phase);
+ if(appearance.bot)bot_tint(r,g,b,alpha,phase);
+ if(appearance.own){if(rainbow||gradient){if(!local_phase(phase))phase=0;}solid(r,g,b,phase);++cosmetic_draws;}
  return native_wide_wrapped(renderer,x,y,width,height,name,size,r,g,b,alpha,align,vertical,first,flags,limit,start,end,phase);
 }
 // Updated modifier panel no longer retains the actor in RBX. Its native

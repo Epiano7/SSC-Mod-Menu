@@ -4,7 +4,12 @@
 using namespace ssc_shared;
 struct Identity {
  inline static std::atomic<uint64_t> id{76561198000000001ULL};
- bool attach(){return true;}uint64_t read()const{return id.load();}
+ inline static std::atomic<bool> hold_next{false},holding{false},release{false};
+ bool attach(){return true;}
+ uint64_t read()const{
+  if(hold_next.exchange(false)){holding=true;while(!release)Sleep(1);}
+  return id.load();
+ }
 };
 struct Net {
  inline static std::atomic<int> requests{0};inline static std::atomic<bool> blocking{false},stopped{false};
@@ -19,11 +24,31 @@ struct Net {
  void stop(){stopped=true;}void cancel(){stop();}
 };
 int main(){
+ ssc_privacy::reader=+[]{return ssc_privacy::Detection::off;};
+ 
  BasicService<Identity,Net> service;service.configure(std::filesystem::temp_directory_path());Style appearance,received;
  service.update("owner",{"other","other"},appearance,true,false);
  for(int i=0;i<100&&!service.get("other",received);++i)Sleep(10);
  assert(service.get("other",received)&&received.colors[0]==5623039);
+ std::shared_ptr<const Cache::View> frame;
+ for(int i=0;i<100&&!frame;++i){service.render_view(frame);if(!frame)Sleep(1);}
+ assert(frame&&frame->get("other",GetTickCount64(),received)&&received.colors[0]==5623039);
+ assert(!frame->get("other",GetTickCount64()+30000,received));
+ Identity::hold_next=true;
+ std::thread contention([&]{Style style;service.get("other",style);});
+ for(int i=0;i<1000&&!Identity::holding;++i)Sleep(1);
+ assert(Identity::holding);
+ assert(!service.render_view(frame)&&frame);
+ assert(!service.observe_render("new_chat",GetTickCount64()));
+ assert(!service.update("owner",{"other"},appearance,true,false,true));
+ Identity::release=true;
+ contention.join();
+ ssc_privacy::manual=true;
+ for(int i=0;i<100&&frame;++i){service.render_view(frame);if(frame)Sleep(1);}
+ assert(!frame);
+ ssc_privacy::manual=false;
  service.update("owner",{"other"},appearance,false,false);assert(!service.get("other",received));
+ assert(service.render_view(frame)&&!frame);
  service.update("owner",{"other"},appearance,true,false);
  for(int i=0;i<100&&!service.get("other",received);++i)Sleep(10);
  assert(service.get("other",received));Identity::id=76561198000000002ULL;assert(!service.get("other",received));
@@ -44,5 +69,5 @@ int main(){
  Net::requests=0;Net::stopped=false;Net::blocking=true;BasicService<Identity,Net> blocked;blocked.configure(std::filesystem::temp_directory_path());
  blocked.update("owner",{"other"},appearance,true,false);for(int i=0;i<100&&Net::requests==0;++i)Sleep(10);assert(Net::requests==1);
  const auto start=GetTickCount64();blocked.stop();assert(GetTickCount64()-start<1000);assert(!blocked.get("other",received));
- std::cout<<"Shared cosmetics worker: async lookup, opt-out, account switch and cancellation passed\n";
+ std::cout<<"PASS shared cosmetics worker: nonblocking render, expiry, privacy, account switch and cancellation\n";
 }

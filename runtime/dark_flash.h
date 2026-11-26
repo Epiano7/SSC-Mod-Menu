@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <GL/gl.h>
 #include <atomic>
+#include <array>
 #include <string>
 #include <map>
 #include <set>
@@ -41,9 +42,24 @@ inline Source original_source=nullptr;inline Attach original_attach=nullptr;inli
 inline Location original_location=nullptr;inline Uniform original_uniform=nullptr;
 inline Delete original_delete_program=nullptr,original_delete_shader=nullptr;
 inline std::mutex mutex;
-inline std::set<GLuint> shaders,programs,image_programs;
+inline std::set<GLuint> shaders,programs;
 inline std::map<GLuint,GLint> locations;
+inline std::atomic<uint64_t> program_revision{1};
 inline thread_local GLuint current_program=0;
+struct FlashBinding { GLuint program=0; uint64_t revision=0; GLint index=-1; GLint reported_index=-1; };
+inline thread_local std::array<FlashBinding,64> bindings{};
+inline GLint flash_index(GLuint program){
+ if(!program)return -1;
+ auto& entry=bindings[program%bindings.size()];
+ const auto revision=program_revision.load(std::memory_order_acquire);
+ if(entry.program==program&&entry.revision==revision)return entry.index;
+ std::lock_guard<std::mutex> lock(mutex);
+ const auto location=locations.find(program);
+ const GLint observed=location==locations.end()?-1:location->second;
+ entry={program,program_revision.load(std::memory_order_relaxed),
+        programs.count(program)?observed:-1,observed};
+ return entry.index;
+}
 inline void APIENTRY shader_source(GLuint shader,GLsizei count,const char* const* strings,const GLint* lengths){
  try{
   if(count>0&&count<=128&&strings){std::string joined;bool valid=true;
@@ -54,9 +70,30 @@ inline void APIENTRY shader_source(GLuint shader,GLsizei count,const char* const
  }catch(...){}
  original_source(shader,count,strings,lengths);
 }
-inline void APIENTRY attach_shader(GLuint program,GLuint shader){original_attach(program,shader);std::lock_guard<std::mutex> lock(mutex);if(shaders.count(shader))programs.insert(program);}
-inline void APIENTRY use_program(GLuint program){ssc_flash_image::restore();original_use(program);current_program=program;}
-inline GLint APIENTRY location(GLuint program,const char* name){auto result=original_location(program,name);if(result>=0&&name&&!std::strcmp(name,"flashIntensity")){std::lock_guard<std::mutex> lock(mutex);locations[program]=result;}return result;}
+inline void APIENTRY attach_shader(GLuint program,GLuint shader){
+ original_attach(program,shader);
+ std::lock_guard<std::mutex> lock(mutex);
+ if(shaders.count(shader)&&programs.insert(program).second)
+  program_revision.fetch_add(1,std::memory_order_release);
+}
+inline void APIENTRY use_program(GLuint program){original_use(program);current_program=program;}
+inline GLint APIENTRY location(GLuint program,const char* name){
+ auto result=original_location(program,name);
+ if(result>=0&&name&&!std::strcmp(name,"flashIntensity")){
+  auto& entry=bindings[program%bindings.size()];
+  auto revision=program_revision.load(std::memory_order_acquire);
+  if(entry.program==program&&entry.revision==revision&&entry.reported_index==result)return result;
+  std::lock_guard<std::mutex> lock(mutex);
+  auto it=locations.find(program);
+  revision=program_revision.load(std::memory_order_relaxed);
+  if(it==locations.end()||it->second!=result){
+   locations[program]=result;
+   revision=program_revision.fetch_add(1,std::memory_order_release)+1;
+  }
+  entry={program,revision,programs.count(program)?result:-1,result};
+ }
+ return result;
+}
 // One frame-owned sample: no second fade timer and no visibility changes to game state.
 inline thread_local HGLRC intensity_context=nullptr;
 inline thread_local float frame_intensity=0;
@@ -64,11 +101,18 @@ inline void observe_intensity(HGLRC context,float value){if(intensity_context!=c
 inline float take_intensity(HGLRC context){const float value=intensity_context==context?frame_intensity:0;frame_intensity=0;return value;}
 inline void APIENTRY uniform(GLint index,GLfloat value){
  if(!enabled.load(std::memory_order_relaxed)){original_uniform(index,value);return;}
- bool flash=false;{std::lock_guard<std::mutex> lock(mutex);auto it=locations.find(current_program);flash=programs.count(current_program)&&it!=locations.end()&&it->second==index;}
- if(flash){observe_intensity(wglGetCurrentContext(),value);value=encode(value,enabled.load(std::memory_order_relaxed));}
+ if(index>=0&&flash_index(current_program)==index){
+  observe_intensity(wglGetCurrentContext(),value);
+  value=encode(value,enabled.load(std::memory_order_relaxed));
+ }
  original_uniform(index,value);
 }
-inline void APIENTRY delete_program(GLuint program){original_delete_program(program);std::lock_guard<std::mutex> lock(mutex);programs.erase(program);image_programs.erase(program);locations.erase(program);}
+inline void APIENTRY delete_program(GLuint program){
+ original_delete_program(program);
+ std::lock_guard<std::mutex> lock(mutex);
+ const auto removed=programs.erase(program)+locations.erase(program);
+ if(removed)program_revision.fetch_add(1,std::memory_order_release);
+}
 inline void APIENTRY delete_shader(GLuint shader){original_delete_shader(shader);std::lock_guard<std::mutex> lock(mutex);shaders.erase(shader);}
 inline PROC lookup(const char* name,PROC original){
  if(!name||reinterpret_cast<INT_PTR>(original)<=3||reinterpret_cast<INT_PTR>(original)==-1)return original;

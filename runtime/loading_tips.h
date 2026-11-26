@@ -27,7 +27,8 @@ inline constexpr const char* messages[]={
  "1iOqIC3LrdY",
  "iOztnsBPrAA",
  "FIXING NEWS: sorry for the delay",
- "who is jix"
+ "who is jix",
+ "BREAKING NEWS: Chill quits SSC and uninstalls, then reinstalls within two hours"
 };
 
 inline constexpr size_t message_count=sizeof(messages)/sizeof(messages[0]);

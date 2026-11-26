@@ -3,6 +3,12 @@
 #include <mutex>
 namespace ssc_combat {
 struct Context {bool valid=false,active=false,ending=false,preparing=false;uintptr_t session=0,actor=0;int round=0;};
+template<class Read> bool multiplayer(uintptr_t world,Read read){
+ unsigned char network=0,solo=1,survival=1,practice=1;
+ return world&&read(world+0x6a39,network)&&network==1&&read(world+0x2d2,solo)&&solo==0&&
+  read(world+0x485,survival)&&survival==0&&read(world+0x121,practice)&&practice==0;
+}
+inline bool multiplayer(uintptr_t world){return multiplayer(world,[](uintptr_t address,auto& value){return ssc_names::read(address,value);});}
 struct Totals {uint64_t shots=0,projectiles=0,hits=0,player_hits=0,npc_hits=0;double impact=0;};
 struct Counter {
  uintptr_t session=0,actor=0;int round=0;bool prepared=false,running=false,complete=false,finished=false;Totals totals;
@@ -18,6 +24,7 @@ struct Counter {
  void fired(const Context& c,int count){if(!accepts(c)||count<=0||count>10000)return;if(totals.projectiles>100000000-uint64_t(count)){complete=false;return;}++totals.shots;totals.projectiles+=unsigned(count);}
  void hit(const Context& c,int kind,float damage){if(!accepts(c)||kind<0||kind>3||!std::isfinite(damage)||damage<=0||damage>1000000)return;if(totals.hits>=100000000||totals.impact+damage>1e12){complete=false;return;}++totals.hits;if(kind<2)++totals.player_hits;else ++totals.npc_hits;totals.impact+=damage;}
 };
+inline std::atomic<bool> achievement_bullets_enabled{false};inline std::atomic<uint64_t> achievement_bullets{0};
 inline Counter counter;inline std::mutex mutex;inline std::atomic<bool> enabled{false};inline bool attached=false;inline uintptr_t image_base=0;
 inline Context context(uintptr_t base){
  using ssc_names::read;Context c;int phase=0,mode=-1,raw=0,last=0,local=-1,slot=-1,kind=-1;double joining=0;float countdown=0,ending=0;unsigned char survival=0,active=0;uintptr_t first=0,end=0,registry=0;
@@ -41,7 +48,13 @@ using Append=uintptr_t(*)(uintptr_t,const float*);
 inline Spawn original_spawn=nullptr;inline Append original_append=nullptr;
 inline int spawn(uintptr_t actor,unsigned char p2,uintptr_t weapon,unsigned char p4,uintptr_t p5,uintptr_t p6,float p7,float p8,unsigned char p9,unsigned char p10,unsigned char p11){
  const auto result=original_spawn(actor,p2,weapon,p4,p5,p6,p7,p8,p9,p10,p11);
- if(enabled.load(std::memory_order_relaxed)&&result>0&&local_candidate(actor)){try{auto c=context(image_base);if(c.valid&&actor==c.actor&&owns_weapon(actor,weapon)){std::lock_guard<std::mutex> lock(mutex);counter.fired(c,result);}}catch(...){enabled=false;}}
+ const bool statistics=enabled.load(std::memory_order_relaxed),achievements=achievement_bullets_enabled.load(std::memory_order_relaxed);
+ if((statistics||achievements)&&result>0&&result<=10000&&local_candidate(actor)){try{auto c=context(image_base);if(c.valid&&actor==c.actor&&owns_weapon(actor,weapon)){
+  if(statistics){std::lock_guard<std::mutex> lock(mutex);counter.fired(c,result);}
+  // The guarded weapon HUD classifies +218: melee=0, explosive=1,
+  // guns=2..7 (pistol through sniper), misc=8. Count actual spawned gun projectiles.
+  int type=-1;if(achievements&&c.active&&!c.ending&&multiplayer(c.session)&&ssc_compat::supports(2)&&ssc_names::read(weapon+0x218,type)&&type>=2&&type<=7)achievement_bullets.fetch_add(unsigned(result),std::memory_order_relaxed);
+ }}catch(...){enabled=false;achievement_bullets_enabled=false;}}
  return result;
 }
 extern "C" __attribute__((used,noinline)) inline uintptr_t ssc_combat_hit(uintptr_t vector,const float* values,uintptr_t shooter,uintptr_t victim,uintptr_t projectile){

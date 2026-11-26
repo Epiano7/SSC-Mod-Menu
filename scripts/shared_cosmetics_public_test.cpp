@@ -12,7 +12,9 @@ struct Net {
   return {200,Json{{"ok",true},{"account_key",wrong.empty()?"owner":wrong},{"lease_seconds",remove?0:120}}.dump()};
  }
 };
-int main(){Style style;Time time{1000,1000};auto clock=[&]{return time;};
+int main(){
+ ssc_privacy::reader=+[]{return ssc_privacy::Detection::off;};
+ Style style;Time time{1000,1000};auto clock=[&]{return time;};
  Net good;publish_public(good,"owner",&style,clock,[]{});assert(good.calls==2);
  Net remove;remove.remove=true;publish_public(remove,"owner",nullptr,clock,[]{});
  for(int failure:{403,429,500}){Net n;n.fail=failure;bool rejected=false;try{publish_public(n,"owner",&style,clock,[]{});}catch(...){rejected=true;}assert(rejected);}

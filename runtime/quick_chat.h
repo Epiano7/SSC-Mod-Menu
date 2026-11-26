@@ -122,9 +122,12 @@ inline uintptr_t draw_label(uintptr_t a,float x,float y,float width,float height
 using ChatSplit=void(*)(uintptr_t,uintptr_t,float,int,uintptr_t,float);
 inline ChatSplit original_chat_split=nullptr;
 inline float chat_viewport_width=0;
+inline thread_local HDC chat_viewport_dc=nullptr;
 inline void (*chat_layout_diagnostic)(const char*)=nullptr;
 inline float native_client_width(){
- RECT rect{};auto window=WindowFromDC(wglGetCurrentDC());
+ const auto dc=wglGetCurrentDC();
+ if(dc&&dc==chat_viewport_dc&&chat_viewport_width>0)return chat_viewport_width;
+ RECT rect{};auto window=WindowFromDC(dc);
  return window&&GetClientRect(window,&rect)?float(rect.right-rect.left):chat_viewport_width;
 }
 inline float (*chat_client_width)()=native_client_width;

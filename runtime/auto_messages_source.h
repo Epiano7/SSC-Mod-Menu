@@ -61,7 +61,7 @@ inline double recording_round_seconds(float duration,double remaining){
  if(!std::isfinite(duration)||!std::isfinite(remaining)||duration<0||duration>7200)return -1;
  double elapsed=std::floor(std::max(20.f,duration)/5.f+.5)*5-remaining;return elapsed>=0&&elapsed<=14400?elapsed:-1;
 }
-inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
+inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world,bool detailed=true){
  Observation o;actor=world=0;if(!supported())return o;using ssc_names::read;
  int session=0,mode=-1,raw_round=0,last=0,local=-1,slot=-1,kind=-1;double joining=0;float countdown=0,ending=0;uintptr_t first=0,end=0,steam=0;unsigned char active=0,survival=0;
  if(!read(base+ssc_compat::resolve(0xfb7734),session)||session!=2||!read(base+ssc_compat::resolve(0xfb7748),joining)||!std::isfinite(joining)||joining>0)return o;
@@ -100,6 +100,7 @@ inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world){
  if(o.values.count("healthRemaining")&&o.values.count("maxHealth"))o.values["healthMissing"]=std::to_string(std::max(0,int(std::ceil(max_hp-hp))));
  // Same actor fields displayed by the validated native currency HUD.
  if(ssc_compat::supports(2)){float money=-1;int syringes=-1;if(read(actor+0x8c0,money)&&std::isfinite(money)&&money>=0&&money<=100000000)o.values["money"]=std::to_string(int(money));if(read(actor+0x8d0,syringes)&&syringes>=0&&syringes<=1000000)o.values["syringes"]=std::to_string(syringes);}
+ if(!detailed)return o;
  uintptr_t weapons=0,weapons_end=0;int equipped=-1;
  if(read(actor+0x12a0,weapons)&&read(actor+0x12a8,weapons_end)&&weapons_end>=weapons&&(weapons_end-weapons)%0x748==0&&(weapons_end-weapons)/0x748<=16&&(weapons||!weapons_end)){
   o.values["weaponCount"]=std::to_string((weapons_end-weapons)/0x748);
@@ -148,17 +149,18 @@ inline void append_combat_values(Values& values,const ssc_combat::Counter& count
 inline Observation tracking_observation;
 inline uint64_t tracking_at=0;
 inline bool tracking_enabled=false;
-inline void tick(uint64_t now,bool recording=false){
- static uint64_t last=0;const bool messaging=enabled&&!ssc_privacy::blocked();if(!messaging)engine.reset();const bool requested=messaging||recording;
+inline void tick(uint64_t now,bool recording=false,bool achievements=false){
+ static uint64_t last=0;const bool messaging=enabled&&!ssc_privacy::blocked();if(!messaging)engine.reset();const bool detailed=messaging||recording;const bool requested=detailed||achievements;
+ static bool prior_detailed=false;if(prior_detailed!=detailed){prior_detailed=detailed;std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();}
  if(requested!=tracking_enabled){last=0;tracking_enabled=requested;round_tracker.reset();tracking_observation={};tracking_at=0;std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();}
  if(last&&now>=last&&now-last<100)return;
  if(last&&(now<last||now-last>2000)){std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();}
  last=now;
- ssc_combat::enabled.store(requested&&ssc_combat::attached,std::memory_order_relaxed);
+ ssc_combat::enabled.store(detailed&&ssc_combat::attached,std::memory_order_relaxed);
  if(!requested){tracking_observation={};tracking_at=0;engine.reset();round_tracker.reset();std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::counter.reset();return;}
  ssc_perf::Scope tracker_timing(ssc_perf::tracker);
- try{auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t actor=0,world=0;auto o=sample(base,actor,world);round_tracker.observe(o,now);
- if(ssc_combat::attached){std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::Context c;c.valid=o.valid;c.active=o.active;c.ending=o.ending;c.preparing=o.preparing;c.session=o.session;c.actor=actor;c.round=o.round;ssc_combat::counter.observe(c);if(o.valid)append_combat_values(o.values,ssc_combat::counter);}
+ try{auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t actor=0,world=0;auto o=sample(base,actor,world,detailed);if(detailed)round_tracker.observe(o,now);else round_tracker.reset();
+ if(ssc_combat::attached&&detailed){std::lock_guard<std::mutex> lock(ssc_combat::mutex);ssc_combat::Context c;c.valid=o.valid;c.active=o.active;c.ending=o.ending;c.preparing=o.preparing;c.session=o.session;c.actor=actor;c.round=o.round;ssc_combat::counter.observe(c);if(o.valid)append_combat_values(o.values,ssc_combat::counter);}
  tracking_observation=o;tracking_at=now;
  if(messaging){engine.observe(o,now);if(o.valid&&!engine.pending.empty())engine.dispatch(now,[&](const std::string& text){return send_native(base,world,actor,text);},ssc_chat::native_spam_available(actor));diagnose(o,now);}else engine.reset();}
  catch(...){tracking_observation={};tracking_at=0;enabled=false;ssc_combat::enabled=false;engine.reset();round_tracker.reset();status=L"Auto messages paused after a data error";}

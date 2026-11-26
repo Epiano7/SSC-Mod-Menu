@@ -22,10 +22,21 @@ inline const wchar_t* label(Status s){switch(s){
  case Status::removed:return L"Your shared colors have been removed";default:return L"Shared cosmetics are off";}}
 template<class Identity=ssc_beta::Identity,class Net=Network> class BasicService {
  mutable std::mutex mutex_;std::condition_variable wake_;std::thread worker_;Identity steam_;Net net_;
- std::filesystem::path directory_;Cache cache_;bool stopping_=false,started_=false,receive_=false,share_=false,remove_=false;
+ std::filesystem::path directory_;Cache cache_;std::shared_ptr<const Cache::View> published_;bool stopping_=false,started_=false,receive_=false,share_=false,remove_=false;
  size_t lookup_cursor_=0;uint64_t last_lookup_=0;unsigned lookup_failures_=0;std::set<std::string> urgent_;
  uint64_t account_=0,generation_=0,next_lookup_=0,next_publish_=0,last_publish_=0;std::string own_,appearance_;Style style_;
  std::vector<std::string> peers_;std::map<std::string,uint64_t> observed_;Status status_=Status::off;
+ // Chat senders outside the current roster still receive on-demand refreshes.
+ void observe_locked(const std::string& account,uint64_t tick){
+  if(account==own_||!account_valid(account)||(std::binary_search(peers_.begin(),peers_.end(),account)&&!observed_.count(account)))return;
+  const auto found=observed_.find(account);
+  if(found!=observed_.end()){found->second=tick;return;}
+  if(observed_.size()>=128)return;
+  observed_.emplace(account,tick);
+  urgent_.insert(account);
+  if(!lookup_failures_)next_lookup_=std::min(next_lookup_,std::max(tick,last_lookup_+1000));
+  wake_.notify_all();
+ }
  void lookup_failed(){lookup_failures_=std::min(lookup_failures_+1,3u);next_lookup_=now().mono_ms+(15000ULL<<(lookup_failures_-1));}
  void work(){
   for(;;){uint64_t id=0,generation=0;std::string own;Style style;bool send=false,remove=false,lookup=false;Pending pending;
@@ -56,7 +67,7 @@ template<class Identity=ssc_beta::Identity,class Net=Network> class BasicService
       pending=cache_.begin(batch,now());}
      current();auto response=net_.request(L"/api/cosmetics/v1/lookup",Json{{"accounts",pending.accounts}}.dump());current();
      std::lock_guard<std::mutex> l(mutex_);if(generation!=generation_||id!=account_)continue;
-     if(response.status==200&&cache_.accept(pending,response.body,now())){lookup_failures_=0;if(!share_&&!remove_)status_=Status::ready;}
+     if(response.status==200&&cache_.accept(pending,response.body,now())){published_=cache_.view();lookup_failures_=0;if(!share_&&!remove_)status_=Status::ready;}
      else {lookup_failed();if(!share_&&!remove_)status_=Status::unavailable;}
     }catch(...){std::lock_guard<std::mutex> l(mutex_);if(generation==generation_){lookup_failed();if(!share_&&!remove_)status_=Status::unavailable;}}}
   }
@@ -64,12 +75,14 @@ template<class Identity=ssc_beta::Identity,class Net=Network> class BasicService
 public:
  ~BasicService(){stop();}
  void configure(const std::filesystem::path& directory){std::lock_guard<std::mutex> l(mutex_);if(!started_)directory_=directory;}
- void update(const std::string& own,const std::vector<std::string>& peers,const Style& style,bool receive,bool share){
-  std::lock_guard<std::mutex> l(mutex_);if(stopping_||directory_.empty())return;
-  if(!started_){if(!steam_.attach())return;try{worker_=std::thread([this]{work();});started_=true;}catch(...){status_=Status::unavailable;return;}}
+ bool update(const std::string& own,const std::vector<std::string>& peers,const Style& style,bool receive,bool share,bool nonblocking=false){
+  std::unique_lock<std::mutex> lock(mutex_,std::defer_lock);
+  if(nonblocking){if(!lock.try_lock())return false;}else lock.lock();
+  if(stopping_||directory_.empty())return true;
+  if(!started_){if(!steam_.attach())return true;try{worker_=std::thread([this]{work();});started_=true;}catch(...){status_=Status::unavailable;return true;}}
   auto id=steam_.read();const auto encoded_style=encode(style).dump();if(ssc_privacy::blocked()){share=false;receive=false;}
   const bool account_change=id!=account_||own!=own_;
-  if(account_change||!receive){observed_.clear();urgent_.clear();lookup_failures_=0;}
+  if(account_change||!receive){published_.reset();observed_.clear();urgent_.clear();lookup_failures_=0;}
   const bool changed=account_change||receive!=receive_||share!=share_||encoded_style!=appearance_;
   if(changed){++generation_;if(account_change){lookup_cursor_=0;last_lookup_=0;remove_=!share&&id&&account_valid(own);next_lookup_=next_publish_=0;cache_.context(0,false);}
    else if(share_&&!share){remove_=true;next_publish_=0;}
@@ -90,19 +103,32 @@ public:
   peers_={unique.begin(),unique.end()};cache_.context(id,receive);
   if(!id||!account_valid(own))status_=Status::account;else if(!receive&&!share&&!remove_)status_=Status::off;
   wake_.notify_all();
+  return true;
  }
- bool get(const std::string& account,Style& style){std::lock_guard<std::mutex> l(mutex_);if(stopping_||!receive_)return false;if(steam_.read()!=account_){cache_.context(0,false);observed_.clear();return false;}
-  // Attributed chat senders may not be in a match roster (main-menu chat).
-  // Queue only bounded public account keys; the worker performs all network I/O.
-  if(!stopping_&&receive_&&account!=own_&&account_valid(account)&&(observed_.count(account)||observed_.size()<128)){
-   const auto time=now().mono_ms;const bool added=!observed_.count(account);observed_[account]=time;
-   if(added){urgent_.insert(account);if(!lookup_failures_)next_lookup_=std::min(next_lookup_,std::max(time,last_lookup_+1000));wake_.notify_all();}
-  }
-  return cache_.get(account,now(),style);
+ bool render_view(std::shared_ptr<const Cache::View>& view){
+  std::unique_lock<std::mutex> lock(mutex_,std::try_to_lock);
+  if(!lock)return false;
+  if(stopping_||!receive_||ssc_privacy::blocked()||steam_.read()!=account_){view.reset();return true;}
+  view=published_;
+  return true;
+ }
+ bool observe_render(const std::string& account,uint64_t tick){
+  std::unique_lock<std::mutex> lock(mutex_,std::try_to_lock);
+  if(!lock)return false;
+  if(!stopping_&&receive_&&!ssc_privacy::blocked())observe_locked(account,tick);
+  return true;
+ }
+ bool get(const std::string& account,Style& style){
+  std::lock_guard<std::mutex> lock(mutex_);
+  if(stopping_||!receive_||ssc_privacy::blocked())return false;
+  if(steam_.read()!=account_){cache_.context(0,false);published_.reset();observed_.clear();return false;}
+  const auto time=now();
+  observe_locked(account,time.mono_ms);
+  return cache_.get(account,time,style);
  }
  Status status()const{std::lock_guard<std::mutex> l(mutex_);return status_;}
  void stop(){
-  {std::lock_guard<std::mutex> l(mutex_);stopping_=true;++generation_;cache_.context(0,false);wake_.notify_all();}
+  {std::lock_guard<std::mutex> l(mutex_);stopping_=true;++generation_;cache_.context(0,false);published_.reset();wake_.notify_all();}
   net_.stop();if(worker_.joinable())worker_.join();
  }
 };

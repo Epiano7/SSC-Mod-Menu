@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -53,6 +54,22 @@ class Cache {
  uint64_t account_=0,generation_=0,request_=0;bool enabled_=false;
  std::map<std::string,Entry> entries_;
 public:
+ class View {
+  friend class Cache;
+  std::map<std::string,Entry> entries_;
+ public:
+  bool get(const std::string& account,uint64_t tick,Style& result)const{
+   const auto it=entries_.find(account);
+   if(it==entries_.end()||!fresh(it->second.start,{0,tick},it->second.ttl))return false;
+   result=it->second.appearance;
+   return true;
+  }
+ };
+ std::shared_ptr<const View> view()const{
+  auto result=std::make_shared<View>();
+  result->entries_=entries_;
+  return result;
+ }
  // Called under the integration layer's mutex. Account zero means logged out.
  void context(uint64_t account,bool enabled){
   if(account_!=account||enabled_!=enabled){account_=account;enabled_=enabled;++generation_;++request_;entries_.clear();}

@@ -36,6 +36,63 @@ int sound_wheel_remainder=0;
 bool sound_search_editing=false;std::wstring sound_query;size_t sound_page=0;std::vector<size_t> sound_results;
 void filter_sounds(){sound_results=ssc_sound::grouped_entries(sound_query);if(ssc_sound::selection<ssc_sound::entries.size()){auto key=ssc_sound::pool_key(ssc_sound::entries[ssc_sound::selection]);auto same=std::find_if(sound_results.begin(),sound_results.end(),[&](size_t index){return ssc_sound::pool_key(ssc_sound::entries[index])==key;});if(same!=sound_results.end())ssc_sound::selection=*same;}sound_page=0;dirty=true;}
 int settings_page=0,ui_scale=100,module_filter=0;
+int achievement_filter=0;size_t achievement_selected=0;
+enum class AchievementSort {alphabetical,fewest_unlocks,most_unlocks,rarity_high,rarity_low};
+constexpr const wchar_t* achievement_sort_labels[]={
+ L"SORT: A-Z",L"SORT: FEWEST UNLOCKS",L"SORT: MOST UNLOCKS",L"SORT: RARITY HIGH",L"SORT: RARITY LOW"
+};
+AchievementSort achievement_sort=AchievementSort::alphabetical;
+int achievement_wheel_remainder=0;
+int achievement_wheel_step(int delta){
+ constexpr int step=2*WHEEL_DELTA;
+ achievement_wheel_remainder+=delta;
+ int rows=achievement_wheel_remainder/step;
+ achievement_wheel_remainder%=step;
+ return rows;
+}
+std::vector<size_t> achievement_rows(){
+ using namespace ssc_achievements;
+ std::vector<size_t> rows;
+ for(size_t i=0;i<catalog.size();++i){
+  const auto& d=catalog[i];if(d.tier>1)continue;
+  const auto row=tier_display(engine.ledger,i);
+  const bool unlocked=row.earned!=catalog.size();
+  if(!achievement_filter||(achievement_filter==2)==unlocked)rows.push_back(i);
+ }
+ std::stable_sort(rows.begin(),rows.end(),[](size_t a,size_t b){
+  auto alphabetic=[&](){
+   std::string_view x=catalog[a].name,y=catalog[b].name;
+   return std::lexicographical_compare(x.begin(),x.end(),y.begin(),y.end(),
+      [](unsigned char x,unsigned char y){return std::tolower(x)<std::tolower(y);});
+  };
+  if(achievement_sort==AchievementSort::alphabetical)return alphabetic();
+  const auto x=tier_display(engine.ledger,a),y=tier_display(engine.ledger,b);
+  if(achievement_sort==AchievementSort::fewest_unlocks||achievement_sort==AchievementSort::most_unlocks){
+   const int first=completion_rates.unlocked(x.shown),second=completion_rates.unlocked(y.shown);
+   if((first>=0)!=(second>=0))return first>=0;
+   if(first==second)return alphabetic();
+   return achievement_sort==AchievementSort::fewest_unlocks?first<second:first>second;
+  }
+  const auto rarity_a=catalog[x.shown].rarity,rarity_b=catalog[y.shown].rarity;
+  return rarity_a==rarity_b?alphabetic():(achievement_sort==AchievementSort::rarity_high?rarity_a>rarity_b:rarity_a<rarity_b);
+ });
+ return rows;
+}
+std::wstring achievement_rate(size_t id){
+ const int rate=ssc_achievements::completion_rates.percent(id);
+ if(rate<0)return {};
+ auto percent=std::to_wstring(rate/100);
+ if(rate%100){percent+=L".";if(rate%100<10)percent+=L"0";percent+=std::to_wstring(rate%100);}
+ return percent+L"% of Mod Menu users have unlocked";
+}
+std::wstring achievement_detail_rate(size_t id){
+ const auto& rates=ssc_achievements::completion_rates;
+ const int count=rates.unlocked(id);
+ if(count<0)return L"Community unlock stats unavailable";
+ auto fraction=std::to_wstring(count)+L"/"+std::to_wstring(rates.participants)+L" synced users";
+ const auto percent=achievement_rate(id);
+ return percent.empty()?fraction:percent+L" ("+std::to_wstring(count)+L"/"+std::to_wstring(rates.participants)+L")";
+}
 int statistics_class=0,statistics_round=0,statistics_metric=0,statistics_intervals=6;
 bool statistics_select_latest=false,statistics_all_runs=false;
 float statistics_mouse_x=-1,statistics_mouse_y=-1;bool recording_requested=false;
@@ -44,7 +101,7 @@ int color_popup=-2,picker_drag=0;unsigned picker_original=0;bool picker_old_grad
 ssc_color::HSV picker_hsv;std::wstring picker_hex;
 void close_color_picker(bool cancel=false);
 unsigned quick_mask=127;
-constexpr int quick_module_count=14;int quick_scroll=0;
+constexpr int quick_module_count=15;int quick_scroll=0;
 int quick_count(){int n=0;for(int i=0;i<quick_module_count;++i)n+=(quick_mask>>i)&1;return n;}
 int quick_height(){return 186+64*std::min(7,quick_count())+(quick_count()>7?36:0);}
 bool auto_rule_editor=false,auto_guide=false;int auto_list_page=0,auto_guide_page=0;
@@ -177,6 +234,11 @@ void save() {
 }
 constexpr float hud_view_x=266,hud_view_y=188,hud_view_w=820,hud_view_h=461;
 int hud_drag=-1;bool hud_resize=false;float hud_start_x=0,hud_start_y=0,hud_item_x=0,hud_item_y=0,hud_item_scale=1;
+float live_hud_start_w=0,live_hud_start_h=0;
+void constrain_hud_item(int index){
+    if(index==ssc_hud::achievement_popup)ssc_achievements::update_popup_bounds(ssc_hud::view_w,ssc_hud::view_h);
+    else ssc_hud::constrain(ssc_hud::items[index]);
+}
 void finish_hud_drag(){ssc_hud::freeze_bounds=false;if(hud_drag>=0){
     const auto& a=ssc_hud::items[hud_drag];char report[192];snprintf(report,sizeof(report),"HUD drag ended: item=%s x=%.4f y=%.4f scale=%.3f",a.key,a.x,a.y,a.scale);log(report);
     hud_drag=-1;save();}}
@@ -189,9 +251,11 @@ void move_hud(float x,float y){
     if(hud_drag<0)return;
     auto& item=ssc_hud::items[hud_drag];float dx=(x-hud_start_x)/hud_view_w,dy=(y-hud_start_y)/hud_view_h;
     if(hud_resize)item.scale=hud_item_scale+std::max(dx/item.w,dy/item.h);else{item.x=hud_item_x+dx;item.y=hud_item_y+dy;}
-    ssc_hud::constrain(item);dirty=true;
+    constrain_hud_item(hud_drag);dirty=true;
 }
 void load_settings() {
+    ssc_achievements::configure(state_dir);
+    ssc_achievements::audio::load(state_dir);
     ssc_flash_image::load(state_dir);
     ssc_chat::load(state_dir);ssc_auto::load(state_dir);ssc_planned::load(state_dir);
     std::ifstream in(state_dir/L"menu.ini");std::string line;const bool had_settings=in.good();bool notice_known=false;bool version2=false,quick_freecam_known=false;
@@ -205,6 +269,8 @@ void load_settings() {
         if(key=="flash_image_mode"){ssc_flash_image::mode=value=="1"?1:0;continue;}
         if(key=="hud_hover_fade"){ssc_hud::hover_fade=value!="0";continue;}
         if(key=="hud_enabled"){ssc_hud::enabled=value=="1";continue;}
+        // Popup geometry is computed from the viewport. Old box data cannot set its default.
+        if(key=="hud_box_achievement_popup")continue;
         if(key.rfind("hud_box_",0)==0){for(int i=0;i<int(ssc_hud::items.size());++i)if(key==std::string("hud_box_")+ssc_hud::items[i].key){float x,y,w,h;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f,%f%c",&x,&y,&w,&h,&extra)==4&&std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&x>=-.5f&&y>=-.5f&&w>0&&h>0){ssc_hud::apply_bounds(i,{x,y,x+w,y+h,2});ssc_hud::measured[i]=false;}}continue;}
         if(key.rfind("hud_",0)==0){for(auto& item:ssc_hud::items)if(key==std::string("hud_")+item.key){float x,y,z;char extra;if(std::sscanf(value.c_str(),"%f,%f,%f%c",&x,&y,&z,&extra)==3){item.x=x;item.y=y;item.scale=z;ssc_hud::constrain(item);}}continue;}
         if(key=="ignored_update_version"){if(ssc_update::valid_version(value))ssc_update::ignored_version=value;continue;}
@@ -305,6 +371,9 @@ void refresh_dynamic_panel(ULONGLONG now,bool presence_tick=false) {
     if(settings_page==34||settings_page==35){static uint64_t assets_revision=0,speech_revision=0;auto asset=ssc_piper::assets().snapshot();auto voice=ssc_chat_tts::speech().revision();if(asset.revision!=assets_revision||voice!=speech_revision){assets_revision=asset.revision;speech_revision=voice;dirty=true;}}
     if(settings_page==34){static uint64_t source_revision=0;if(source_revision!=ssc_chat_tts::source_revision){source_revision=ssc_chat_tts::source_revision;dirty=true;}static size_t count=0;auto next=ssc_chat_tts::speech().voices().size();if(next!=count){count=next;dirty=true;}}
     static bool freecam_notice=false;bool notice=now<ssc_freecam::notice_until;if(notice!=freecam_notice){freecam_notice=notice;dirty=true;}
+    static uint64_t sync_revision=0;if(sync_revision!=ssc_achievements::community_sync.revision){sync_revision=ssc_achievements::community_sync.revision;if(settings_page==43)dirty=true;}
+    static uint64_t rates_revision=0;if(rates_revision!=ssc_achievements::completion_rates.revision){rates_revision=ssc_achievements::completion_rates.revision;if(settings_page==40||settings_page==41)dirty=true;}
+    static uint64_t achievements_revision=0;static std::wstring achievements_status;auto next_achievement_revision=ssc_achievements::engine.ledger.revision;if(achievements_revision!=next_achievement_revision||achievements_status!=ssc_achievements::status){achievements_revision=next_achievement_revision;achievements_status=ssc_achievements::status;if(settings_page==40||settings_page==41||settings_page==-1)dirty=true;}
     static unsigned statistics_revision=0;auto revision=ssc_stats::reader().revision.load();if(statistics_revision!=revision){statistics_revision=revision;if(statistics_select_latest){statistics_round=0;statistics_select_latest=false;}if(settings_page==20||settings_page==21)dirty=true;}
     if(presence_tick&&(settings_page==5||settings_page==16))dirty=true;
     static ULONGLONG caret_at=0;if((picker_editing||private_editing||chat_editing||sound_search_editing||color_editing||rpc_editing||(settings_page==11&&(ssc_lab::picker>=0||ssc_lab::editing>=0)))&&now/500!=caret_at){caret_at=now/500;dirty=true;}
@@ -334,7 +403,7 @@ void show_manager(int page=-1) {
 }
 void show_quick() {cosmetics_popup=false;update_popup=false;finish_hud_drag();ReleaseCapture();cancel_edit();manager=false;visibility=animations?0.f:1.f;dirty=true;hovered=pressed=keyboard_focus=0;controls.clear();}
 void show_cosmetics_notice(){show_quick();cosmetics_popup=true;opened=true;modal_visibility=0;dirty=true;}
-void start_live_hud(){log("HUD editor opened");if(!ssc_hud::available(ssc_hud::selected))ssc_hud::selected=ssc_hud::next_item(0,1);finish_hud_drag();ReleaseCapture();cancel_edit();ssc_hud::enabled=true;ssc_hud::editing=true;ssc_hud::capture_frame=true;opened=true;manager=false;visibility=1;modal_visibility=0;controls.clear();pressed=hovered=keyboard_focus=0;dirty=true;save();}
+void start_live_hud(){log("HUD editor opened");if(!ssc_hud::available(ssc_hud::selected))ssc_hud::selected=ssc_hud::next_item(0,1);finish_hud_drag();ReleaseCapture();cancel_edit();if(ssc_hud::selected!=ssc_hud::achievement_popup)ssc_hud::enabled=true;ssc_hud::editing=true;ssc_hud::capture_frame=true;opened=true;manager=false;visibility=1;modal_visibility=0;controls.clear();pressed=hovered=keyboard_focus=0;dirty=true;save();}
 int live_hud_hit(float x,float y){
  auto inside=[&](int i){if(!ssc_hud::visible(i,GetTickCount64()))return false;const auto& a=ssc_hud::items[i];float px=6.f/std::max(1,ssc_hud::view_w),py=6.f/std::max(1,ssc_hud::view_h);return x>=a.x-px&&x<=a.x+a.w*a.scale+px&&y>=a.y-py&&y<=a.y+a.h*a.scale+py;};
  if(inside(ssc_hud::selected))return ssc_hud::selected;
@@ -342,7 +411,13 @@ int live_hud_hit(float x,float y){
  for(int i=0;i<int(ssc_hud::items.size());++i)if(inside(i)){const auto& a=ssc_hud::items[i];float size=a.w*a.h*a.scale*a.scale;if(size<area){best=i;area=size;}}
  return best;
 }
-void live_hud_move(float x,float y){if(hud_drag<0)return;auto& a=ssc_hud::items[hud_drag];float dx=x-hud_start_x,dy=y-hud_start_y;if(hud_resize)a.scale=hud_item_scale+std::max(dx/a.w,dy/a.h);else{a.x=hud_item_x+dx;a.y=hud_item_y+dy;}ssc_hud::constrain(a);dirty=true;}
+void live_hud_move(float x,float y){
+ if(hud_drag<0)return;
+ auto& item=ssc_hud::items[hud_drag];const float dx=x-hud_start_x,dy=y-hud_start_y;
+ if(hud_resize)item.scale=hud_item_scale+std::max(dx/live_hud_start_w,dy/live_hud_start_h);
+ else{item.x=hud_item_x+dx;item.y=hud_item_y+dy;}
+ constrain_hud_item(hud_drag);dirty=true;
+}
 // Some Proton desktops coalesce or omit WM_MOUSEMOVE during capture.
 // Poll only an already-started gesture, and finish it if mouse-up was missed.
 void sample_live_hud_drag(int x,int y,int width,int height,bool down){
@@ -357,7 +432,13 @@ void poll_live_hud_drag(HWND window){
  if(!GetCursorPos(&cursor)||!ScreenToClient(window,&cursor)||!GetClientRect(window,&client))return;
  sample_live_hud_drag(cursor.x,cursor.y,client.right,client.bottom,(GetAsyncKeyState(VK_LBUTTON)&0x8000)!=0);
 }
-void live_hud_wheel(int delta,int hovered_item){if(hud_drag>=0){finish_hud_drag();ReleaseCapture();}if(hovered_item>=0)ssc_hud::selected=hovered_item;auto& a=ssc_hud::items[ssc_hud::selected];a.scale*=std::pow(1.1f,float(delta)/WHEEL_DELTA);ssc_hud::constrain(a);save();}
+void live_hud_wheel(int delta,int hovered_item){
+ if(hud_drag>=0){finish_hud_drag();ReleaseCapture();}
+ if(hovered_item>=0)ssc_hud::selected=hovered_item;
+ auto& item=ssc_hud::items[ssc_hud::selected];
+ item.scale*=std::pow(1.1f,float(delta)/WHEEL_DELTA);
+ constrain_hud_item(ssc_hud::selected);save();
+}
 bool module_ready(int id){
     if(id==1950)return ssc_loading_tips::attached;
     if(id==1945||id==1946)return ssc_challenge::view_supported;
@@ -372,7 +453,7 @@ bool module_ready(int id){
 bool wheel_round_ended=false;
 int chaos_options_page=0;
 void open_dropdown(int id,std::vector<std::wstring> labels,int choice){dropdown=dropdown==id?-1:id;dropdown_items=std::move(labels);dropdown_choice=choice;dirty=true;}
-int parent_page(int page){switch(page){case 31:return 4;case 35:return 34;case 36:return 3;case 39:return 38;default:return -1;}}
+int parent_page(int page){switch(page){case 41:case 42:case 43:return 40;case 31:return 4;case 35:return 34;case 36:return 3;case 39:return 38;default:return -1;}}
 std::vector<ssc_kos::NativeTarget> kos_choices;
 std::wstring kos_status;
 
@@ -395,12 +476,51 @@ void move_color_picker(int x,int y){float px=(x-panel_x)/draw_scale,py=(y-panel_
  picker_apply();
 }
 void activate(int id) {
+    if(id==1980)id=1982;
+    if(id==1981){achievement_wheel_remainder=0;ssc_achievements::request_statistics();show_manager(40);return;}
+    if(id==1982){ssc_achievements::engine.ledger.notifications=!ssc_achievements::engine.ledger.notifications;ssc_achievements::options_changed();dirty=true;return;}
+    if(id==1983){ssc_achievements::engine.preview();dirty=true;return;}
+    if(id==1984||id==1985||id==1987){achievement_filter=id==1984?0:id==1985?1:2;option_scroll[40]=0;dirty=true;return;}
+    if(id==1988){ssc_hud::selected=ssc_hud::achievement_popup;start_live_hud();return;}
+    if(id==1989){achievement_sort=AchievementSort((size_t(achievement_sort)+1)%std::size(achievement_sort_labels));option_scroll[40]=0;dirty=true;return;}
+    if(id==1994){show_manager(42);return;}
+    if(id==1998){show_manager(43);return;}
+    if(id==2990){
+        using namespace ssc_achievements;
+        community_request(community_sync.enabled?community::Action::pause:community::Action::enable);
+        dirty=true;return;
+    }
+    if(id==2993){ssc_achievements::community_request(ssc_achievements::community::Action::start);dirty=true;return;}
+    if(id==2991){
+        const auto& state=ssc_achievements::community_sync.state;
+        if(ssc_achievements::community::hex(state,32)){
+            const auto url=L"https://api.epiano7.dev/v1/achievements/link?state="+ssc_chat::widen(state);
+            ShellExecuteW(game_window,L"open",url.c_str(),nullptr,nullptr,SW_SHOWNORMAL);
+        }
+        return;
+    }
+    if(id==2992){ssc_achievements::community_request(ssc_achievements::community::Action::withdraw);dirty=true;return;}
+    if(id==1995){
+        ssc_sound::stop_preview();
+        wchar_t path[32768]{};
+        OPENFILENAMEW dialog{};dialog.lStructSize=sizeof(dialog);dialog.hwndOwner=game_window;
+        dialog.lpstrFilter=L"Audio files\0*.wav;*.mp3\0\0";dialog.lpstrFile=path;dialog.nMaxFile=32768;
+        dialog.lpstrTitle=L"Choose an achievement sound";
+        dialog.Flags=OFN_FILEMUSTEXIST|OFN_PATHMUSTEXIST|OFN_NOCHANGEDIR;
+        if(GetOpenFileNameW(&dialog))ssc_achievements::audio::import_file(path);
+        dirty=true;return;
+    }
+    if(id==1996){ssc_achievements::audio::preview();dirty=true;return;}
+    if(id==1997){ssc_sound::stop_preview();ssc_achievements::audio::restore();dirty=true;return;}
+    if(id>=1990&&id<1994){auto rows=achievement_rows();size_t row=size_t(option_scroll[40]+id-1990);if(row<rows.size()){achievement_selected=rows[row];show_manager(41);}return;}
     if(id==1901){show_manager(37);return;}
     if(id==1960){show_manager(39);return;}
 
     if(id==1930||id==1931){chaos_options_page=id-1930;dirty=true;return;}
     if(id==1950){ssc_loading_tips::enabled=!ssc_loading_tips::enabled.load();save();return;}
     if(id==1911){show_manager(38);return;}
+    if(id==1900||id==1902||id==1903)ssc_achievements::engine.challenge_changed(true);
+    if(id==1910||id==1917||(id>=1940&&id<1949))ssc_achievements::engine.challenge_changed(false);
     if(id==1900){if(ssc_challenge::attached){ssc_challenge::draft_settings_changed();ssc_challenge::random.enabled=!ssc_challenge::random.enabled;ssc_challenge::picker.reset();ssc_challenge::reroller.reset();ssc_challenge::commit={};ssc_challenge::prepared={};ssc_challenge::status=ssc_challenge::random.enabled?L"Waiting for a round":L"Off";if(ssc_challenge::random.enabled)ssc_geri::enabled=false;}save();return;}
     if(id==1903){if(!ssc_challenge::blind_supported)return;ssc_challenge::draft_settings_changed();ssc_challenge::random.blind=!ssc_challenge::random.blind;save();dirty=true;return;}
     if(id==1902){ssc_challenge::draft_settings_changed();ssc_challenge::random.stims=!ssc_challenge::random.stims;save();return;}
@@ -415,10 +535,15 @@ void activate(int id) {
     if(id==1600){if(ssc_planned_native::kos)ssc_kos::enabled=!ssc_kos::enabled;save();return;}
     if(id==1601){show_manager(32);return;}
     if(id==1602){kos_choices=ssc_kos::choices();std::vector<std::wstring> names;int current=0;for(size_t i=0;i<kos_choices.size();++i){names.push_back(ssc_chat::widen(kos_choices[i].target.player.handle)+(kos_choices[i].historical?L" (recent)":L""));if(kos_choices[i].actor==ssc_kos::selected.actor)current=int(i);}if(names.empty()){kos_status=L"No public players available";dirty=true;}else open_dropdown(id,names,current);return;}
-    if(id==1603){bool ok=ssc_kos::commit();kos_status=ok?L"KOS list updated":L"Player changed or is anonymous; no change made";ssc_commands::reply(ok?"KOS list updated":"Player changed or is anonymous; no change made");dirty=true;return;}
+    if(id==1603){auto status=ssc_kos::add_selected();kos_status=ssc_chat::widen(status);ssc_commands::reply(status);dirty=true;return;}
     if(id==1605){kos_handle_editing=true;edit_cursor.begin(kos_handle.size());dirty=true;return;}
     if(id==1606||id==1607){kos_status=ssc_chat::widen(ssc_kos::manage_handle(kos_handle,id==1606?"add":"remove"));kos_handle_editing=false;dirty=true;return;}
     if(id==1604){if(!ssc_kos::list.entries().empty()){auto account=ssc_kos::list.entries().back().account;ssc_kos::list.remove(account);ssc_kos::save();}dirty=true;return;}
+    if(id>=1630&&id<1635){
+        const auto index=size_t(option_scroll[32]+id-1630);
+        if(index<ssc_kos::list.entries().size())kos_status=ssc_chat::widen(ssc_kos::save_mark(ssc_kos::list.increase(ssc_kos::list.entries()[index].account)));
+        dirty=true;return;
+    }
     if(id>=1620&&id<1625){size_t index=size_t(option_scroll[32]+id-1620);if(index<ssc_kos::list.entries().size()){auto account=ssc_kos::list.entries()[index].account;ssc_kos::list.remove(account);ssc_kos::save();}dirty=true;return;}
     if(id==1705){command_sender_buffer=ssc_commands::sender_name;command_sender_editing=true;edit_cursor.begin(command_sender_buffer.size());dirty=true;return;}
     if(id==1700){if(ssc_commands::attached)ssc_commands::router.enabled=!ssc_commands::router.enabled;ssc_commands::router.channel=ssc_commands::Channel::unchanged;save();return;}
@@ -656,7 +781,7 @@ void activate(int id) {
     else if(id==94){if(module_ready(86))start_live_hud();else show_manager(6);}
     else if(id==146){if(module_ready(86))start_live_hud();}
     else if(id==147)close_menu(true);
-    else if(id==148){auto& a=ssc_hud::items[ssc_hud::selected];a.x=a.home_x;a.y=a.home_y;a.scale=1;save();}
+    else if(id==148){ssc_hud::reset_item(ssc_hud::items[ssc_hud::selected]);constrain_hud_item(ssc_hud::selected);save();}
     else if(id==143){show_manager(10);}
     else if(id==190){ssc_hud::reset();save();show_manager(6);}
     else if(id==191){show_manager(6);}
@@ -796,10 +921,27 @@ std::string local_command(const std::string& action,const std::string& argument)
  }
  if(action=="volume"){if(argument.empty()||argument.size()>3||argument.find_first_not_of("0123456789")!=std::string::npos)return "Use /tts volume 0 to 200";int n=std::stoi(argument);if(n>200)return "Use volume 0 to 200";ssc_chat_tts::volume=n;save();return "Speech volume "+std::to_string(n);}
  if(action=="mute"||action=="unmute"){if(!ssc_kos::valid_text(argument,128))return "Use /tts mute NAME or /tts unmute NAME";ssc_chat_tts::speech().mute(argument,action=="mute");return action=="mute"?"Muted for local chat speech":"Unmuted for local chat speech";}
- if(action=="kos"){if(argument.empty()){opened=true;show_manager(32);return "KOS list";}if(argument=="list"){std::string out="KOS list:";for(const auto& e:ssc_kos::list.entries())out+="\n"+e.handle;return out;}auto split=argument.find(' ');auto verb=ssc_kos::canonical(argument.substr(0,split));if(verb=="add"||verb=="remove"){if(split==std::string::npos)return "Use /kos add HANDLE or /kos remove HANDLE";return ssc_kos::manage_handle(argument.substr(split+1),verb);}return ssc_kos::manage_handle(argument);}
+  if(action=="kos"){
+   if(argument.empty()){opened=true;show_manager(32);return "KOS list";}
+   if(argument=="list"){
+    std::string out="KOS kills remaining";
+    for(const auto& e:ssc_kos::list.entries())out+="\n"+e.handle+" x"+std::to_string(e.marks);
+    return out;
+   }
+   const auto split=argument.find_first_of(" \t");
+   const auto verb=ssc_kos::canonical(argument.substr(0,split));
+   if(verb=="add"||verb=="remove"){
+    if(split==std::string::npos)return "Use /kos add HANDLE or /kos remove HANDLE";
+    return ssc_kos::manage_handle(argument.substr(split+1),verb);
+   }
+   const auto count=ssc_kos::parse_count(argument);
+   if(!count.valid)return "Use a kill count from 1 to "+std::to_string(ssc_kos::List::max_marks);
+   return ssc_kos::manage_handle(std::string(count.handle),count.marks?"add":"toggle",count.marks);
+  }
  return "Unknown local action";
 }
 LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
+    if(window==game_window&&message==WM_SIZE)ssc_chat::chat_viewport_dc=nullptr;
     if(ssc_commands::slash_input(message,wp,lp,opened||visibility>0.f||ssc_hud::editing||ssc_freecam::state.active||((message==WM_KEYDOWN||message==WM_KEYUP)&&int(wp)==menu_hotkey)))return 0;
 
 
@@ -829,7 +971,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     if(message==WM_POWERBROADCAST&&(wp==PBT_APMSUSPEND||wp==PBT_APMRESUMEAUTOMATIC||wp==PBT_APMRESUMESUSPEND||wp==PBT_APMRESUMECRITICAL)){ssc_freecam::lose_focus();ssc_beta::service().invalidate();ssc_auth::service().invalidate();dirty=true;}
     if(message==WM_DESTROY){ssc_chat_tts::speech().stop();ssc_piper::assets().stop();ssc_beta::service().stop();ssc_auth::service().stop();}
     if(opened&&!manager&&quick_count()>7&&message==WM_MOUSEWHEEL){quick_scroll=std::clamp(quick_scroll-GET_WHEEL_DELTA_WPARAM(wp)/WHEEL_DELTA,0,quick_count()-7);dirty=true;return 0;}
-    if(opened&&manager&&option_limits.count(settings_page)&&message==WM_MOUSEWHEEL){POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(window,&p);float x=(p.x-panel_x)/draw_scale,y=(p.y-panel_y)/draw_scale;if(x>=260&&x<=1100&&y>=155&&y<=640){option_scroll[settings_page]=std::clamp(option_scroll[settings_page]-GET_WHEEL_DELTA_WPARAM(wp)/WHEEL_DELTA,0,option_limits[settings_page]);keyboard_focus=hovered=pressed=0;dirty=true;return 0;}}
+    if(opened&&manager&&option_limits.count(settings_page)&&message==WM_MOUSEWHEEL){POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(window,&p);float x=(p.x-panel_x)/draw_scale,y=(p.y-panel_y)/draw_scale;if(x>=260&&x<=1100&&y>=155&&y<=640){const int delta=GET_WHEEL_DELTA_WPARAM(wp);const int rows=settings_page==40?achievement_wheel_step(delta):delta/WHEEL_DELTA;if(rows){option_scroll[settings_page]=std::clamp(option_scroll[settings_page]-rows,0,option_limits[settings_page]);keyboard_focus=hovered=pressed=0;dirty=true;}return 0;}}
     if(opened&&dropdown>=0){if(message==WM_MOUSEWHEEL){dropdown_choice=std::clamp(dropdown_choice-GET_WHEEL_DELTA_WPARAM(wp)/WHEEL_DELTA,0,int(dropdown_items.size())-1);dirty=true;return 0;}if(message==WM_KEYDOWN){if(wp==VK_ESCAPE){dropdown=-1;dirty=true;suppress_escape_up=true;return 0;}if(wp==VK_UP||wp==VK_DOWN||wp==VK_TAB){dropdown_choice=std::clamp(dropdown_choice+(wp==VK_UP?-1:1),0,int(dropdown_items.size())-1);dirty=true;return 0;}if(wp==VK_RETURN){select_dropdown(dropdown_choice);return 0;}}if(message==WM_LBUTTONDOWN&&hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp))==0){dropdown=-1;pressed=0;dirty=true;return 0;}}
 
     if(opened&&manager&&settings_page==3&&message==WM_MOUSEWHEEL){POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(window,&p);float x=(p.x-panel_x)/draw_scale,y=(p.y-panel_y)/draw_scale;if(x>=266&&x<=1086&&y>=187&&y<=452){sound_wheel_remainder+=GET_WHEEL_DELTA_WPARAM(wp);int steps=sound_wheel_remainder/WHEEL_DELTA;sound_wheel_remainder%=WHEEL_DELTA;int last=std::max(0,int(sound_results.size())-5);sound_page=size_t(std::clamp(int(sound_page)-steps,0,last));dirty=true;return 0;}}
@@ -901,7 +1043,7 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         POINT cursor{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};
         if(message==WM_MOUSEWHEEL)ScreenToClient(window,&cursor);
         float x=float(cursor.x)/std::max(1,ssc_hud::view_w),y=float(cursor.y)/std::max(1,ssc_hud::view_h);
-        if(message==WM_LBUTTONDOWN){pressed=hit(cursor.x,cursor.y);if(pressed)return 0;int i=live_hud_hit(x,y);if(i>=0){ssc_hud::selected=i;hud_drag=i;ssc_hud::freeze_bounds=true;auto& a=ssc_hud::items[i];hud_start_x=x;hud_start_y=y;hud_item_x=a.x;hud_item_y=a.y;hud_item_scale=a.scale;hud_resize=cursor.x>=(a.x+a.w*a.scale)*ssc_hud::view_w-12&&cursor.y>=(a.y+a.h*a.scale)*ssc_hud::view_h-12;SetCapture(window);char report[192];snprintf(report,sizeof(report),"HUD drag started: item=%s capture=%d view=%dx%d",a.key,GetCapture()==window,ssc_hud::view_w,ssc_hud::view_h);log(report);dirty=true;}else{unsigned visible=0;for(int j=0;j<int(ssc_hud::items.size());++j)if(ssc_hud::visible(j,GetTickCount64()))visible|=1u<<j;char report[192];snprintf(report,sizeof(report),"HUD click missed: x=%.4f y=%.4f view=%dx%d visible=0x%X",x,y,ssc_hud::view_w,ssc_hud::view_h,visible);log(report);}return 0;}
+        if(message==WM_LBUTTONDOWN){pressed=hit(cursor.x,cursor.y);if(pressed)return 0;int i=live_hud_hit(x,y);if(i>=0){ssc_hud::selected=i;hud_drag=i;ssc_hud::freeze_bounds=true;auto& a=ssc_hud::items[i];hud_start_x=x;hud_start_y=y;hud_item_x=a.x;hud_item_y=a.y;hud_item_scale=a.scale;live_hud_start_w=a.w;live_hud_start_h=a.h;hud_resize=cursor.x>=(a.x+a.w*a.scale)*ssc_hud::view_w-12&&cursor.y>=(a.y+a.h*a.scale)*ssc_hud::view_h-12;SetCapture(window);char report[192];snprintf(report,sizeof(report),"HUD drag started: item=%s capture=%d view=%dx%d",a.key,GetCapture()==window,ssc_hud::view_w,ssc_hud::view_h);log(report);dirty=true;}else{unsigned visible=0;for(int j=0;j<int(ssc_hud::items.size());++j)if(ssc_hud::visible(j,GetTickCount64()))visible|=1u<<j;char report[192];snprintf(report,sizeof(report),"HUD click missed: x=%.4f y=%.4f view=%dx%d visible=0x%X",x,y,ssc_hud::view_w,ssc_hud::view_h,visible);log(report);}return 0;}
         if(message==WM_MOUSEMOVE){if(hud_drag>=0)live_hud_move(x,y);return 0;}
         if(message==WM_LBUTTONUP){if(hud_drag>=0){live_hud_move(x,y);finish_hud_drag();ReleaseCapture();}else{int id=hit(cursor.x,cursor.y),down=pressed;pressed=0;if(id&&id==down)activate(id);}return 0;}
         if(message==WM_MOUSEWHEEL){live_hud_wheel(GET_WHEEL_DELTA_WPARAM(wp),live_hud_hit(x,y));return 0;}
@@ -1023,7 +1165,11 @@ LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         }
         if(message==WM_CAPTURECHANGED)finish_hud_drag();
         if(message==WM_MOUSEMOVE){if(postgame_visible()){postgame_mouse_x=(GET_X_LPARAM(lp)-panel_x)/draw_scale;postgame_mouse_y=(GET_Y_LPARAM(lp)-panel_y)/draw_scale;dirty=true;}if(statistics_graph_visible()){statistics_mouse_x=(GET_X_LPARAM(lp)-panel_x)/draw_scale;statistics_mouse_y=(GET_Y_LPARAM(lp)-panel_y)/draw_scale;dirty=true;}int id=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));if(hovered!=id){hovered=id;keyboard_focus=0;dirty=true;}}
-        if(message==WM_LBUTTONDOWN){pressed=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));dirty=true;}
+        if(message==WM_LBUTTONDOWN){
+            pressed=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));dirty=true;
+        }else if(message==WM_LBUTTONDBLCLK&&manager&&settings_page==40&&hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp))==1989){
+            pressed=1989;dirty=true;
+        }
         if(message==WM_LBUTTONUP){int id=hit(GET_X_LPARAM(lp),GET_Y_LPARAM(lp));int down=pressed;pressed=0;if(id&&id==down){activate(id);place_caret(id,GET_X_LPARAM(lp));}else if(!id){commit_text();}dirty=true;}
         if((message>=WM_KEYFIRST&&message<=WM_KEYLAST)||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST))return 0;
         if(message==WM_INPUT){ssc_freecam::raw_motion(lp);return DefWindowProcW(window,message,wp,lp);}
@@ -1174,14 +1320,21 @@ void text(int x,int y,const wchar_t* value,COLORREF color=ink,bool title=false,i
     }
 }
 
-void button(int id,int x,int y,int w,int h,const wchar_t* label,bool selected=false,bool enabled=true,bool centered=false) {
+void button(int id,int x,int y,int w,int h,const wchar_t* label,bool selected=false,bool enabled=true,bool centered=false,bool grayscale=false) {
     controls.push_back({id,x,y,w,h,enabled});bool focus=enabled&&(hovered==id||keyboard_focus==id);
     COLORREF base=selected?RGB(27,106,196):RGB(33,57,88);
     if(focus)base=RGB(46,121,193);
     if(enabled&&pressed==id)base=RGB(26,81,133);
     if(!enabled)base=RGB(22,35,51);
-    polygon(x,y,w,h,base);rectangle(x+8,y+1,w-16,1,focus?cyan:RGB(63,91,132));
-    if(focus)rectangle(x+8,y+h-2,w-16,2,cyan);
+    COLORREF edge=focus?cyan:RGB(63,91,132);
+    if(grayscale){
+        base=selected?RGB(65,69,76):RGB(43,46,51);
+        if(focus)base=RGB(74,78,85);
+        if(enabled&&pressed==id)base=RGB(55,59,66);
+        edge=focus?RGB(174,178,185):RGB(78,82,89);
+    }
+    polygon(x,y,w,h,base);rectangle(x+8,y+1,w-16,1,edge);
+    if(focus)rectangle(x+8,y+h-2,w-16,2,edge);
     int size=15;while(size>11&&text_width(label,size)>w-28)--size;
     text(centered?x+(w-text_width(label,size))/2:x+14,y+(h-size)/2,label,enabled?ink:muted,false,size);
 }
@@ -1322,6 +1475,31 @@ void paint_statistics_graph(){
 }
 int option_list(int count,int visible,int controls_y=108,int scroll_y=166,int scroll_h=450){int limit=std::max(0,count-visible);option_limits[settings_page]=limit;int& start=option_scroll[settings_page];start=std::clamp(start,0,limit);if(limit){button(1290,958,controls_y,54,38,L"^",false,start>0);button(1291,1026,controls_y,54,38,L"v",false,start<limit);rectangle(1094,scroll_y,4,scroll_h,RGB(18,41,72));rectangle(1094,scroll_y+scroll_h*start/count,4,std::max(16,scroll_h*visible/count),cyan);}return start;}
 #include "postgame_menu.h"
+constexpr int manager_footer_top=669;
+void paint_manager_navigation(bool show_private_module){
+    constexpr int top=108,row_height=44;
+    constexpr int regular_pitch=54,expanded_pitch=50;
+    static_assert(top+10*expanded_pitch+row_height<manager_footer_top);
+    const int pitch=show_private_module?expanded_pitch:regular_pitch;
+    int y=top;
+    const auto tab=[&](int id,const wchar_t* label,bool selected){
+        button(id,24,y,192,row_height,label,selected);
+        y+=pitch;
+    };
+    tab(10,L"MODULES",settings_page==-1||(settings_page>=3&&settings_page<=6));
+    tab(11,L"INTERFACE",settings_page==1);
+    tab(997,L"MATCH SUMMARY",settings_page==28);
+    tab(13,L"MISC",settings_page==9);
+    tab(12,L"ABOUT",settings_page==2);
+    tab(14,L"WEAPON LAB",settings_page==11);
+    tab(15,L"RECORDING",settings_page==12);
+    tab(16,L"CREDITS",settings_page==13);
+    tab(1981,L"ACHIEVEMENTS",settings_page==40||settings_page==41);
+    tab(520,L"PRIVATE ACCESS",settings_page==19);
+    if(show_private_module)tab(510,ssc_chat::widen(private_label).c_str(),settings_page==18);
+    rectangle(238,108,1,584,RGB(38,65,101));
+}
+
 void paint_panel() {
     prepare_canvas();if(!pixels)return;controls.clear();wheel_hits.clear();
     if(postgame_visible()){paint_postgame();return;}
@@ -1384,26 +1562,113 @@ void paint_panel() {
         text(50,585,L"Manage this popup in Interface > Show update notes",muted,false,14);
         button(282,410,624,300,48,L"GOT IT",true,true,true);
     } else if(!manager) {
-        const wchar_t* names[]={L"SOUND REPLACER",L"COSMETICS",L"DISCORD PRESENCE",L"HUD EDITOR",L"CUSTOM QUICK CHAT",L"AUTO MESSAGES",L"FREECAM",L"DRIVING",L"FLASHBANG",L"KOS",L"CHAT COMMANDS",L"CHAT SPEECH",L"RANDOM DRAFTS",L"CHAOS MODE"};
-        const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load(),ssc_dark_flash::enabled.load(),ssc_kos::enabled,ssc_commands::router.enabled,ssc_chat_tts::settings.enabled,ssc_challenge::random.enabled,ssc_challenge::chaos.enabled};
-        const int ids[]={80,81,83,86,300,330,588,981,1200,1600,1700,1800,1900,1910},settings[]={91,92,93,94,301,302,585,980,1201,1601,1701,1801,1901,1911};
+        const wchar_t* names[]={L"SOUND REPLACER",L"COSMETICS",L"DISCORD PRESENCE",L"HUD EDITOR",L"CUSTOM QUICK CHAT",L"AUTO MESSAGES",L"FREECAM",L"DRIVING",L"FLASHBANG",L"KOS",L"CHAT COMMANDS",L"CHAT SPEECH",L"RANDOM DRAFTS",L"CHAOS MODE",L"ACHIEVEMENT POPUPS"};
+        const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load(),ssc_dark_flash::enabled.load(),ssc_kos::enabled,ssc_commands::router.enabled,ssc_chat_tts::settings.enabled,ssc_challenge::random.enabled,ssc_challenge::chaos.enabled,ssc_achievements::engine.ledger.notifications};
+        const int ids[]={80,81,83,86,300,330,588,981,1200,1600,1700,1800,1900,1910,1980},settings[]={91,92,93,94,301,302,585,980,1201,1601,1701,1801,1901,1911,1981};
         quick_scroll=std::clamp(quick_scroll,0,std::max(0,quick_count()-7));int row=0,selected=0;for(int i=0;i<quick_module_count;++i)if(quick_mask&(1u<<i)){if(selected++<quick_scroll||row>=7)continue;int y=100+row++*64;rectangle(20,y,600,56,RGB(16,37,62));text(32,y+20,names[i],ink,false,15);toggle(ids[i],350,y+10,enabled[i]);button(settings[i],456,y+10,146,36,L"SETTINGS");}
         if(quick_count()>7){button(2120,20,100+row*64,286,30,L"EARLIER",false,quick_scroll>0);button(2121,322,100+row*64,298,30,L"LATER",false,quick_scroll<quick_count()-7);}
         int bottom=118+row*64+(quick_count()>7?36:0);button(3,20,bottom,366,42,L"ALL MODULES",true,true,true);button(4,402,bottom,218,42,L"DISABLE ALL");
         if(save_failed)text(24,bottom+51,L"Could not save settings",RGB(247,191,83));
         else if(GetTickCount64()<ssc_freecam::notice_until)text(24,bottom+51,ssc_freecam::entry_status,RGB(255,190,120),false,11);
     } else {
-        button(10,24,108,192,44,L"MODULES",settings_page==-1||(settings_page>=3&&settings_page<=6));
-        button(11,24,162,192,44,L"INTERFACE",settings_page==1);
-        button(997,24,216,192,44,L"MATCH SUMMARY",settings_page==28);
-        button(13,24,270,192,44,L"MISC",settings_page==9);
-        button(12,24,324,192,44,L"ABOUT",settings_page==2);
-        button(14,24,378,192,44,L"WEAPON LAB",settings_page==11);button(15,24,432,192,44,L"RECORDING",settings_page==12);button(16,24,486,192,44,L"CREDITS",settings_page==13);
-        button(520,24,540,192,44,L"PRIVATE ACCESS",settings_page==19);
-        if(ssc_names::private_visible())button(510,24,594,192,44,ssc_chat::widen(private_label).c_str(),settings_page==18);
-        rectangle(238,108,1,546,RGB(38,65,101));
+        paint_manager_navigation(ssc_names::private_visible());
 
-        if(settings_page==23){
+        if(settings_page==40){
+            using namespace ssc_achievements;
+            const auto& ledger=engine.ledger;
+            text(266,111,L"ACHIEVEMENTS",ink,true);
+            button(1988,670,106,196,38,L"MOVE POPUP");button(1983,876,106,210,38,L"PREVIEW POPUP",false,ready);
+            text(280,166,L"Unlock popups",ink,false,14);toggle(1982,438,152,ledger.notifications);
+            button(1994,539,152,182,38,L"UNLOCK SOUND");
+            button(1984,266,209,100,34,L"ALL",achievement_filter==0);button(1985,374,209,130,34,L"LOCKED",achievement_filter==1);button(1987,512,209,150,34,L"UNLOCKED",achievement_filter==2);
+            button(1998,676,209,140,34,L"SYNC STATS");
+            button(1989,830,209,256,34,achievement_sort_labels[size_t(achievement_sort)]);
+            auto rows=achievement_rows();int first=option_list(int(rows.size()),4,282,264,352);
+            for(int row=0;row<4&&first+row<int(rows.size());++row){
+                const auto root=rows[size_t(first+row)];const auto view=tier_display(ledger,root);
+                const auto& d=catalog[view.shown];int y=264+row*88;
+                const bool earned=view.earned<catalog.size();
+                const auto row_ink=earned?ink:RGB(184,187,194);
+                const auto row_muted=earned?muted:RGB(158,162,170);
+                const auto row_value=earned?cyan:row_ink;
+                button(1990+row,266,y,820,81,L"",achievement_selected==root,true,false,!earned);
+                rectangle(270,y+8,4,65,rarity_color(d.rarity));
+                auto name=ssc_chat::widen(d.name);
+                if(d.tier)name+=L" / Tier "+std::to_wstring(d.tier);
+                text(280,y+8,name.c_str(),row_ink,false,15);
+                const auto tag=rarity_names[size_t(d.rarity)];
+                const int rarity_x=1068-int(text_width(tag,12));
+
+                text(rarity_x,y+8,tag,earned?rarity_color(d.rarity):row_muted,false,12);
+                auto value=earned?(view.next<catalog.size()||!d.tier?L"Unlocked":L"Highest tier unlocked"):
+                    (engine.available(view.shown)?ssc_chat::widen(progress_text(d,ledger.items[view.shown])):L"Pending");
+                const int value_x=1068-int(text_width(value.c_str(),12));
+                const auto lines=wrap_label(ssc_chat::widen(d.description),value_x-298,12);
+                if(!lines.empty())text(280,y+31,lines[0].c_str(),row_muted,false,12);
+                if(lines.size()>1&&!(earned&&view.next<catalog.size()))text(280,y+47,lines[1].c_str(),row_muted,false,12);
+                text(value_x,y+31,value.c_str(),earned?RGB(118,235,160):row_value,false,12);
+                if(earned&&view.next<catalog.size()){
+                    const auto& goal=catalog[view.next];
+                    auto remaining=engine.available(view.next)?ssc_chat::widen(progress_text(goal,ledger.items[view.next])):L"Pending";
+                    const int remaining_x=1068-int(text_width(remaining.c_str(),11));
+                    const auto next=wrap_label(L"Next: "+ssc_chat::widen(goal.description),remaining_x-298,11);
+                    if(!next.empty())text(280,y+49,next[0].c_str(),muted,false,11);
+                    text(remaining_x,y+49,remaining.c_str(),cyan,false,11);
+                }
+                if(completion_rates.percent(view.shown)>=0){
+                    const auto rate=achievement_detail_rate(view.shown);
+                    text(280,y+65,rate.c_str(),row_muted,false,10);
+                }
+            }
+            if(!ready||api_busy||storage_error)text(266,648,status.c_str(),muted,false,11);
+        }else if(settings_page==41){
+            using namespace ssc_achievements;
+            const auto view=tier_display(engine.ledger,achievement_selected);
+            if(view.shown<catalog.size()){
+                const auto& d=catalog[view.shown];
+                button(1981,850,106,236,38,L"< ALL ACHIEVEMENTS");
+                text(282,115,ssc_chat::widen(d.name).c_str(),ink,true,20);
+                std::wstring rarity=rarity_names[size_t(d.rarity)];if(d.tier)rarity+=L" / Tier "+std::to_wstring(d.tier);
+                rectangle(282,173,4,16,rarity_color(d.rarity));
+                text(296,172,rarity.c_str(),rarity_color(d.rarity),false,15);
+                const auto lines=wrap_label(ssc_chat::widen(d.description),794,14);
+                int y=222;
+                for(const auto& line:lines){text(282,y,line.c_str(),ink,false,14);y+=21;}
+                text(282,std::max(259,y+9),achievement_detail_rate(view.shown).c_str(),muted,false,13);
+                if(view.next<catalog.size()){
+                    const auto& goal=catalog[view.next];
+                    if(view.next!=view.shown)text(282,327,(L"Next: "+ssc_chat::widen(goal.description)).c_str(),ink,false,14);
+                    const auto line=engine.available(view.next)?ssc_chat::widen(progress_text(goal,engine.ledger.items[view.next])):std::wstring(availability(view.next));
+                    text(282,372,line.c_str(),cyan,false,14);
+                }else text(282,327,d.tier?L"Highest tier unlocked":L"Unlocked",RGB(118,235,160),false,14);
+            }
+        }else if(settings_page==42){
+            using namespace ssc_achievements;
+            text(266,111,L"ACHIEVEMENT SOUND",ink,true);
+            button(1981,850,106,236,38,L"< ALL ACHIEVEMENTS");
+            text(282,184,audio::custom?L"Custom sound":L"Campaign item unlock",ink,false,16);
+            button(1995,266,223,260,38,L"CHOOSE AUDIO FILE");
+            button(1996,536,223,216,38,L"PREVIEW SOUND");
+            button(1997,762,223,240,38,L"USE GAME SOUND",false,audio::custom);
+            if(!audio::message.empty())text(282,284,audio::message.c_str(),muted,false,13);
+        }else if(settings_page==43){
+            const auto& sync=ssc_achievements::community_sync;
+            text(266,111,L"ACHIEVEMENT SYNC",ink,true);
+            button(1981,850,106,236,38,L"< ALL ACHIEVEMENTS");
+            text(282,176,ssc_achievements::community::public_scope,muted,false,13);
+            const bool available=ssc_achievements::ready&&sync.loaded&&!sync.busy;
+            button(2990,266,221,268,38,sync.enabled?L"PAUSE SYNC":L"ENABLE SYNC",false,available&&sync.state.empty());
+            const auto label=sync.message.empty()?L"Uses the Steam account open in Skillshot City":sync.message.c_str();
+            text(282,290,label,ink,false,14);
+            if(!sync.state.empty()){
+                button(2991,266,350,268,38,L"OPEN STEAM SIGN-IN");
+                text(550,368,ssc_chat::widen(sync.code).c_str(),cyan,false,16);
+            }else if(!sync.token.empty()){
+                button(2992,266,350,326,38,L"REMOVE SHARED PROGRESS",false,available);
+            }else{
+                button(2993,266,350,326,38,L"CONFIRM STEAM TO REMOVE",false,available);
+            }
+        }else if(settings_page==23){
             auto& r=ssc_auto::current();text(266,111,L"MESSAGE TIMING",ink,true);
             button(584,850,106,236,38,L"< EDIT RULE");
             text(282,180,ssc_chat::widen(r.name).c_str(),cyan);
@@ -1453,14 +1718,14 @@ void paint_panel() {
             text(266,500,bot_color_error?L"Enter 6 or 8 hex digits":L"Applies to overhead names and the scoreboard",bot_color_error?RGB(255,120,100):muted,false,13);
         } else if(settings_page==17){
             text(266,111,L"QUICK MENU",ink,true);
-            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving",L"Flashbang",L"KOS",L"Chat commands",L"Chat speech",L"Random Drafts",L"Chaos Mode"};
+            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving",L"Flashbang",L"KOS",L"Chat commands",L"Chat speech",L"Random Drafts",L"Chaos Mode",L"Achievements"};
             int first=option_list(quick_module_count,7);for(int row=0;row<7&&first+row<quick_module_count;++row){int i=first+row,y=164+row*66;text(282,y+9,names[i]);toggle(2100+i,978,y,(quick_mask&(1u<<i))!=0);}
         } else if(settings_page==-1) {
             text(266,111,L"MODULES",ink,true);
-            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving",L"Flashbang",L"KOS",L"Chat commands",L"Chat speech",L"Random Drafts",L"Chaos Mode"};
-            const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load(),ssc_dark_flash::enabled.load(),ssc_kos::enabled,ssc_commands::router.enabled,ssc_chat_tts::settings.enabled,ssc_challenge::random.enabled,ssc_challenge::chaos.enabled};
-            const int ids[]={80,81,83,86,300,330,588,981,1200,1600,1700,1800,1900,1910},settings[]={91,92,93,94,301,302,585,980,1201,1601,1701,1801,1901,1911};
-            button(1870,550,108,94,36,L"ALL",module_filter==0);button(1871,652,108,120,36,L"ON",module_filter==1);button(1872,780,108,120,36,L"OFF",module_filter==2);std::vector<int> visible;for(int i=0;i<14;++i)if(!module_filter||(module_filter==1)==enabled[i])visible.push_back(i);int first=option_list(int(visible.size()),7);text(266,146,(std::to_wstring(visible.size())+L" modules").c_str(),muted,false,10);for(int row=0;row<7&&first+row<int(visible.size());++row){int i=visible[size_t(first+row)],y=164+row*66;rectangle(266,y,820,60,RGB(16,37,62));text(284,y+15,names[i],ink,true);toggle(ids[i],822,y+9,enabled[i]);button(settings[i],932,y+9,138,36,L"SETTINGS");}
+            const wchar_t* names[]={L"Sound replacer",L"Cosmetics",L"Discord presence",L"HUD editor",L"Custom quick chat",L"Auto messages",L"Freecam",L"Driving",L"Flashbang",L"KOS",L"Chat commands",L"Chat speech",L"Random Drafts",L"Chaos Mode",L"Achievements"};
+            const bool enabled[]={sound_requested,cosmetic_requested,rpc_requested,ssc_hud::enabled,ssc_chat::enabled,ssc_auto::enabled,ssc_freecam::state.active,ssc_vehicle::enabled.load(),ssc_dark_flash::enabled.load(),ssc_kos::enabled,ssc_commands::router.enabled,ssc_chat_tts::settings.enabled,ssc_challenge::random.enabled,ssc_challenge::chaos.enabled,ssc_achievements::enabled};
+            const int ids[]={80,81,83,86,300,330,588,981,1200,1600,1700,1800,1900,1910,1980},settings[]={91,92,93,94,301,302,585,980,1201,1601,1701,1801,1901,1911,1981};
+            button(1870,550,108,94,36,L"ALL",module_filter==0);button(1871,652,108,120,36,L"ON",module_filter==1);button(1872,780,108,120,36,L"OFF",module_filter==2);std::vector<int> visible;for(int i=0;i<quick_module_count-1;++i)if(!module_filter||(module_filter==1)==enabled[i])visible.push_back(i);int first=option_list(int(visible.size()),7);text(266,146,(std::to_wstring(visible.size())+L" modules").c_str(),muted,false,10);for(int row=0;row<7&&first+row<int(visible.size());++row){int i=visible[size_t(first+row)],y=164+row*66;rectangle(266,y,820,60,RGB(16,37,62));text(284,y+15,names[i],ink,true);toggle(ids[i],822,y+9,enabled[i]);button(settings[i],932,y+9,138,36,L"SETTINGS");}
             if(GetTickCount64()<ssc_freecam::notice_until){rectangle(266,636,820,26,RGB(50,37,53));text(276,640,ssc_freecam::entry_status,RGB(255,190,120),false,12);}
         } else if(settings_page==37){
             text(266,111,L"RANDOM DRAFTS",ink,true);toggle(1900,986,106,ssc_challenge::random.enabled);
@@ -1631,12 +1896,27 @@ void paint_panel() {
             text(266,111,L"KOS",ink,true);toggle(1600,986,106,ssc_kos::enabled);
             text(266,170,L"Anonymous players stay unmarked.",muted,false,14);button(1608,800,154,282,40,L"MARK COLOR");
             button(1602,266,207,520,40,ssc_kos::selected.target.player.handle.empty()?L"CURRENT / RECENT PLAYERS":ssc_chat::widen(ssc_kos::selected.target.player.handle).c_str());
-            button(1603,802,207,280,40,ssc_kos::list.marked(ssc_kos::selected.target.player)?L"REMOVE FROM KOS":L"MARK PLAYER",false,ssc_kos::eligible(ssc_kos::selected.target.player));
-            editbox(1605,266,264,460,38,ssc_chat::widen(kos_handle.empty()&&!kos_handle_editing?"Player handle":kos_handle),kos_handle_editing);button(1606,742,264,160,38,L"ADD HANDLE");button(1607,918,264,164,38,L"REMOVE");
-            text(266,322,L"SAVED PLAYERS",muted,false,14);
-            int first=option_list(int(ssc_kos::list.entries().size()),5,312,350,220);for(int row=0;row<5&&first+row<int(ssc_kos::list.entries().size());++row){const auto& entry=ssc_kos::list.entries()[size_t(first+row)];rectangle(266,350+row*44,820,38,RGB(16,37,62));text(282,358+row*44,ssc_chat::widen(entry.handle).c_str(),RGB((ssc_kos::color_rgb>>16)&255,(ssc_kos::color_rgb>>8)&255,ssc_kos::color_rgb&255),false,18);button(1620+row,920,353+row*44,150,32,L"REMOVE");}
+            button(1603,802,207,280,40,L"ADD MARK",false,ssc_kos::eligible(ssc_kos::selected.target.player));
+            editbox(1605,266,264,460,38,ssc_chat::widen(kos_handle.empty()&&!kos_handle_editing?"Player handle":kos_handle),kos_handle_editing);button(1606,742,264,160,38,L"ADD MARK");button(1607,918,264,164,38,L"REMOVE");
+            text(266,322,L"SAVED PLAYERS",muted,false,14);text(746,322,L"KILLS LEFT",muted,false,14);
+            int first=option_list(int(ssc_kos::list.entries().size()),5,312,350,220);
+            for(int row=0;row<5&&first+row<int(ssc_kos::list.entries().size());++row){
+                const auto& entry=ssc_kos::list.entries()[size_t(first+row)];
+                const int y=350+row*44;
+                auto name=ssc_chat::widen(entry.handle);
+                if(text_width(name.c_str(),18)>454){
+                    while(!name.empty()&&text_width((name+L"...").c_str(),18)>454)name.pop_back();
+                    name+=L"...";
+                }
+                const auto count=L"x"+std::to_wstring(entry.marks);
+                rectangle(266,y,820,38,RGB(16,37,62));
+                text(282,y+8,name.c_str(),RGB((ssc_kos::color_rgb>>16)&255,(ssc_kos::color_rgb>>8)&255,ssc_kos::color_rgb&255),false,18);
+                text(int(840-text_width(count.c_str(),16)),y+8,count.c_str(),muted,false,16);
+                button(1630+row,852,y+3,60,32,L"+1",false,entry.marks<ssc_kos::List::max_marks);
+                button(1620+row,920,y+3,150,32,L"REMOVE");
+            }
             text(266,594,!kos_status.empty()?kos_status.c_str():ssc_kos::saved?L"Saved locally":L"Could not save KOS list",muted,false,13);
-            text(266,646,ssc_planned_native::kos?L"/kos NAME toggles marking     /kos list shows saved names":L"Unavailable on this game build",muted,false,13);
+            text(266,646,!ssc_planned_native::kos?L"Unavailable on this game build":ssc_kos::kill_tracking_supported?L"/kos NAME toggles     /kos NAME 3 sets three kills":L"Automatic kill tracking unavailable on this game build",muted,false,13);
         } else if(settings_page==33) {
             text(266,111,L"LOCAL CHAT COMMANDS",ink,true);toggle(1700,986,106,ssc_commands::router.enabled);
             text(266,165,L"LOCAL SENDER",muted,false,15);editbox(1705,650,152,432,38,ssc_chat::widen(command_sender_editing?command_sender_buffer:ssc_commands::sender_name),command_sender_editing);
@@ -1930,7 +2210,7 @@ void paint_panel() {
             text(266,605,L"Unofficial mod client. Not affiliated with the game developer.",muted,false,14);
 
         }
-        rectangle(20,669,1080,1,RGB(38,65,101));if(save_failed)text(28,687,L"Could not save settings",RGB(247,191,83));
+        rectangle(20,manager_footer_top,1080,1,RGB(38,65,101));if(save_failed)text(28,687,L"Could not save settings",RGB(247,191,83));
         if(settings_page==31||settings_page==35||settings_page==36||settings_page==39)button(1890,266,677,320,34,settings_page==31?L"< COLORS":settings_page==35?L"< CHAT SPEECH":settings_page==39?L"< CHAOS":L"< SOUNDS");
         button(5,862,677,226,34,L"<  QUICK MENU");
     }
@@ -1983,7 +2263,7 @@ void paint_panel() {
 void paint_live_hud_toolbar(){
  prepare_canvas();if(!pixels)return;std::memset(pixels,0,raster_w*raster_h*4);controls.clear();edit_visuals.clear();rectangle(0,0,panel_w,panel_h,RGB(12,30,50));
  wchar_t label[128];const auto& a=ssc_hud::items[ssc_hud::selected];swprintf(label,128,L"%ls  %d%%",a.name,int(std::lround(a.scale*100)));text(12,10,label,cyan,false,16);
- text(12,42,L"Drag / wheel resize / Tab select / Esc done",muted,false,12);
+ text(12,42,ssc_hud::selected==ssc_hud::achievement_popup?L"Drag to move / Wheel or drag corner to resize / Esc done":L"Drag / wheel resize / Tab select / Esc done",muted,false,12);
  button(144,386,8,34,28,L"<");button(145,428,8,34,28,L">");button(148,474,8,168,28,L"RESET ITEM");button(147,654,8,94,28,L"DONE");finish_canvas();
 }
 void layout_panel(int width,int height) {

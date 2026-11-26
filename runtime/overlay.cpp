@@ -48,6 +48,8 @@
 #include "loading_tips.h"
 #include "render_dispatch.h"
 #include "planned_module_settings.h"
+#include "kos_kill_tracking.h"
+#include "achievement_notice.h"
 
 namespace {
 bool native_supported=false;
@@ -92,8 +94,87 @@ void upload_canvas_texture() {
         allocated_texture=texture;allocated_w=raster_w;allocated_h=raster_h;
     }else glTexSubImage2D(GL_TEXTURE_2D,0,0,0,raster_w,raster_h,0x80E1,GL_UNSIGNED_BYTE,pixels);
 }
+void sample_performance(HWND window,ULONGLONG now){
+    auto& recorder=ssc_record::state();
+    static ssc_perf::FrameWindow sample;
+    static ULONGLONG window_started=0,match_started=0;
+    static double prior_frame_at=0;
+    static bool prior_focus=false,prior_menu=false;
+    static unsigned dropped_at=0;
+
+    const bool enabled=recorder.enabled&&recorder.match_open;
+    if(!enabled&&!ssc_perf::recording)return;
+    const unsigned dropped=recorder.dropped.load();
+    if(!enabled||!ssc_perf::recording||match_started!=recorder.match_started){
+        sample={};
+        prior_frame_at=0;
+        window_started=now;
+        match_started=recorder.match_started;
+        dropped_at=dropped;
+    }
+    ssc_perf::recording=enabled;
+    if(!enabled)return;
+
+    const double frame_at=ssc_perf::clock_ms();
+    if(prior_frame_at)
+        sample.add(frame_at-prior_frame_at,prior_focus,prior_menu,ssc_perf::milliseconds,ssc_perf::calls,ssc_perf::overlay_times,now);
+    ssc_perf::milliseconds.fill(0);
+    ssc_perf::calls.fill(0);
+    ssc_perf::overlay_times.fill(0);
+    prior_frame_at=frame_at;
+    prior_focus=GetForegroundWindow()==window;
+    prior_menu=opened;
+    if(!sample.frames||now-window_started<10000)return;
+
+    ssc_perf::Scope emission(ssc_perf::diagnostics_emit);
+    RECT client{};
+    GetClientRect(window,&client);
+    const auto& phase=sample.phase_ms;
+    const auto named_phases=[](const ssc_perf::OverlayTimes& values){
+        auto result=ssc_record::Json::object();
+        for(size_t i=0;i<values.size();++i)if(values[i]>0)result[ssc_perf::overlay_phase_names[i]]=values[i];
+        return result;
+    };
+    const auto describe_frames=[&](const auto& frames){
+        auto result=ssc_record::Json::array();
+        for(const auto& slow:frames){
+            if(!slow.frame_ms)break;
+            result.push_back({{"frame_ms",slow.frame_ms},{"overlay_ms",slow.overlay_ms},
+                {"native_present_ms",slow.present_ms},{"shared_lookup_ms",slow.sharing_ms},
+                {"native_draft_ms",slow.draft_ms},{"overlay_graphics_ms",slow.graphics_ms},
+                {"focused",slow.focused},{"menu_open",slow.menu_open},
+                {"ended_tick_ms",slow.ended_tick_ms},{"diagnostics_emit_ms",slow.diagnostics_ms},
+                {"overlay_phase_ms",named_phases(slow.overlay_phases)}});
+        }
+        return result;
+    };
+    ssc_record::diagnostic({
+        {"event","performance_sample"},{"timing_schema",2},{"window_ms",now-window_started},
+        {"frames",sample.frames},{"focused_frames",sample.focused_frames},{"menu_frames",sample.menu_frames},
+        {"average_fps",1000*sample.frames/sample.sum_ms},{"mean_frame_ms",sample.sum_ms/sample.frames},
+        {"frame_p50_ms",sample.percentile(50)},{"frame_p95_ms",sample.percentile(95)},
+        {"frame_p99_ms",sample.percentile(99)},{"max_frame_ms",sample.max_ms},
+        {"frames_over_16_67ms",sample.over_16ms},{"frames_over_25ms",sample.over_25ms},
+        {"frames_over_33ms",sample.over_33ms},{"frames_over_50ms",sample.over_50ms},
+        {"frames_over_100ms",sample.over_100ms},{"slowest_frames",describe_frames(sample.slowest)},
+        {"overlay_detail_version",1},{"sample_tick_ms",now},
+        {"slowest_overlay_frames",describe_frames(sample.slowest_overlay)},
+        {"overlay_phase_ms",named_phases(sample.overlay_phase_ms)},{"diagnostics_emit_ms",phase[ssc_perf::diagnostics_emit]},
+        {"mod_overlay_ms",phase[ssc_perf::overlay]},{"native_present_ms",phase[ssc_perf::present]},
+        {"overlay_graphics_ms",phase[ssc_perf::overlay_gl]},{"advisor_prepare_ms",phase[ssc_perf::advisor]},{"shared_lookup_ms",phase[ssc_perf::sharing]},
+        {"kos_tracking_ms",phase[ssc_perf::kos]},{"achievements_ms",phase[ssc_perf::achievements]},
+        {"match_tracker_ms",phase[ssc_perf::tracker]},{"native_draft_ms",phase[ssc_perf::draft]},
+        {"timed_calls",sample.phase_calls},{"recorder_drops",dropped>=dropped_at?dropped-dropped_at:dropped},
+        {"client_width",client.right-client.left},{"client_height",client.bottom-client.top},
+        {"focused",prior_focus},{"menu_open",prior_menu},{"advisor_attached",ssc_advisor::attached},
+        {"advisor_enabled",ssc_advisor::enabled},{"shared_receive",shared_receive},{"shared_publish",shared_publish},
+        {"random_drafts",ssc_challenge::random.enabled},{"blind_drafts",ssc_challenge::blind()}
+    });
+    sample={};
+    window_started=now;
+    dropped_at=dropped;
+}
 void render(HDC dc) {
-    ssc_perf::Scope timing(ssc_perf::overlay);
     HWND window=WindowFromDC(dc); HGLRC context=wglGetCurrentContext();
     if(!window||!context) return;
     const float native_flash=ssc_dark_flash::take_intensity(context);
@@ -105,31 +186,31 @@ void render(HDC dc) {
         previous_proc=reinterpret_cast<WNDPROC>(old);game_window=window;log("Render and input attached; menu key configurable in Interface");
     }
     ULONGLONG now=GetTickCount64();float seconds=last_frame?float(now-last_frame)/1000.f:0.f;last_frame=now;
-    static double precise_frame_at=0;const double precise_now=ssc_perf::clock_ms();const double frame_seconds=precise_frame_at?(precise_now-precise_frame_at)/1000.0:0;precise_frame_at=precise_now;
-    static ULONGLONG performance_at=0;static unsigned performance_frames=0,slow_frames=0;static double frame_sum=0,frame_max=0;
-    if(!ssc_record::state().enabled||!ssc_record::state().match_open){performance_at=now;performance_frames=slow_frames=0;frame_sum=frame_max=0;ssc_perf::milliseconds.fill(0);ssc_perf::calls.fill(0);}
-    else if(frame_seconds>0){
-      ++performance_frames;frame_sum+=frame_seconds;frame_max=std::max(frame_max,frame_seconds);if(frame_seconds>.033333)++slow_frames;
-      if(now-performance_at>=10000){
-        ssc_record::diagnostic({{"event","performance_sample"},{"mod_overlay_ms",ssc_perf::milliseconds[ssc_perf::overlay]},{"advisor_prepare_ms",ssc_perf::milliseconds[ssc_perf::advisor]},{"shared_lookup_ms",ssc_perf::milliseconds[ssc_perf::sharing]},{"timed_calls",ssc_perf::calls},{"frames",performance_frames},{"window_ms",now-performance_at},{"average_fps",performance_frames/frame_sum},{"mean_frame_ms",1000*frame_sum/performance_frames},{"max_frame_ms",1000*frame_max},{"frames_over_33ms",slow_frames},{"focused",GetForegroundWindow()==game_window},{"menu_open",opened},{"advisor_attached",ssc_advisor::attached},{"advisor_enabled",ssc_advisor::enabled},{"shared_receive",shared_receive},{"shared_publish",shared_publish}});
-        performance_at=now;performance_frames=slow_frames=0;frame_sum=frame_max=0;ssc_perf::milliseconds.fill(0);ssc_perf::calls.fill(0);
-      }
-    }
+    if(window==game_window)sample_performance(window,now);
+    using ssc_perf::OverlayPhase;
+    ssc_perf::OverlayTimer timing(window==game_window);
     if(presence_supported)ssc_sound::tick_music_apply();
     static bool music_was_busy=false;if(music_was_busy!=ssc_sound::music_busy.load()){music_was_busy=ssc_sound::music_busy.load();dirty=true;}
+    timing.mark(OverlayPhase::chat_speech);
     ssc_chat_tts::tick(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),now);
+    timing.mark(OverlayPhase::kos);
     ssc_kos::tick_recent(now);
+    if(ssc_kos::tick_kills(now))dirty=true;
+    timing.mark(OverlayPhase::privacy);
     static uint64_t command_revision=0;if(command_revision!=ssc_commands::revision){command_revision=ssc_commands::revision;dirty=true;}
     static uint64_t anonymous_at=0;if(!anonymous_at||now-anonymous_at>=100){anonymous_at=now;ssc_privacy::lobby=ssc_privacy::lobby_anonymity(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),ssc_compat::supports(4)&&ssc_planned_native::kos,[](uintptr_t p,auto& v){return ssc_names::read(p,v);});}
     const bool privacy=ssc_privacy::blocked();
     static bool prior_privacy=false;if(privacy!=prior_privacy){prior_privacy=privacy;dirty=true;ssc_auto::engine.reset();save();}
+    timing.mark(OverlayPhase::private_access);
     const auto private_view=ssc_auth::service().view();
     ssc_names::begin_render_frame(shared_receive&&!privacy,ssc_names::attached&&ssc_names::bot_layout&&private_view.active);
     static ULONGLONG auth_start_at=0;
     if(now-auth_start_at>=1000){auth_start_at=now;ssc_auth::service().start();}
-    static ULONGLONG shared_at=0;static uint64_t shared_privacy=0;
+    timing.mark(OverlayPhase::shared_cosmetics);
+    static ULONGLONG shared_at=0,shared_retry_at=0;static uint64_t shared_privacy=0;
     const auto privacy_revision=ssc_privacy::generation.load();
-    if(now-shared_at>=1000||shared_privacy!=privacy_revision){shared_at=now;shared_privacy=privacy_revision;
+    ssc_names::refresh_shared_accounts(now,shared_receive&&!privacy,privacy_revision);
+    if(now>=shared_retry_at&&(now-shared_at>=1000||shared_privacy!=privacy_revision)){
       std::string own;if(ssc_names::attached)ssc_names::account_string(ssc_names::image_base+ssc_compat::resolve(0xe091e8),own);
       ssc_shared::Style appearance;appearance.mode=ssc_names::gradient?ssc_shared::Mode::gradient:ssc_names::rainbow?ssc_shared::Mode::rainbow:ssc_shared::Mode::solid;
       appearance.count=ssc_names::gradient?unsigned(std::clamp(ssc_names::gradient_count,2,3)):ssc_names::rainbow?0:1;
@@ -137,10 +218,17 @@ void render(HDC dc) {
       ssc_cosmetic_access::refresh(own,now);
       ssc_shared::Style permitted;const bool can_share=ssc_cosmetic_access::publication(ssc_cosmetic_access::current,appearance,ssc_names::solid_rgb,permitted);
       if(can_share)appearance=permitted;
-      ssc_shared::service().update(own,shared_receive?ssc_names::shared_accounts():std::vector<std::string>{},appearance,shared_receive&&ssc_names::attached,shared_publish&&!privacy&&ssc_names::cosmetics.load()&&can_share);
+      if(ssc_shared::service().update(own,shared_receive?ssc_names::shared_accounts():std::vector<std::string>{},
+                                    appearance,shared_receive&&ssc_names::attached,
+                                    shared_publish&&!privacy&&ssc_names::cosmetics.load()&&can_share,true)){
+        shared_at=now;
+        shared_privacy=privacy_revision;
+      }
+      shared_retry_at=now+50;
       if(settings_page==22||cosmetics_popup)dirty=true;
     }
     ssc_names::refresh_shared_labels(now,shared_receive||ssc_names::render_private_active());
+    timing.mark(OverlayPhase::private_access);
     static uint64_t private_cleared=0;auto cleared=private_view.cleared;if(cleared!=private_cleared){private_cleared=cleared;ssc_auth::license::wipe(private_code);private_editing=false;dirty=true;}
     static auto private_last=ssc_auth::license::State::idle;auto private_state=private_view.state;if(private_state!=private_last){private_last=private_state;if(settings_page==19)dirty=true;}
     static bool private_was_visible=false;
@@ -148,15 +236,17 @@ void render(HDC dc) {
     if(private_visible!=private_was_visible){private_was_visible=private_visible;dirty=true;controls.clear();pressed=hovered=keyboard_focus=0;if(!private_visible&&settings_page==18)show_manager(-1);}
     static ULONGLONG diagnostics_at=0;
     if(developer_tools&&now-diagnostics_at>15000){diagnostics_at=now;char report[160];snprintf(report,sizeof(report),"Draw diagnostics: rainbow=%u audio=%u",ssc_names::cosmetic_draws.load(),ssc_sound::substituted.load());log(report);}
-    ssc_auto::tick(now,ssc_record::state().enabled||ssc_challenge::random.enabled||ssc_challenge::chaos.enabled||ssc_challenge::blind());
+    timing.mark(OverlayPhase::game_tracking);
+    ssc_auto::tick(now,ssc_record::state().enabled||ssc_challenge::random.enabled||ssc_challenge::chaos.enabled||ssc_challenge::blind(),ssc_achievements::enabled);
+    timing.mark(OverlayPhase::challenges);
     ssc_challenge::tick(now,opened||ssc_hud::editing);
     ssc_mirror::tick(now,ssc_challenge::active()&&ssc_challenge::chaos.effects[8]&&GetForegroundWindow()==window);
+    timing.mark(OverlayPhase::achievements);
+    ssc_achievements::tick(now,presence_supported,ssc_render::dispatch.pixel_supported());
+    timing.mark(OverlayPhase::match_review);
     const auto& pg=ssc_auto::tracking_observation;
     if(presence_supported&&rpc_preview.phase==1&&!pg.connected)ssc_challenge::blind_locked=false;
-    ssc_blind::RoundView blind_view;
-    if(ssc_challenge::attached&&ssc_challenge::random.blind&&(ssc_challenge::random.enabled||ssc_challenge::blind_locked))
-        blind_view=ssc_blind::current_round(ssc_challenge::game);
-    const bool board_drawn=ssc_blind::scoreboard_drawn;ssc_blind::scoreboard_drawn=false;
+    ssc_blind::scoreboard_drawn=false;
     const bool pg_fresh=ssc_auto::tracking_at&&now>=ssc_auto::tracking_at&&now-ssc_auto::tracking_at<=500;
     ssc_postgame_live::state.observe(pg.session,pg_fresh&&pg.valid,pg.active,pg.ending,pg.preparing,pg.round,pg.last_round);
     if(postgame_visible()&&(ssc_challenge::blind()||(!ssc_postgame_live::state.eligible&&rpc_preview.phase!=1)))close_menu(true);
@@ -179,12 +269,16 @@ void render(HDC dc) {
     }
     // Open the asynchronous recording before the first build observation;
     // leave round/match closure until after its final snapshot is appended.
+    timing.mark(OverlayPhase::recorder);
     if(pg.active)ssc_record::track_observation(now);
+    timing.mark(OverlayPhase::training);
     ssc_training::tick(now,state_dir);
+    timing.mark(OverlayPhase::match_review);
 
     refresh_postgame_history();
     static unsigned analysis_revision=0;static std::string analysis_match_seen;auto analysis_now=ssc_review_online::revision.load();if(analysis_now!=analysis_revision||analysis_match_seen!=ssc_postgame_live::state.match_id){analysis_revision=analysis_now;analysis_match_seen=ssc_postgame_live::state.match_id;if(ssc_review_online::requested||analysis_now){auto answer=ssc_review_online::client().snapshot(analysis_match_seen);postgame_analysis_match=answer->match;postgame_analysis_status=answer->status;postgame_analysis_message=answer->message;postgame_analysis=answer->report;}else{postgame_analysis=nullptr;postgame_analysis_match.clear();}if(postgame_visible())dirty=true;}
     if(postgame_visible()&&animations&&postgame_score_started&&now>=postgame_score_started&&now-postgame_score_started<1000)dirty=true;
+    timing.mark(OverlayPhase::camera);
     // Live advisor retired; recording collection remains separately gated.
     if(rpc_preview.phase==1)ssc_freecam::stop();
     bool was_freecam=ssc_freecam::state.active;auto pending_freecam=ssc_freecam::pending_since;
@@ -192,9 +286,12 @@ void render(HDC dc) {
     if(!was_freecam&&ssc_freecam::state.active)finish_freecam_entry();
     if(pending_freecam!=ssc_freecam::pending_since)dirty=true;
     ssc_vehicle::blocked=opened||ssc_freecam::state.active||GetForegroundWindow()!=game_window;
+    timing.mark(OverlayPhase::recorder);
     if(!pg.active)ssc_record::track_observation(now);
+    timing.mark(OverlayPhase::presence);
     static ULONGLONG presence_at=0;
-    if(now-presence_at>=1000){presence_at=now;rpc_preview=presence_supported?ssc_rpc::sample_steam(rpc_rating):ssc_rpc::Snapshot{};static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);refresh_dynamic_panel(now,true);if(ssc_record::state().enabled){auto observed=presence_supported?ssc_rpc::native_fallback(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_rpc::Snapshot{};ssc_record::sample(observed.phase,observed.details,observed.state,now,observed.phase==2?ssc_record::sample_local_build(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_record::Json(nullptr));if(opened&&manager&&settings_page==12)dirty=true;}}
+    if(now-presence_at>=1000){presence_at=now;rpc_preview=presence_supported?ssc_rpc::sample_steam(rpc_rating):ssc_rpc::Snapshot{};static int source_phase=-1;if(source_phase!=rpc_preview.phase){source_phase=rpc_preview.phase;log(source_phase==0?"RPC source: game status unavailable":source_phase==1?"RPC source: verified main menu":"RPC source: verified game session");}ssc_rpc::submit(rpc_requested&&presence_supported,rpc_id,rpc_timer,rpc_preview);refresh_dynamic_panel(now,true);if(ssc_record::state().enabled){timing.mark(OverlayPhase::recorder);auto observed=presence_supported?ssc_rpc::native_fallback(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_rpc::Snapshot{};ssc_record::sample(observed.phase,observed.details,observed.state,now,observed.phase==2?ssc_record::sample_local_build(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))):ssc_record::Json(nullptr));if(opened&&manager&&settings_page==12)dirty=true;}}
+    timing.mark(OverlayPhase::updater);
     static ULONGLONG update_at=0;
     if(now-update_at>=1000){update_at=now;
         if(presence_supported&&rpc_preview.phase==1&&!welcome_seen&&!opened){opened=true;show_manager(8);}
@@ -205,20 +302,35 @@ void render(HDC dc) {
         if(rpc_preview.phase==2&&opened&&(update_popup||cosmetics_popup||(manager&&settings_page==7)))close_menu(true);
         if(ssc_update::notification_due(!presence_supported||rpc_preview.phase!=2)&&!opened){ssc_update::notified=true;manager=false;update_popup=true;opened=true;dirty=true;}
     }
-    RECT hud_client{};GetClientRect(window,&hud_client);ssc_kos::client_width=hud_client.right;ssc_kos::client_height=hud_client.bottom;if(!ssc_kos::enabled||!ssc_kos::tab_held())ssc_kos::rows.clear();ssc_chat::chat_viewport_width=float(hud_client.right);if(ssc_hud::finish_frame(hud_client.right,hud_client.bottom,now)&&ssc_hud::editing)dirty=true;
+    timing.mark(OverlayPhase::hud);
+    RECT hud_client{};GetClientRect(window,&hud_client);ssc_achievements::update_popup_bounds(hud_client.right,hud_client.bottom);ssc_kos::client_width=hud_client.right;ssc_kos::client_height=hud_client.bottom;if(!ssc_kos::enabled||!ssc_kos::tab_held())ssc_kos::rows.clear();if(window==game_window){ssc_chat::chat_viewport_width=float(hud_client.right-hud_client.left);ssc_chat::chat_viewport_dc=dc;}if(ssc_hud::finish_frame(hud_client.right,hud_client.bottom,now)&&ssc_hud::editing)dirty=true;
     if(opened&&manager&&settings_page==11&&ssc_lab::duel_animating()){ssc_lab::advance_duel(seconds);static ULONGLONG duel_paint_at=0;if(now-duel_paint_at>=16||!ssc_lab::duel_animating()){duel_paint_at=now;dirty=true;}}
     poll_live_hud_drag(window);
     advance_animation(seconds);
+    timing.mark(OverlayPhase::chat_completion);
     auto command_popup=ssc_commands::completion_popup(hud_client.right,hud_client.bottom);const auto& command_completions=command_popup.items;
     bool command_notice=!command_completions.empty();
-    static std::string command_layout;std::string command_stamp;for(const auto& item:command_completions)command_stamp+=item.text+"\n";command_stamp+=std::to_string(command_popup.selected);command_stamp+=std::to_string(command_popup.anchor.x)+":"+std::to_string(command_popup.anchor.y)+":"+std::to_string(hud_client.right)+":"+std::to_string(hud_client.bottom);if(command_stamp!=command_layout){command_layout=std::move(command_stamp);dirty=true;}
+    static std::string command_layout;
+    if(command_notice){
+        std::string command_stamp;
+        for(const auto& item:command_completions)command_stamp+=item.text+"\n";
+        command_stamp+=std::to_string(command_popup.selected)+":"+std::to_string(command_popup.anchor.x)
+            +":"+std::to_string(command_popup.anchor.y)+":"+std::to_string(hud_client.right)+":"+std::to_string(hud_client.bottom);
+        if(command_stamp!=command_layout){command_layout=std::move(command_stamp);dirty=true;}
+    }else if(!command_layout.empty()){
+        command_layout.clear();
+        dirty=true;
+    }
+    bool achievement_notice=ssc_achievements::engine.has_notice();
     bool freecam_notice=now<ssc_freecam::notice_until||command_notice;
-    bool advisor_border=ssc_advisor::border_ready()||ssc_advisor::stim_ready();
+    const bool blind=ssc_challenge::blind();
+    bool advisor_border=!blind&&(ssc_advisor::border_ready()||ssc_advisor::stim_ready());
     if(!advisor_border||opened){ssc_advisor::border.pending=false;ssc_advisor::stim_border.pending=false;}
-    if(!flash_picture&&!ssc_challenge::blind()&&!freecam_notice&&!opened&&visibility==0.f&&ssc_freecam::state.active&&(ssc_freecam::hide_hud||ssc_freecam::hide_all_gui))return;
-    if(window!=game_window||(!opened&&visibility==0.f&&modal_visibility==0.f&&!clock_enabled&&!freecam_notice&&!advisor_border&&!ssc_challenge::active()&&!ssc_challenge::blind()&&!flash_picture))return;
-    RECT client;GetClientRect(window,&client);int width=client.right,height=client.bottom;
+    if(!achievement_notice&&!flash_picture&&!freecam_notice&&!opened&&visibility==0.f&&ssc_freecam::state.active&&(ssc_freecam::hide_hud||ssc_freecam::hide_all_gui))return;
+    if(window!=game_window||(!opened&&visibility==0.f&&modal_visibility==0.f&&!clock_enabled&&!freecam_notice&&!advisor_border&&!ssc_challenge::active()&&!flash_picture&&!achievement_notice))return;
+    int width=hud_client.right,height=hud_client.bottom;
     if(width<=0||height<=0)return;
+    timing.mark(OverlayPhase::graphics);
     layout_panel(width,height);
     if(!owner_context) owner_context=context;
     if(context!=owner_context) return; // Never reuse texture IDs across GL contexts.
@@ -254,15 +366,8 @@ void render(HDC dc) {
     glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     if(ssc_challenge::active()&&ssc_challenge::chaos.effects[7])ssc_render::pixelation.apply(graphics,width,height);
     ssc_challenge::draw_chaos(width,height);
-    if(ssc_challenge::blind()){
-        unsigned char actor_panel=0,global_panel=0;
-        if(pg.valid&&pg.actor)ssc_names::read(pg.actor+0x26a9,actor_panel);
-        ssc_names::read(ssc_challenge::game+0xfb75f0,global_panel);
-        ssc_blind::draw(width,height,actor_panel||global_panel||(GetAsyncKeyState(VK_CONTROL)&0x8000),
-                        board_drawn||ssc_kos::tab_held(),blind_view.intermission);
-    }else{
-        ssc_advisor::render_border();ssc_advisor::render_stim(width,height);
-    }
+    // Blind Drafts concealment is handled by the native HUD hooks.
+    if(!blind){ssc_advisor::render_border();ssc_advisor::render_stim(width,height);}
     const float opacity=ease(visibility);
     if(modal_visibility>0.f&&!ssc_hud::editing) {
         glDisable(GL_TEXTURE_2D);glColor4f(.01f,.03f,.07f,.45f*ease(modal_visibility));
@@ -321,6 +426,7 @@ void render(HDC dc) {
         glBegin(GL_QUADS);glTexCoord2f(0,pv0);glVertex2f(popup.x,popup.y);glTexCoord2f(pu,pv0);glVertex2f(popup.x+popup.width,popup.y);glTexCoord2f(pu,pv1);glVertex2f(popup.x+popup.width,popup.y+popup.height);glTexCoord2f(0,pv1);glVertex2f(popup.x,popup.y+popup.height);glEnd();
     }
     }
+    ssc_achievements::draw_notice(width,height,now,flash_picture||native_flash>0);
     if(flash_picture)ssc_flash_image::draw_final(width,height,native_flash);
     glMatrixMode(GL_TEXTURE);glPopMatrix();glMatrixMode(GL_MODELVIEW);glPopMatrix();glMatrixMode(GL_PROJECTION);glPopMatrix();glMatrixMode(mode);
     glPopClientAttrib();glPopAttrib();
@@ -337,7 +443,9 @@ BOOL WINAPI swap_hook(HDC dc) {
     }
     int capture_result=ssc_freecam::capture::writer().result.exchange(0);
     if(capture_result)ssc_freecam::reject(GetTickCount64(),capture_result>0?L"Location capture saved in captures.":L"Capture could not be saved. Check disk space.");
-    render(dc);return original_swap(dc);
+    render(dc);
+    ssc_perf::Scope present_timing(ssc_perf::present,ssc_perf::recording&&WindowFromDC(dc)==game_window);
+    return original_swap(dc);
 }
 void log_game_build() {
     wchar_t path[32768];if(!GetModuleFileNameW(nullptr,path,32768))return;
@@ -402,6 +510,14 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     log(ssc_privacy::initialize_native(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))?"Anonymous setting detector validated":"Anonymous setting detector unavailable; privacy defaults protected");
     if(!supported){native_supported=false;log("Unsupported executable; runtime inactive");ssc_update::notify_without_overlay();return;}
     ssc_planned_native::initialize(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)));
+    log(ssc_kos::attach_kill_tracking()?"KOS kill tracking attached":"KOS kill tracking unavailable: native guards");
+    log(ssc_achievements::airborne::attach()?"Airborne knife tracking attached":"Airborne knife tracking unavailable: native guards");
+    ssc_achievements::native_events::attach();
+    ssc_achievements::account_stats::attach();
+    log(ssc_achievements::account_stats::profile_supported&&ssc_achievements::account_stats::xp_supported&&ssc_achievements::account_stats::cash_supported?"Achievement Account Statistics and gains attached":"Achievement Account Statistics or gains unavailable");
+    log(ssc_achievements::native_events::death_attached?"Achievement death timing attached":"Achievement death timing unavailable");
+    log(ssc_achievements::native_events::award_attached?"Multiplayer bullet award attached":"Multiplayer bullet award unavailable");
+    log(ssc_achievements::jumps::attach()?"Jump milestone tracking attached":"Jump milestone tracking unavailable: native guards");
     presence_supported=(supported&4)!=0;native_supported=true;
     log((supported&8)?"Weapon Lab definitions supported":"Weapon Lab unavailable on this game version");
     char result[128];std::snprintf(result,sizeof(result),"Compatibility: cosmetics=%d HUD=%d presence=%d scan=%llums",int((supported&1)!=0),int((supported&2)!=0),int(presence_supported),static_cast<unsigned long long>(GetTickCount64()-started));log(result);
@@ -417,7 +533,7 @@ extern "C" __declspec(dllexport) void WINAPI SscModInitialize() {
     ssc_names::attached=ssc_names::attach();ssc_names::validate_bot_layout();log(ssc_names::bot_layout?"Private module compatibility supported":"Private module unavailable: native compatibility check failed");log(ssc_names::attached?"Tab and overhead name adapters attached":"Name adapters unavailable");
     try {
         wchar_t executable[32768];DWORD length=GetModuleFileNameW(nullptr,executable,32768);
-        if(length&&length<32768){ssc_sound::initialize(std::filesystem::path(executable).parent_path(),state_dir,sound_requested);ssc_sound::attached=attach_sound();log(ssc_music::attach()?"Music file adapter attached":"Music file adapter unavailable");log(ssc_sound::attached?"Audio buffer adapter attached (WAV effects / OGG music; restart applies changes)":"Audio adapter unavailable");}
+        if(length&&length<32768){const auto game_root=std::filesystem::path(executable).parent_path();ssc_achievements::audio::prepare_default(game_root/L"data"/L"sounds"/ssc_achievements::audio::default_name,state_dir);ssc_sound::initialize(game_root,state_dir,sound_requested);ssc_sound::attached=attach_sound();log(ssc_music::attach()?"Music file adapter attached":"Music file adapter unavailable");log(ssc_sound::attached?"Audio buffer adapter attached (WAV effects / OGG music; restart applies changes)":"Audio adapter unavailable");}
     }catch(const std::exception&){log("Sound catalog unavailable; originals preserved");}
     ssc_advisor::attached=ssc_advisor::attach();log(ssc_advisor::attached?"Post-game recording adapter validated":"Post-game recording adapter unavailable");
     ssc_challenge::input_supported=ssc_mirror::attach();log(ssc_challenge::input_supported?"Mirrored on-foot movement attached":"Mirrored movement unavailable: native guards");

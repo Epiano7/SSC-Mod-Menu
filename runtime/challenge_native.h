@@ -9,12 +9,18 @@
 #include "draft_choice_guards.h"
 #include "silent_reroll.h"
 #include "silent_draft_guards.h"
+#include "performance_metrics.h"
 namespace ssc_challenge {
 inline uintptr_t game=0;inline bool selecting=false,in_session=false;
 using Buy=bool(*)(uintptr_t,int,uintptr_t,int,unsigned char,unsigned char,unsigned char,int,unsigned char);
 using Action=bool(*)(uintptr_t,int,unsigned char,unsigned char);
 using CanAct=bool(*)(uintptr_t);inline CanAct native_can_act=nullptr;
 using MutationCost=int(*)(uintptr_t,int);using MutationBlocked=bool(*)();using IsMutated=bool(*)(uintptr_t,int);
+using StimRank=int(*)(uintptr_t,int);using StimRarity=int(*)(uintptr_t,int,int);
+using AddProfileMutation=void(*)(uintptr_t,const int*);
+using RecordStimBonus=void(*)(uintptr_t,int,int);
+inline StimRank native_stim_rank=nullptr;inline StimRarity native_stim_rarity=nullptr;
+inline AddProfileMutation native_add_mutation=nullptr;inline RecordStimBonus native_record_stim_bonus=nullptr;
 inline MutationCost native_mutation_cost=nullptr;inline MutationBlocked native_mutation_blocked=nullptr;inline IsMutated native_is_mutated=nullptr;inline bool choices_supported=false;
 using Reroll=bool(*)(uintptr_t,unsigned char,unsigned char);inline Reroll native_reroll=nullptr;inline bool reroll_supported=false;
 struct RerollPanel {uintptr_t actor=0,world=0;int points=0,generation=-1;uint64_t at=0;bool available=false;};inline RerollPanel reroll_panel;
@@ -63,7 +69,7 @@ inline bool skill_commit_ready(uintptr_t actor){int index=-1,old=-2;if(!native_c
 inline bool profile_submission_ready(uintptr_t actor){if(!native_submit)return true;int kind=-1;float timer=0;unsigned char blocked=2;return ssc_names::read(actor+0x7dc,kind)&&kind>=0&&kind<=1&&ssc_names::read(actor+0x88,timer)&&std::isfinite(timer)&&ssc_names::read(actor+0x84,blocked)&&blocked==0&&(kind!=0||timer<0);}
 inline int last_commit_result=-1;
 inline bool commit_skill(uintptr_t actor){if(native_submit){uintptr_t current=0;if(!panel_context||!ssc_names::read(panel_context,current)||current!=actor||!profile_submission_ready(actor)){last_commit_result=0;return false;}native_submit(panel_context);last_commit_result=1;return true;}bool deferred=false;if(!deferred_skill_mode(deferred)){last_commit_result=0;return false;}if(deferred){int pending=-2;const bool ready=ssc_names::read(actor+0x1300,pending)&&pending==-1;const bool ok=ready&&commit_local&&commit_local(actor,6);last_commit_result=ok?1:0;return ok;}int index=-1,old=-2;if(!action_index(actor,index)||!ssc_names::read(actor+0xdd8,old)||!skill_commit_ready(actor)||!write_local(actor+0xdd8,index)){last_commit_result=0;return false;}const bool ok=native_action(actor,6,1,0);write_local(actor+0xdd8,old);last_commit_result=ok?1:0;return ok;}
-inline bool queue_stim(uintptr_t actor,int id){int pending=0;if(!choices_supported||!random.stims||id<0||id>=54||!native_mutation_cost||!native_mutation_blocked||native_mutation_blocked()||native_mutation_cost(actor,id)<=0||!ssc_names::read(actor+0x337c,pending)||pending>=0)return false;return write_local(actor+0x337c,id);}
+
 struct Commit {bool pending=false,accepted=false;uintptr_t actor=0,world=0;int round=0;uint64_t last=0;};inline Commit commit;
 using PrepareProfile=void(*)(uintptr_t,uintptr_t,int);
 inline PrepareProfile native_prepare=nullptr;
@@ -89,6 +95,69 @@ inline bool prepare_profile(uintptr_t context){
  native_prepare(o.session,game+0xe09e98,slot);int copied_cls=-1,copied_points=-1;
  if(!read(game+0xe09e98+0x2b0,copied_cls)||!read(game+0xe09e98+0x11a0,copied_points)||copied_cls!=cls||copied_points!=points)return false;
  prepared={o.actor,o.session,o.round,cls,points,syringes,hash};return true;
+}
+inline int stim_bonus_levels(int rank,int rarity,int base_cap,int grant){
+ if(rank<0||rank>1000||rarity<0||rarity>3||base_cap<0||base_cap>1000||grant<0||grant>54)return -1;
+ return std::clamp(base_cap+1+rarity-rank,0,grant);
+}
+inline bool queue_stim(const Offer& offer,int id,uint64_t now){
+ using ssc_names::read;
+ const auto actor=offer.actor,profile=game+0xe09e98;
+ int pending=-2;
+ unsigned char stage_profile=2;
+ if(!choices_supported||!random.stims||id<0||id>=54||!native_mutation_cost||!native_mutation_blocked||
+    native_mutation_blocked()||native_mutation_cost(actor,id)<=0||!read(actor+0x337c,pending)||pending!=-1||
+    !read(game+0xfb9a20,stage_profile)||stage_profile>1)return false;
+ if(!stage_profile)return write_local(actor+0x337c,id);
+
+ uintptr_t current=0;
+ if(!native_submit||!native_prepare||!native_stim_rank||!native_stim_rarity||!native_add_mutation||
+    !native_record_stim_bonus||!native_buy||!native_is_mutated||!panel_context||
+    !read(panel_context,current)||current!=actor||!profile_submission_ready(actor)||native_is_mutated(profile,id))return false;
+ // The manual button stages the post-spend count in the copied profile.
+ // Only the native pending mutation spends the live actor's inventory.
+ int available=-1,base_cap=-1,grant=-1;
+ constexpr uintptr_t profile_syringes=0x830;
+ if(!read(actor+0x8d0,available)||available<=0||available!=offer.syringes||
+    !read(game+0xfba230,base_cap)||!read(game+0xfb9a24,grant))return false;
+ const int levels=stim_bonus_levels(native_stim_rank(profile,id),native_stim_rarity(actor+0xa0,offer.class_id,id),base_cap,grant);
+ if(levels<0)return false;
+ uintptr_t first=0,last=0,limit=0;
+ if(!read(profile+0x320,first)||!read(profile+0x328,last)||!read(profile+0x330,limit)||
+    last<first||limit<last||(!first&&limit)||(last-first)%4||(last-first)/4>=54)return false;
+ // The manual button updates matching draft offers before staging the native award.
+ std::array<std::pair<uintptr_t,int>,3> matching{};
+ size_t count=0;
+ if(levels){
+  if(!read(profile+0x4b8,first)||!read(profile+0x4c0,last)||!read(profile+0x4c8,limit)||
+     last<first||limit<last||(!first&&limit)||(last-first)%12||(last-first)/12>matching.size())return false;
+  for(auto row=first;row<last;row+=12){
+   int skill=-2,value=-1;
+   if(!read(row,skill)||skill<-1||skill>=54)return false;
+   if(skill!=id)continue;
+   if(!read(row+4,value)||value<0||value>1000)return false;
+   matching[count++]={row+4,value+levels};
+  }
+ }
+ const auto rebuild_profile=[](){
+  prepared={};
+  prepare_profile(panel_context);
+  return false;
+ };
+ // Stage both parts with the same native profile calls as a manual syringe.
+ // The game alone spends the syringe through its pending mutation command.
+ if(!write_local(profile+profile_syringes,available-1))return false;
+ native_add_mutation(profile+0x320,&id);
+ for(size_t i=0;i<count;++i)if(!write_local(matching[i].first,matching[i].second))return rebuild_profile();
+ if(levels){
+  if(!native_buy(profile,id,0,0,1,1,0,levels,0))return rebuild_profile();
+  native_record_stim_bonus(profile,id,levels);
+ }
+ if(!write_local(actor+0x337c,id))return rebuild_profile();
+ picker.expected_stim_levels=levels;
+ commit={true,false,actor,offer.world,offer.round,now};
+ commit.accepted=commit_skill(actor);
+ return true;
 }
 inline bool snapshot(Offer& out){
  const auto& o=ssc_auto::tracking_observation;if(!attached||!o.valid||!o.active||o.round<1||!o.actor||!o.session)return false;
@@ -117,7 +186,9 @@ inline bool snapshot(Offer& out){
 inline void observe_reroll_panel(uintptr_t context){
  const auto& o=ssc_auto::tracking_observation;uintptr_t actor=0;int points=-1,generation=-1;auto now=GetTickCount64();
  if(!random.enabled||!reroll_supported||!o.valid||!o.active||!context||!ssc_names::read(context,actor)||actor!=o.actor||!ssc_names::read(actor+0x1240,points)||!ssc_names::read(game+0xe09e98+0x5ec,generation)){panel_context=0;reroll_panel={};return;}
- auto plan=reroll_plan(actor,o.session,context);if(!plan.valid){panel_context=0;reroll_panel={};return;}panel_context=context;reroll_panel={actor,o.session,points,generation,now,plan.available};
+ panel_context=context;
+ auto plan=reroll_plan(actor,o.session,context);if(!plan.valid){reroll_panel={};return;}
+ reroll_panel={actor,o.session,points,generation,now,plan.available};
 }
 inline bool request_reroll(uintptr_t profile,unsigned char a,unsigned char b){
  Offer o;if(profile!=game+0xe09e98||a!=1||b!=1||!snapshot(o)||!o.reroll_known||!o.reroll_available||!native_generate)return false;auto plan=reroll_plan(o.actor,o.world,panel_context);if(!plan.valid||!plan.available||!write_local(o.actor+0x12f8,plan.cost))return false;
@@ -136,6 +207,7 @@ inline void tick(uint64_t now,bool menu,bool native_panel=false,uintptr_t contex
  const auto& o=ssc_auto::tracking_observation;bool fresh=ssc_auto::tracking_at&&now>=ssc_auto::tracking_at&&now-ssc_auto::tracking_at<=500;
  in_session=fresh&&o.valid&&o.round>=1;observe(o.session,in_session,o.active,o.ending&&!o.preparing,o.round,o.last_round,now,menu);
  static uint64_t at=0,unavailable_at=0;if(!random.enabled||!attached){picker.reset();reroller.reset();reroll_panel={};reroll_request={};commit={};prepared={};unavailable_at=0;return;}if(menu||!in_session||!o.active||!native_panel)return;if(at&&now>=at&&now-at<100)return;at=now;
+ ssc_perf::Scope draft_timing(ssc_perf::draft);
  if(native_prepare&&!prepare_profile(context)){status=L"Waiting for the native draft profile";return;}
  if(native_prepare)observe_reroll_panel(context);
  Offer next;if(!snapshot(next)){if(!unavailable_at)unavailable_at=now;status=L"Waiting for an eligible native draft";return;}unavailable_at=0;
@@ -147,7 +219,7 @@ inline void tick(uint64_t now,bool menu,bool native_panel=false,uintptr_t contex
  if(((next.points>0&&!next.skills.empty())||(next.syringes>0&&!next.stims.empty()))&&!profile_submission_ready(next.actor)){status=L"Waiting until the game allows drafting";return;}
  if(next.points>0&&!next.skills.empty()&&!skill_purchase_ready(next.actor)){status=L"Waiting for the normal skill action";return;}
  picker.tick(next,now,[](size_t count,size_t& choice){return uniform(count,random_word,choice);},[&](bool skill,uintptr_t choice){Offer verify;if(!snapshot(verify)||verify.offline!=next.offline||verify.actor!=next.actor||verify.world!=next.world||verify.points!=next.points||verify.syringes!=next.syringes||verify.skills!=next.skills||verify.stims!=next.stims)return false;struct Permit{Permit(){selecting=true;}~Permit(){selecting=false;}} permit;
-  if(skill){if(!native_buy(game+0xe09e98,int(choice),0,1,0,0,1,0,1))return false;commit={true,false,next.actor,next.world,next.round,now};commit.accepted=commit_skill(next.actor);return true;}return queue_stim(next.actor,int(choice));
+  if(skill){if(!native_buy(game+0xe09e98,int(choice),0,1,0,0,1,0,1))return false;commit={true,false,next.actor,next.world,next.round,now};commit.accepted=commit_skill(next.actor);return true;}return queue_stim(verify,int(choice),now);
  });
 }
 // Use the native panel update for timing without changing visibility or cursor flags.
@@ -169,7 +241,7 @@ inline bool attach(){game=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))
  const unsigned char jump[]={0xff,0x25,0,0,0,0};auto buy=reinterpret_cast<uintptr_t>(buy_hook);std::memcpy(bridge,jump,6);std::memcpy(bridge+6,&buy,8);make_stim_gate(bridge+64,game+0x3e0f7e,game+0x3e1457);
  DWORD old=0;if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}FlushInstructionCache(GetCurrentProcess(),bridge,4096);
  DWORD protection[2]{};for(int i=0;i<2;++i)if(!VirtualProtect(calls[i],sites[i].length,PAGE_EXECUTE_READWRITE,&protection[i])){for(int j=i-1;j>=0;--j){DWORD ignored;VirtualProtect(calls[j],sites[j].length,protection[j],&ignored);}VirtualFree(bridge,0,MEM_RELEASE);return false;}
- reroll_supported=choices_supported=true;native_reroll=request_reroll;native_generate=reinterpret_cast<Reroll>(game+0x925bf0);native_has_skill=reinterpret_cast<HasSkill>(game+0x942a90);native_world_rule=reinterpret_cast<WorldRule>(game+0x1e76f0);native_world_modifier=reinterpret_cast<WorldModifier>(game+0x1e7680);native_skill_count=reinterpret_cast<SkillCount>(game+0x3afec0);native_can_learn=reinterpret_cast<CanLearn>(game+0x941870);native_reroll_blocked=reinterpret_cast<bool(*)(uintptr_t)>(game+0x3aff30);native_mutation_cost=reinterpret_cast<MutationCost>(game+0x7d9200);native_mutation_blocked=reinterpret_cast<MutationBlocked>(game+0x3b97f0);native_is_mutated=reinterpret_cast<IsMutated>(game+0x1d8090);native_can_act=reinterpret_cast<CanAct>(game+0x7df1e0);native_prepare=reinterpret_cast<PrepareProfile>(game+0x2e0a20);native_submit=reinterpret_cast<SubmitProfile>(game+0x3e5750);native_buy=reinterpret_cast<Buy>(game+0x941260);native_action=reinterpret_cast<Action>(game+0x7e2640);
+ reroll_supported=choices_supported=true;native_reroll=request_reroll;native_generate=reinterpret_cast<Reroll>(game+0x925bf0);native_has_skill=reinterpret_cast<HasSkill>(game+0x942a90);native_world_rule=reinterpret_cast<WorldRule>(game+0x1e76f0);native_world_modifier=reinterpret_cast<WorldModifier>(game+0x1e7680);native_skill_count=reinterpret_cast<SkillCount>(game+0x3afec0);native_can_learn=reinterpret_cast<CanLearn>(game+0x941870);native_reroll_blocked=reinterpret_cast<bool(*)(uintptr_t)>(game+0x3aff30);native_mutation_cost=reinterpret_cast<MutationCost>(game+0x7d9200);native_mutation_blocked=reinterpret_cast<MutationBlocked>(game+0x3b97f0);native_is_mutated=reinterpret_cast<IsMutated>(game+0x1d8090);native_stim_rank=reinterpret_cast<StimRank>(game+0x3afff0);native_stim_rarity=reinterpret_cast<StimRarity>(game+0x923ca0);native_add_mutation=reinterpret_cast<AddProfileMutation>(game+0x1b0670);native_record_stim_bonus=reinterpret_cast<RecordStimBonus>(game+0x941150);native_can_act=reinterpret_cast<CanAct>(game+0x7df1e0);native_prepare=reinterpret_cast<PrepareProfile>(game+0x2e0a20);native_submit=reinterpret_cast<SubmitProfile>(game+0x3e5750);native_buy=reinterpret_cast<Buy>(game+0x941260);native_action=reinterpret_cast<Action>(game+0x7e2640);
  for(int i=0;i<2;++i){int32_t rel=int32_t(bridge+i*64-(calls[i]+5));if(i)calls[i][0]=0xe9;std::memcpy(calls[i]+1,&rel,4);if(i==1)std::memset(calls[i]+5,0x90,3);FlushInstructionCache(GetCurrentProcess(),calls[i],sites[i].length);}for(int i=1;i>=0;--i){DWORD ignored;VirtualProtect(calls[i],sites[i].length,protection[i],&ignored);}return true;
 }
 }
