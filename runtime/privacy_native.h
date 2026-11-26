@@ -14,7 +14,7 @@ inline Detection native_read(){
 inline bool initialize_native(uintptr_t base){
  native_base=0;tournament_validated=false;
  struct Span{uint32_t rva,length;uint64_t hash;};
- const Span spans[]={{0x3adf80,41,0x00d564f29bf8b3b9ULL},{0x7dfd04,103,0x0b0cc4f317fc4aa5ULL},{0xc7e538,13,0xd544cc964571dddeULL},{0x6a2b50,9088,0xf57571686e3b125dULL},{0x1f3de0,3466,0x7e24af7cbe251685ULL}};
+ const Span spans[]={{0x3ae210,41,0xe345b314d2a9711dULL},{0x7e0044,103,0x27ee13ecb6a04569ULL},{0xc7e568,13,0xd544cc964571dddeULL},{0x6a2de0,9088,0xc8ed5fc36408cde4ULL},{0x1f3de0,3466,0x839e4cb8e2b9d569ULL}};
  for(const auto& span:spans){std::vector<unsigned char> bytes(span.length);SIZE_T read=0;
   if(!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(base+span.rva),bytes.data(),bytes.size(),&read)||read!=bytes.size()){reader=native_read;return false;}
   uint64_t hash=14695981039346656037ULL;for(auto byte:bytes)hash=(hash^byte)*1099511628211ULL;

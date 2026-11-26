@@ -11,7 +11,7 @@ $sources=@("$root\installer\Engine.cs","$root\installer\Setup.cs","$root\install
 $common=@('/nologo','/warnaserror','/platform:x64','/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Web.Extensions.dll')
 if($RuntimeDirectory) {
     # Approved runtime/proxy hashes for the packaged release.
-    $approved=@{'opengl32.dll'='48D124680667462E2FCE1DBA1080DAE414E90C079C130FFE10278C3C55E5D0C8';'runtime.dll'='4633E36F444FDFCCCED4BA7B3F3772947DB806ED0B3378D4E063219FF554FF6E'}
+    $approved=@{'opengl32.dll'='6ECB6F55B75CD7710281FE8626B80996C451C29D3AD66CACE99215FC1A03144C';'runtime.dll'='8A74A42857504B54965CD8AFFAF4D1019BAF129C5D7AC083750BF57CCDA83C32'}
     foreach($name in $approved.Keys) {
         $path=(Resolve-Path -LiteralPath (Join-Path $RuntimeDirectory $name)).Path
         if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $approved[$name]) { throw "Unapproved payload hash for $name. Run runtime and isolated installation checks before updating the approved release hashes." }

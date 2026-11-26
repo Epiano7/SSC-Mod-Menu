@@ -48,7 +48,7 @@ void test_xp_source(const unsigned char* reviewed=nullptr){
  if(reviewed){
   // Use a distinct allocation: guards cache their decision per module base.
   auto* native=static_cast<unsigned char*>(VirtualAlloc(nullptr,0x1000000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));assert(native);
-  for(auto span:std::vector<std::pair<size_t,size_t>>{{0x242be0,335},{0x2317b8,36},{0x3bc524,91},{0x3bed2f,71},{0xc80f60,4},{0xc80e44,4},{0xc803c8,8},{0xc81934,4}})std::memcpy(native+span.first,reviewed+span.first,span.second);
+  for(auto span:std::vector<std::pair<size_t,size_t>>{{0x242f00,335},{0x231ad8,36},{0x3bc7b4,91},{0x3befbf,71},{0xc80f90,4},{0xc80e74,4},{0xc803f8,8},{0xc81964,4}})std::memcpy(native+span.first,reviewed+span.first,span.second);
   // Reset the guard's last checked base before testing a potentially reused allocation.
   assert(ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(reviewed)));
   fixture_put(native,0xfb7734,2);fixture_put(native,0xdef5d0,w);fixture_put(native,0xe27138,a);fixture_put(native,0xe23678,0);
@@ -59,7 +59,7 @@ void test_xp_source(const unsigned char* reviewed=nullptr){
   fixture_put(world.data(),0x3bc,80.2f);fixture_put(world.data(),0x3cc,float(NAN));
   native_o=ssc_auto::sample(reinterpret_cast<uintptr_t>(native),got_actor,got_world);assert(native_o.recording_countdown_seconds==81);
   fixture_put(world.data(),0x3bc,-1.f);native_o=ssc_auto::sample(reinterpret_cast<uintptr_t>(native),got_actor,got_world);assert(std::isnan(native_o.recording_countdown_seconds));
-   assert(ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(reviewed)));native[0x3bed2f]^=1;assert(!ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(native)));native[0x3bed2f]^=1;assert(ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(reviewed)));assert(ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(native)));
+   assert(ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(reviewed)));native[0x3befbf]^=1;assert(!ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(native)));native[0x3befbf]^=1;assert(ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(reviewed)));assert(ssc_auto::recording_clock_supported(reinterpret_cast<uintptr_t>(native)));
   VirtualFree(native,0,MEM_RELEASE);
  }
 }

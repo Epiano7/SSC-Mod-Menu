@@ -3,7 +3,7 @@
 namespace ssc_mirror {
 struct Guard {uint32_t rva,size;uint64_t hash;};
 inline constexpr Guard guards[]={
- {0x8164d0,5540,0x2dd671b72f7c7124ULL},
- {0x8182e0,1495,0x03b7d4ff6b280c4dULL},
+ {0x816810,5540,0xc221f1ed384d2029ULL},
+ {0x818620,1495,0x875d01830aa1fe83ULL},
 };
 }
