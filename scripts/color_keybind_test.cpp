@@ -54,7 +54,7 @@ int main(){
  put(image_base+ssc_compat::resolve(0xdef5d0),w);put(w+0xa658,a);put(w+0xa660,a+actors.size());put(image_base+ssc_compat::resolve(0xe27138),a);put(image_base+ssc_compat::resolve(0xe23678),0);
  small(image_base+ssc_compat::resolve(0xe091e8),"owner");put(a+0x78,0);put(a+0x7dc,0);put(a+0x81,(unsigned char)1);small(a+0x6f0,"owner");small(a+0x798,"owner");
  auto bot=a+0x34b8;put(bot+0x78,1);put(bot+0x7dc,1);put(bot+0x81,(unsigned char)1);small(bot+0x798,"robot");
- put(image_base+0xfb990c,1);put(w+0x190,0);put(w+0x28c,1);
+ put(image_base+0xfb9a84,1);put(w+0x190,0);put(w+0x28c,1);
  shared_label_world=w;shared_label_index["robot"]=bot;render_access=true;render_access_at=GetTickCount64();native_predicate=consume_account;lookup_shared=shared_fixture;receive_colors=true;
  std::array<unsigned char,32> raw{};auto rawaddr=reinterpret_cast<uintptr_t>(raw.data());
  small(rawaddr,"robot");assert(event_predicate(nullptr,0,raw.data())==0);assert(event_appearance.bot);assert(std::strcmp(reinterpret_cast<char*>(raw.data()),"consumed")==0);

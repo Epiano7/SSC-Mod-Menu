@@ -29,7 +29,7 @@ inline bool context(uintptr_t car,uintptr_t& actor,float& heading){
  if(!read(actor+0x2ae0,linked)||linked!=car||!read(actor+0x7dc,kind)||kind!=0||!read(actor+0x81,active)||active!=1||!read(actor+0x8a0,actor_mode)||actor_mode==3||!read(actor+0x13a4,health)||!std::isfinite(health)||health<=0)return false;
  // Native 9dd400 consumes seat zero's controls, not every occupant's.
  if(!read(car+0x368,seats)||!read(car+0x370,seats_end)||!seats||seats_end<seats||seats_end-seats<0x68||seats_end-seats>16*0x68||!read(seats+0x60,driver)||driver!=actor)return false;
- if(!read(car+0x90,heading)||!std::isfinite(heading)||!read(image+0xfb6d10,yaw)||!std::isfinite(yaw)||std::abs(std::remainder(yaw,360.f))>.01f)return false;
+ if(!read(car+0x90,heading)||!std::isfinite(heading)||!read(image+0xfb6e88,yaw)||!std::isfinite(yaw)||std::abs(std::remainder(yaw,360.f))>.01f)return false;
  // 76db20 rotates world velocity into car-local space; 9d4f70 tests
  // its X component for forward/reverse. Car forward is local +X.
  // 76d8f0 maps it to (cos(angle), sin(angle)); screen-up is -Y.
@@ -47,8 +47,8 @@ inline void control(uintptr_t car){
 }
 inline uint64_t hash(const unsigned char* p,size_t n){uint64_t h=14695981039346656037ULL;for(size_t i=0;i<n;++i)h=(h^p[i])*1099511628211ULL;return h;}
 inline bool matches(const unsigned char* p,size_t n){
- if(n<0xfb6d14||hash(p+0x9e4740,0x230)!=0x753e0234c9b74ad6ULL||hash(p+0x9dc200,0x980)!=0x6070baa67b822110ULL)return false;
- int32_t rel=0;std::memcpy(&rel,p+0x9e4961,4);return p[0x9e4960]==0xe8&&int64_t(0x9e4965)+rel==0x9dc200;
+ if(n<0xfb6e8c||hash(p+0x9e4bf0,0x230)!=0xc68632ecbff0f686ULL||hash(p+0x9dc6b0,0x980)!=0x4f24b856392036b4ULL)return false;
+ int32_t rel=0;std::memcpy(&rel,p+0x9e4e11,4);return p[0x9e4e10]==0xe8&&int64_t(0x9e4e15)+rel==0x9dc6b0;
 }
 inline bool attach(){
  auto p=reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));
@@ -60,9 +60,9 @@ inline bool attach(){
  const unsigned char jump[]={0xff,0x25,0,0,0,0};auto target=reinterpret_cast<uintptr_t>(control);
  std::memcpy(bridge,jump,6);std::memcpy(bridge+6,&target,8);DWORD old=0;
  if(!VirtualProtect(bridge,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=p+0x9e4960;
+ FlushInstructionCache(GetCurrentProcess(),bridge,14);auto site=p+0x9e4e10;
  if(!VirtualProtect(site,5,PAGE_EXECUTE_READWRITE,&old)){VirtualFree(bridge,0,MEM_RELEASE);return false;}
- image=origin;original=reinterpret_cast<Control>(p+0x9dc200);
+ image=origin;original=reinterpret_cast<Control>(p+0x9dc6b0);
  int32_t relative=int32_t(reinterpret_cast<uintptr_t>(bridge)-reinterpret_cast<uintptr_t>(site+5));std::memcpy(site+1,&relative,4);
  DWORD ignored=0;VirtualProtect(site,5,old,&ignored);FlushInstructionCache(GetCurrentProcess(),site,5);return true;
 }

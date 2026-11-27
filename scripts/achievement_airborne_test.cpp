@@ -70,7 +70,7 @@ int main(int argc,char** argv){
  std::vector<unsigned char> world_data(0x10000), actors(4*actor_size);
  const auto world=reinterpret_cast<uintptr_t>(world_data.data()), killer=reinterpret_cast<uintptr_t>(actors.data());
  auto actor=[&](int slot){return killer+slot*actor_size;};
- write(base+0xfb7734,2);write(base+0xfb7748,0.0);
+ write(base+0xfb78ac,2);write(base+0xfb78c0,0.0);
  write(base+0xdef5d0,world);write(base+0xe27138,killer);write(base+0xe23678,0);
  write(base+0xdef5d8,world);write(base+0xfb5cb4,0.01f);
  write(world+0x128,6);write(world+0x6a39,uint8_t(1));write(world+0x160,2);write(world+0x3e0,2);write(world+0x46c,3);write(world+0x3c0,-1.f);

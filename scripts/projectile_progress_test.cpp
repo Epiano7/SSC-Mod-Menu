@@ -10,7 +10,7 @@ int main(){
  auto* base=static_cast<unsigned char*>(VirtualAlloc(nullptr,0x1000000,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));assert(base);
  std::vector<unsigned char> world(0xb0000),actor(0x34b8),weapon(0x748),foreign(0x34b8);
  auto w=reinterpret_cast<uintptr_t>(world.data()),a=reinterpret_cast<uintptr_t>(actor.data()),gun=reinterpret_cast<uintptr_t>(weapon.data());
- put(base,0xfb7734,2);put(base,0xfb7748,0.0);put(base,0xdef5d0,w);put(base,0xe27138,a);put(base,0xe23678,0);
+ put(base,0xfb78ac,2);put(base,0xfb78c0,0.0);put(base,0xdef5d0,w);put(base,0xe27138,a);put(base,0xe23678,0);
  put(world.data(),0x128,6);put(world.data(),0x6a39,uint8_t(1));put(world.data(),0x160,2);put(world.data(),0x3e0,2);put(world.data(),0x46c,3);put(world.data(),0x3c0,-1.f);put(world.data(),0x6ae8,0.f);
  put(world.data(),0xa658,a);put(world.data(),0xa660,a+0x34b8);put(actor.data(),0x78,0);put(actor.data(),0x7dc,0);put(actor.data(),0x81,static_cast<unsigned char>(1));
  put(actor.data(),0x12a0,gun);put(actor.data(),0x12a8,gun+0x748);put(weapon.data(),0x218,2);

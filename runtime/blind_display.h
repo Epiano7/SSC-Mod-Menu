@@ -9,7 +9,7 @@ struct RoundView {bool match=false,intermission=false;};
 inline RoundView current_round(uintptr_t base){
     using ssc_names::read;
     int state=0;
-    if(!read(base+ssc_compat::resolve(0xfb7734),state))return {true,true};
+    if(!read(base+ssc_compat::resolve(0xfb78ac),state))return {true,true};
     if(state!=2){ssc_challenge::blind_locked=false;completed_world=0;completed_round=0;return {};}
     uintptr_t world=0;int mode=0,raw=0,final=0;float countdown=0,ending=0;
     if(!read(base+ssc_compat::resolve(0xdef5d0),world)||!world||

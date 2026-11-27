@@ -38,7 +38,7 @@ inline void sample_weapon(uintptr_t record,Values& values){
 }
 
 // Fingerprint both producers/consumers of world+6aa0 and the native send route.
-inline constexpr uint32_t native_dependencies[][3]={{0x8934d0,0x2aeb60,0},{0x2eabd0,0x223d10,0},{0x8343c0,0x805fb3,0},{0x22c8c0,0x89cdc0,0}};
+inline constexpr uint32_t native_dependencies[][3]={{0x893970,0x2aec80,0},{0x2eacf0,0x223dd0,0},{0x834850,0x806423,0},{0x22c980,0x89d260,0}};
 inline bool supported(){return ssc_compat::supports(32)&&ssc_compat::supports(4)&&ssc_compat::supports(8);}
 // HUD survival timer (mode 6): 3b9d69 uses ceil(world+3bc) while positive,
 // then switches to -world+3cc for overtime. The gameplay countdown at +3bc
@@ -46,10 +46,10 @@ inline bool supported(){return ssc_compat::supports(32)&&ssc_compat::supports(4)
 // Guard the HUD selector/formatter as well as the nominal-duration helper.
 inline bool recording_clock_supported(uintptr_t base){
  static uintptr_t checked=0;static bool valid=false;if(checked==base)return valid;checked=base;valid=false;
- struct Span{uint32_t rva,length;uint64_t hash;};const Span spans[]={{0x242f00,335,0x2b65ee8e407e374bULL},{0x231ad8,36,0x5cbf8d15625d298cULL},{0x3bc7b4,91,0x6be3fd038b617293ULL},{0x3befbf,71,0x2afc74abb7ceb0b8ULL}};
+ struct Span{uint32_t rva,length;uint64_t hash;};const Span spans[]={{0x242fd0,335,0xfdccc073e6ece51aULL},{0x231b98,36,0x3bbfc8e73a3ec8dbULL},{0x3bc8d4,91,0xf062ff02b88129beULL},{0x3bf0df,71,0xfca958552730e8b5ULL}};
  for(const auto& span:spans){uint64_t hash=14695981039346656037ULL;for(uint32_t i=0;i<span.length;++i){unsigned char byte=0;if(!ssc_names::read(base+span.rva+i,byte))return false;hash=(hash^byte)*1099511628211ULL;}if(hash!=span.hash)return false;}
  float minimum=0,step=0,sign=0;double half=0;
- valid=ssc_names::read(base+0xc80f90,minimum)&&minimum==20&&ssc_names::read(base+0xc80e74,step)&&step==5&&ssc_names::read(base+0xc803f8,half)&&half==.5&&ssc_names::read(base+0xc81964,sign)&&sign==-1;return valid;
+ valid=ssc_names::read(base+0xc80fb0,minimum)&&minimum==20&&ssc_names::read(base+0xc80e94,step)&&step==5&&ssc_names::read(base+0xc80418,half)&&half==.5&&ssc_names::read(base+0xc81984,sign)&&sign==-1;return valid;
 }
 inline double recording_hud_countdown(float remaining,float overtime){
  if(!std::isfinite(remaining)||remaining>7200||remaining<-14400)return NAN;
@@ -64,7 +64,7 @@ inline double recording_round_seconds(float duration,double remaining){
 inline Observation sample(uintptr_t base,uintptr_t& actor,uintptr_t& world,bool detailed=true){
  Observation o;actor=world=0;if(!supported())return o;using ssc_names::read;
  int session=0,mode=-1,raw_round=0,last=0,local=-1,slot=-1,kind=-1;double joining=0;float countdown=0,ending=0;uintptr_t first=0,end=0,steam=0;unsigned char active=0,survival=0;
- if(!read(base+ssc_compat::resolve(0xfb7734),session)||session!=2||!read(base+ssc_compat::resolve(0xfb7748),joining)||!std::isfinite(joining)||joining>0)return o;
+ if(!read(base+ssc_compat::resolve(0xfb78ac),session)||session!=2||!read(base+ssc_compat::resolve(0xfb78c0),joining)||!std::isfinite(joining)||joining>0)return o;
  o.connected=true;
  if(!read(base+ssc_compat::resolve(0xdef5d0),world)||!world)return o;
  if(!read(world+0x128,mode)||mode!=6||!read(world+0x485,survival)||survival||!read(world+0x3e0,raw_round)||raw_round<1||raw_round>100||!read(world+0x46c,last)||last<raw_round-1||last>100||!read(world+0x3c0,countdown)||!std::isfinite(countdown)||!read(world+0x6ae8,ending)||!std::isfinite(ending))return o;
@@ -119,7 +119,7 @@ inline bool send_native(uintptr_t base,uintptr_t world,uintptr_t actor,const std
  // The native client chat-input path calls this with flag=0. It deep-copies the
  // temporary native-layout string into its own outbound queue, then shows it locally.
  ssc_chat::NativeString message{reinterpret_cast<uintptr_t>(text.data()),0,text.size(),std::max(size_t(16),text.size())};
- if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x223d10));
+ if(!sender)sender=reinterpret_cast<NativeSender>(base+ssc_compat::resolve(0x223dd0));
  if(!ssc_chat::native_spam_available(actor))return false;
  sender(world,0,actor,&message);
  ssc_chat::charge_native_spam(actor,false);

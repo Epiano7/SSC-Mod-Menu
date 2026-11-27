@@ -23,9 +23,9 @@ int main(int argc,char** argv){
  std::ifstream input(argv[1],std::ios::binary);
  assert(input.read(reinterpret_cast<char*>(fixture),image_size));
  auto base=reinterpret_cast<uintptr_t>(fixture);
- fixture[0x901710]^=1;fixture[0x8d3f27]^=1;
+ fixture[0x901bb0]^=1;fixture[0x8d43c7]^=1;
  events::attach(base);assert(!events::award_attached&&!events::death_attached);
- fixture[0x901710]^=1;fixture[0x8d3f27]^=1;
+ fixture[0x901bb0]^=1;fixture[0x8d43c7]^=1;
  events::attach(base);assert(events::award_attached&&events::death_attached);
  events::original_award=award_passthrough;
  events::original_death=death_passthrough;
@@ -33,7 +33,7 @@ int main(int argc,char** argv){
 
  std::vector<unsigned char> world_data(0x10000),actors(stride*2);
  auto world=reinterpret_cast<uintptr_t>(world_data.data()),actor=reinterpret_cast<uintptr_t>(actors.data());
- write(base+0xfb7734,2);write(base+0xfb7748,0.0);write(base+0xdef5d0,world);write(base+0xe27138,actor);write(base+0xe23678,0);
+ write(base+0xfb78ac,2);write(base+0xfb78c0,0.0);write(base+0xdef5d0,world);write(base+0xe27138,actor);write(base+0xe23678,0);
  write(world+0x128,6);write(world+0x6a39,uint8_t(1));write(world+0x160,2);
  write(world+0x3e0,2);write(world+0x46c,3);write(world+0x3c0,-1.f);
  write(world+0xa658,actor);write(world+0xa660,actor+actors.size());write(actor+0x81,uint8_t(1));
@@ -71,7 +71,7 @@ int main(int argc,char** argv){
  write(base+0xe08ba8,123456);assert(account_stats::player_id(base)==123456);
  account_stats::Historical history;
  assert(!account_stats::history(base,history));
- write(base+0xfb7734,1);
+ write(base+0xfb78ac,1);
  assert(account_stats::history(base,history)&&history.xp==100000000&&history.kills==11849);
  write(base+0xe09418,std::numeric_limits<double>::quiet_NaN());
  assert(!account_stats::history(base,history));

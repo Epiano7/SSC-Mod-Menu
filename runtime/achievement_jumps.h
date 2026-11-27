@@ -6,13 +6,13 @@ namespace ssc_achievements::jumps {
 // Verified on Steam build 26820987. The queue call runs only after the
 // simulation accepts the launch. R15d is the pad index, or -1 for Jump.
 inline constexpr ssc_planned_native::Guard guards[]={
- {0x8026cb,0x41f,0x71201550e05d54fbULL},
- {0x802c72,0x62,0x61613bbbe877ea4eULL},
- {0x80322c,0x2b,0xbb8983c1639bed5bULL},
- {0x1b0670,0x98,0xcac8932c3d3dbeb3ULL},
- {0x2eb226,0x23,0x49be129062132d7bULL}
+ {0x802b3b,0x41f,0x75b5b730ae50758bULL},
+ {0x8030e2,0x62,0x61613bbbe877ea4eULL},
+ {0x80369c,0x2b,0xf1dcdd182a1f1a6fULL},
+ {0x1b0720,0x98,0xcac8932c3d3dbeb3ULL},
+ {0x2eb346,0x23,0x05f325e45412ef93ULL}
 };
-inline constexpr uintptr_t completion_site=0x803248,queue_rva=0x1b0670;
+inline constexpr uintptr_t completion_site=0x8036b8,queue_rva=0x1b0720;
 using Queue=void(*)(uintptr_t,const int*);
 inline Queue original_queue=nullptr;
 inline uintptr_t image_base=0;

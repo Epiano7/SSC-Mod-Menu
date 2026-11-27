@@ -4,18 +4,18 @@
 #include "kos_kill_tracking.h"
 
 namespace ssc_achievements::airborne {
-// Verified on Steam build 26820987. Both movement paths share the floor test
+// Verified on Steam build 26979702. Both movement paths share the floor test
 // and landing transition. The credited-kill call has its own KOS guards.
 inline constexpr ssc_planned_native::Guard guards[]={
- {0x22ebe7,0x3e,0x5f0d0d79d712d34cULL},
- {0x2edec3,0x3c,0x0819709a10e0fe09ULL},
- {0x7ff080,0x21ef,0xe3048643571b4d43ULL},
- {0x7bc489,0xb3,0x8e36a823af0271e3ULL},
- {0x7a8bf0,0x13d,0x956b43cc3dc7ef49ULL},
- {0x583460,0x236,0x6e175d8601386ecdULL}
+ {0x22eca7,0x3e,0xfccc3533a1ebc037ULL},
+ {0x2edfe3,0x3c,0xcd7ef3d6a96c4d73ULL},
+ {0x7ff4d0,0x220e,0x915edd857851de68ULL},
+ {0x7bc8c9,0xb3,0xf1d210c4724da272ULL},
+ {0x7a9030,0x13d,0xddf9800739fa9f7dULL},
+ {0x583580,0x236,0x4d3e669d515660e7ULL}
 };
-inline constexpr uintptr_t movement_sites[]={0x22ec06,0x2edee2};
-inline constexpr uintptr_t movement_rva=0x7ff080;
+inline constexpr uintptr_t movement_sites[]={0x22ecc6,0x2ee002};
+inline constexpr uintptr_t movement_rva=0x7ff4d0;
 using Movement=int(*)(uintptr_t,float,unsigned char,unsigned char,unsigned char);
 using Terrain=float(*)(uintptr_t,const float*,unsigned char,unsigned char,int);
 using Allies=unsigned char(*)(uintptr_t,uintptr_t,float,unsigned char);
@@ -46,7 +46,7 @@ inline bool is_airborne(uintptr_t actor){
     !read(actor+0x2ae0,vehicle)||vehicle||
     !read(actor+0x2c,position)||!std::all_of(position.begin(),position.end(),[](float v){return std::isfinite(v);})||
     !read(image_base+0xdef5d8,map)||!map||
-    !read(image_base+0xfb7cbc,clearance)||!std::isfinite(clearance)||clearance<0||clearance>128)return false;
+    !read(image_base+0xfb7e34,clearance)||!std::isfinite(clearance)||clearance<0||clearance>128)return false;
  const float floor=terrain(map,position.data(),0,0,-1);
  return std::isfinite(floor)&&position[2]-floor>clearance;
 }
@@ -142,8 +142,8 @@ inline bool attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(n
  }
  image_base=base;
  original_move=reinterpret_cast<Movement>(base+movement_rva);
- terrain=reinterpret_cast<Terrain>(base+0x583460);
- allies=reinterpret_cast<Allies>(base+0x7a8bf0);
+ terrain=reinterpret_cast<Terrain>(base+0x583580);
+ allies=reinterpret_cast<Allies>(base+0x7a9030);
  for(size_t i=0;i<std::size(movement_sites);++i){
   const auto site=base+movement_sites[i];
   const auto rel=int32_t(reinterpret_cast<intptr_t>(bridge)-static_cast<intptr_t>(site+5));

@@ -48,7 +48,7 @@ inline void sample_rating(uintptr_t base,Snapshot& snapshot,ssc_review_context::
     float profile_rating=-1,profile_matches=-1;int profile_required=0,profile_loaded=0;
     const bool profile_valid=read(base+ssc_compat::resolve(0xe091f8),profile_loaded)&&profile_loaded&&
         read(base+ssc_compat::resolve(0xe09a9c),profile_rating)&&read(base+ssc_compat::resolve(0xe09a98),profile_matches)&&
-        read(base+ssc_compat::resolve(0xfbba90),profile_required)&&ssc_review_context::valid_rating(profile_rating,profile_matches,profile_required);
+        read(base+ssc_compat::resolve(0xfbbc08),profile_required)&&ssc_review_context::valid_rating(profile_rating,profile_matches,profile_required);
     if(observation&&profile_valid)*observation={true,false,profile_matches<profile_required,profile_rating,profile_matches,profile_required};
     // The actor login field is an authentication state (often 3), not a user ID.
     // Read the loaded account profile's public game ID independently of actors.
@@ -65,7 +65,7 @@ inline void sample_rating(uintptr_t base,Snapshot& snapshot,ssc_review_context::
         ||!read(actor+0x81,f.active)||!read(actor+0x7dc,f.kind)||!read(actor+0x700,f.name_length)||!read(actor+0x6e0,f.login)
         ||!read(actor+0x6e4,f.authenticated)||!read(actor+0x270,f.committed)||!read(actor+0xf98,f.bonus)
         ||!read(actor+0xab4,f.account_level)||!read(actor+0x204,f.eligibility)
-        ||!read(base+ssc_compat::resolve(0xfbbabc),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfbbac0),f.bonus_threshold))return;
+        ||!read(base+ssc_compat::resolve(0xfbbc34),f.normal_threshold)||!read(base+ssc_compat::resolve(0xfbbc38),f.bonus_threshold))return;
     if(observation&&profile_valid){observation->rank_blockers=ranked_blockers(f);}
     if(!ranked(f))return;
     add_rating(snapshot,true,profile_rating,profile_matches,profile_required);
@@ -88,7 +88,7 @@ inline std::string native_string(uintptr_t address){
 }
 inline Snapshot native_fallback(uintptr_t base){
     using ssc_names::read;Snapshot s;int session=0;double joining=0;
-    if(!read(base+ssc_compat::resolve(0xfb7734),session)||!read(base+ssc_compat::resolve(0xfb7748),joining)||!std::isfinite(joining))return s;
+    if(!read(base+ssc_compat::resolve(0xfb78ac),session)||!read(base+ssc_compat::resolve(0xfb78c0),joining)||!std::isfinite(joining))return s;
     if(session==1)return from_steam("#Status_AtMainMenu","");
     if(session!=2)return s;
     if(joining>0){s.details="Joining game";s.state="Loading";s.phase=3;return s;}
@@ -117,7 +117,7 @@ inline Snapshot native_fallback(uintptr_t base){
 inline Snapshot sample_steam(bool show_rating=true){
     auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));int initialized=0;
     auto fallback=native_fallback(base);if(show_rating)sample_rating(base,fallback);
-    if(!ssc_names::read(base+ssc_compat::resolve(0xfb64ec),initialized)||initialized<=0)return fallback;
+    if(!ssc_names::read(base+ssc_compat::resolve(0xfb665c),initialized)||initialized<=0)return fallback;
     auto dll=GetModuleHandleW(L"steam_api64.dll");if(!dll)return fallback;
     using Interface=void*(*)();using OwnId=uint64_t(*)(void*);using Presence=const char*(*)(void*,uint64_t,const char*);
     auto friends=reinterpret_cast<Interface>(GetProcAddress(dll,"SteamAPI_SteamFriends_v017"));

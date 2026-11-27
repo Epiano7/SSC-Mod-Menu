@@ -8,13 +8,13 @@ namespace ssc_kos {
 // resolving a credited local killer and ruling out self-kills and clones.
 // It is called from both the replicated death and game simulation paths.
 inline constexpr ssc_planned_native::Guard kill_guards[]={
- {0x31a980,0x1106,0xc07666d598b3cfe1ULL},
- {0x22ccb6,0x3d,0x33bec68b3a6c1a86ULL},
- {0x8d3f27,0xa4,0x8c51ff675a109615ULL},
- {0x1d9f20,64,0xc7c352f88988b6bbULL}
+ {0x31aaa0,0x1106,0x350236e02d1060feULL},
+ {0x22cd76,0x3d,0x237e4065840fb6eeULL},
+ {0x8d43c7,0xa4,0x78503be6d7f455f1ULL},
+ {0x1d9fd0,64,0xc7c352f88988b6bbULL}
 };
-inline constexpr uintptr_t kill_cue_site=0x31aaa4;
-inline constexpr uintptr_t native_queue_cue=0x1d9f20;
+inline constexpr uintptr_t kill_cue_site=0x31abc4;
+inline constexpr uintptr_t native_queue_cue=0x1d9fd0;
 inline bool kill_tracking_supported=false;
 
 struct CreditedKill {

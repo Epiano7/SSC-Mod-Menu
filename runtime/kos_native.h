@@ -27,7 +27,7 @@ inline NativeTarget player(uintptr_t actor,const ssc_names::ActorRange& range,bo
     !ssc_names::read(actor+0x209,anon)||anon>1)return out;
  // Reject anonymous actors BEFORE reading their account or display string.
  out.target.player.visibility=anon?Visibility::anonymous:Visibility::public_player;if(anon)return out;
- if(kind==1){int start=-1,offset=-1,count=-1,total=int(range.size());uintptr_t owner=1;if(!ssc_names::bot_layout||!ssc_names::read(base+0xfb990c,start)||!ssc_names::read(world+0x190,offset)||!ssc_names::read(world+0x28c,count)||!ssc_names::bot_range(slot,kind,start,offset,count,total)||!ssc_names::read(actor+0x2e8,owner)||owner)return out;}
+ if(kind==1){int start=-1,offset=-1,count=-1,total=int(range.size());uintptr_t owner=1;if(!ssc_names::bot_layout||!ssc_names::read(base+0xfb9a84,start)||!ssc_names::read(world+0x190,offset)||!ssc_names::read(world+0x28c,count)||!ssc_names::bot_range(slot,kind,start,offset,count,total)||!ssc_names::read(actor+0x2e8,owner)||owner)return out;}
  if(kind==0){auto identity=ssc_names::identify_direct(actor,range,false);out.target.player.local=identity.local;out.target.player.account=identity.account;}
  out.target.player.handle=ssc_rpc::native_string(actor+0x798);
  if(kind==1&&valid_text(out.target.player.handle,64))out.target.player.account="handle:"+canonical(out.target.player.handle);

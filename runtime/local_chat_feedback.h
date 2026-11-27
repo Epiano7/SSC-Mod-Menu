@@ -25,7 +25,7 @@ inline bool attach(uintptr_t base){
  // These exact native receive/copy/append fingerprints are verified before
  // hooks. No outgoing sender, packet builder or transport is used here.
  if(!ssc_planned_native::tts)return false;
- image_base=base;receive=reinterpret_cast<Receive>(base+0x31be60);return true;
+ image_base=base;receive=reinterpret_cast<Receive>(base+0x31bf80);return true;
 }
 inline std::wstring wide(const std::string& s){if(s.empty()||s.size()>8192)return {};int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s.data(),int(s.size()),nullptr,0);if(n<=0)return {};std::wstring out(size_t(n),L' ');MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s.data(),int(s.size()),out.data(),n);return out;}
 inline std::string utf8(const std::wstring& s){if(s.empty())return {};int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,s.data(),int(s.size()),nullptr,0,nullptr,nullptr);if(n<=0)return {};std::string out(size_t(n),' ');WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,s.data(),int(s.size()),out.data(),n,nullptr,nullptr);return out;}
@@ -56,7 +56,7 @@ inline bool valid_world(uintptr_t world){
 // All three guarded native typed-chat constructors take their lifetime from
 // game+0xfba384 (e.g. the load at 0x22393d). Read it for each reply so changes
 // to the game's normal chat duration are followed instead of inventing a timer.
-inline float normal_message_duration(){float value=0;if(!ssc_planned_native::commands||!ssc_names::read(image_base+ssc_compat::resolve(0xfbc39c),value)||!std::isfinite(value)||value<0||value>300)return 0;return value;}
+inline float normal_message_duration(){float value=0;if(!ssc_planned_native::commands||!ssc_names::read(image_base+ssc_compat::resolve(0xfbc510),value)||!std::isfinite(value)||value<0||value>300)return 0;return value;}
 inline void show_received_reply(uintptr_t world,size_t before,const Pending& line,float duration){
  uintptr_t first=0,last=0;using ssc_names::read;
  if(!valid_world(world)||!read(world+0xecc0,first)||!read(world+0xecc8,last)||(last-first)/sizeof(Message)!=before+1)return;

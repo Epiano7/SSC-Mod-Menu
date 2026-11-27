@@ -44,7 +44,7 @@ void setup(){
  ssc_auto::tracking_observation={true,true,false,actor,world,1,3};
  random={true,true,false};choices_supported=true;picker.reset();commit={};prepared={};reroller.reset();
  rank=2;rarity=1;bonus=registered=submissions=prepares=0;blocked=false;buy_accepted=true;
- put<unsigned char>(game+0xfb9a20,1);put<int>(game+0xfb9a24,2);put<int>(game+0xfba230,4);
+ put<unsigned char>(game+0xfb9b98,1);put<int>(game+0xfb9b9c,2);put<int>(game+0xfba3a8,4);
  put<int>(game+0xe23678,0);put<uintptr_t>(world+0xa658,actor);put<uintptr_t>(world+0xa660,actor+0x34b8);
  put<int>(actor+0x350,2);put<int>(actor+0x1240,0);put<int>(actor+0x8d0,2);
  put<int>(actor+0x1300,-1);put<int>(actor+0x337c,-1);
@@ -104,7 +104,7 @@ int main(){
  setup();buy_accepted=false;select(offer(),100);
  assert(queued()==-1&&submissions==0&&prepares==1&&draft_offers[1]==1&&!native_is_mutated(profile,7));
  int restored=-1;assert(ssc_names::read(profile+0x830,restored)&&restored==2);
- setup();put<unsigned char>(game+0xfb9a20,0);select(offer(),100);
+ setup();put<unsigned char>(game+0xfb9b98,0);select(offer(),100);
  assert(queued()==7&&bonus==0&&registered==0&&submissions==0);
  std::cout<<"PASS native syringe bonus, capped levels, split confirmations, no duplicate spends, profile recovery, and legacy queued mutation\n";
 }

@@ -7,11 +7,11 @@ inline bool profile_supported=false,xp_supported=false,cash_supported=false;
 inline void attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
  if(!ssc_compat::supports(2))return;
  using ssc_planned_native::check;
- // The native account-totals consumer and profile XP update on build 26950674.
- profile_supported=check(base,{0x630c54,0x25,0x798d160120edc38bULL})&&check(base,{0x2afdbf,0x2f,0x703ff84151eaa8d5ULL});
+ // The native account-totals consumer and profile XP update on build 26979702.
+ profile_supported=check(base,{0x630e74,0x25,0x16fd7de8defc9fbbULL})&&check(base,{0x2afedf,0x2f,0x327eda50bc60dbebULL});
  // The native XP bar uses cumulative round XP. Cash is the replicated gross earned counter.
- xp_supported=check(base,{0x40df7f,0x46,0xa0029346e0c0ed98ULL});
- cash_supported=check(base,{0x26c867,0x1b,0x08fb101fdcb4dd63ULL})&&check(base,{0x89ea26,6,0x197d729cc78433dbULL});
+ xp_supported=check(base,{0x40e09f,0x46,0xf955ae8496c4e624ULL});
+ cash_supported=check(base,{0x26c977,0x1b,0xc016cb8758b5fbb8ULL})&&check(base,{0x89eec6,6,0x197d729cc78433dbULL});
 }
 inline int player_id(uintptr_t base){
  uintptr_t loaded=0;
@@ -26,7 +26,7 @@ template<class Read> bool history(uintptr_t base,Read read,Historical& out){
  int phase=0,kills=-1;
  uintptr_t loaded=0;
  double xp=-1;
- if(!read(base+ssc_compat::resolve(0xfb7734),phase)||phase!=1||
+ if(!read(base+ssc_compat::resolve(0xfb78ac),phase)||phase!=1||
     !read(base+0xe091f8,loaded)||!loaded||!read(base+0xe09418,xp)||
     !std::isfinite(xp)||xp<0||xp>10000000000.||!read(base+0xe09524,kills)||kills<0||kills>1000000000)return false;
  out={uint64_t(xp),uint64_t(kills)};

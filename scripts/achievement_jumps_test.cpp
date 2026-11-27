@@ -45,7 +45,7 @@ int main(int argc,char** argv){
 
  std::vector<unsigned char> world_data(0x10000),actors(stride*2);
  const auto world=reinterpret_cast<uintptr_t>(world_data.data()),actor=reinterpret_cast<uintptr_t>(actors.data());
- write(base+0xfb7734,2);write(base+0xfb7748,0.0);write(base+0xdef5d0,world);write(base+0xe27138,actor);write(base+0xe23678,0);
+ write(base+0xfb78ac,2);write(base+0xfb78c0,0.0);write(base+0xdef5d0,world);write(base+0xe27138,actor);write(base+0xe23678,0);
  write(world+0x128,6);write(world+0x6a39,uint8_t(1));write(world+0x160,2);write(world+0x3e0,2);write(world+0x46c,3);write(world+0x3c0,-1.f);write(world+0xa658,actor);write(world+0xa660,actor+actors.size());
  write(actor+0x78,0);write(actor+0x81,uint8_t(1));write(actor+0x3375,uint8_t(1));write(actor+0x54,10.f);
  auto fire=[&](float frame,int pad=-1,uintptr_t other=0){

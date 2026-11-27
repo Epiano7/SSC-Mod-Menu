@@ -19,7 +19,7 @@ template<class Read>Detection community_cup_anonymity(uintptr_t world,Read read)
 // The native name formatter and local actor layout must already be validated.
 template<class Read>Detection lobby_anonymity(uintptr_t base,bool supported,Read read){
  if(!supported)return Detection::off;
- int phase=0;if(!read(base+0xfb7734,phase))return Detection::unavailable;if(phase!=2)return Detection::off;
+ int phase=0;if(!read(base+0xfb78ac,phase))return Detection::unavailable;if(phase!=2)return Detection::off;
  uintptr_t world=0,first=0,last=0,canonical=0;int slot=-1,world_slot=-2,stored=-3,kind=-1;unsigned char anonymous=2,active=0;
  if(!read(base+0xdef5d0,world)||!world)return Detection::unavailable;
  if(!tournament_validated.load())return Detection::unavailable;
