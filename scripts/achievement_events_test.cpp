@@ -23,9 +23,9 @@ int main(int argc,char** argv){
  std::ifstream input(argv[1],std::ios::binary);
  assert(input.read(reinterpret_cast<char*>(fixture),image_size));
  auto base=reinterpret_cast<uintptr_t>(fixture);
- fixture[0x901bb0]^=1;fixture[0x8d43c7]^=1;
+ fixture[0x901e50]^=1;fixture[0x8d4667]^=1;
  events::attach(base);assert(!events::award_attached&&!events::death_attached);
- fixture[0x901bb0]^=1;fixture[0x8d43c7]^=1;
+ fixture[0x901e50]^=1;fixture[0x8d4667]^=1;
  events::attach(base);assert(events::award_attached&&events::death_attached);
  events::original_award=award_passthrough;
  events::original_death=death_passthrough;

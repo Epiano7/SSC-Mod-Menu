@@ -88,19 +88,19 @@ inline void attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(n
  if(!ssc_compat::supports(2)||!ssc_compat::supports(4))return;
  image=base;
  using ssc_planned_native::Guard;
- constexpr Guard award_guards[]={{0x901bb0,0x8b,0xf97e08d3a84849fbULL},{0x317d3e,0x74,0x492304c147613164ULL},{0x1ae610,0x60,0xaf74e4560ecdfa6eULL}};
- constexpr Guard death_guards[]={{0x8d43c7,0xa4,0x78503be6d7f455f1ULL},{0x7fb0b0,0xa0,0xf8fe07ba396f2ec8ULL},
-  {0x3bc8d4,0x5b,0xf062ff02b88129beULL},{0x3bf0df,0x47,0xfca958552730e8b5ULL}};
+ constexpr Guard award_guards[]={{0x901e50,0x8b,0x2330fe3f110c219fULL},{0x317dce,0x74,0xdea08fb2a2e6cde6ULL},{0x1ae620,0x60,0xbcc68be8854766deULL}};
+ constexpr Guard death_guards[]={{0x8d4667,0xa4,0xb1c7d6b46a9564f0ULL},{0x7fb290,0xa0,0xa7641b6d8ac5ca1bULL},
+  {0x3bc964,0x5b,0x3d5aa4abfb1ebebbULL},{0x3bf16f,0x47,0x90b6b13777690f0eULL}};
  auto valid=[base](const auto& g){return ssc_planned_native::check(base,g);};
  if(!award_attached&&std::all_of(std::begin(award_guards),std::end(award_guards),valid)){
-  original_award=reinterpret_cast<Award>(base+0x1ae610);
-  const Site sites[]={{0x901c38,0xe9},{0x317dab,0xe8}};
-  award_attached=attach_calls(base,sites,0x1ae610,reinterpret_cast<uintptr_t>(award));
+  original_award=reinterpret_cast<Award>(base+0x1ae620);
+  const Site sites[]={{0x901ed8,0xe9},{0x317e3b,0xe8}};
+  award_attached=attach_calls(base,sites,0x1ae620,reinterpret_cast<uintptr_t>(award));
  }
  if(!death_attached&&std::all_of(std::begin(death_guards),std::end(death_guards),valid)){
-  original_death=reinterpret_cast<Death>(base+0x7fb0b0);
-  const Site site[]={{0x8d4466,0xe8}};
-  death_attached=attach_calls(base,site,0x7fb0b0,reinterpret_cast<uintptr_t>(death));
+  original_death=reinterpret_cast<Death>(base+0x7fb290);
+  const Site site[]={{0x8d4706,0xe8}};
+  death_attached=attach_calls(base,site,0x7fb290,reinterpret_cast<uintptr_t>(death));
  }
 }
 }

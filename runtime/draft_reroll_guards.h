@@ -3,7 +3,7 @@
 namespace ssc_challenge {
 struct RerollGuard {uint32_t rva,size;uint64_t hash;};
 inline constexpr RerollGuard reroll_guards[]={
-{0x3daad0,10386,0x4d220a86dd2e997aULL},
-{0x926090,23542,0xe01a8b594f692998ULL},
+{0x3dab60,10386,0xacbf231b1f6c78b5ULL},
+{0x926330,23558,0x496ce70c97767c95ULL},
 };
 }

@@ -3,7 +3,7 @@
 namespace ssc_loading_tips {
 struct Guard {uint32_t rva,size;uint64_t hash;};
 inline constexpr Guard guards[]={
- {0x4824d0,390,0x2756b7224ccb79f5ULL},
- {0x745980,6181,0x8e10c3facfe9bc92ULL},
+ {0x482500,390,0x6d0b28fed590b424ULL},
+ {0x7459c0,6181,0x7db51697f141748cULL},
 };
 }

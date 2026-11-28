@@ -7,11 +7,11 @@ inline bool profile_supported=false,xp_supported=false,cash_supported=false;
 inline void attach(uintptr_t base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))){
  if(!ssc_compat::supports(2))return;
  using ssc_planned_native::check;
- // The native account-totals consumer and profile XP update on build 26979702.
- profile_supported=check(base,{0x630e74,0x25,0x16fd7de8defc9fbbULL})&&check(base,{0x2afedf,0x2f,0x327eda50bc60dbebULL});
+ // The native account-totals consumer and profile XP update on build 26992189.
+ profile_supported=check(base,{0x630ea4,0x25,0x5994e893bcd1bdbbULL})&&check(base,{0x2aff6f,0x2f,0x1b81b4d317ca5521ULL});
  // The native XP bar uses cumulative round XP. Cash is the replicated gross earned counter.
- xp_supported=check(base,{0x40e09f,0x46,0xf955ae8496c4e624ULL});
- cash_supported=check(base,{0x26c977,0x1b,0xc016cb8758b5fbb8ULL})&&check(base,{0x89eec6,6,0x197d729cc78433dbULL});
+ xp_supported=check(base,{0x40e0cf,0x46,0x8a16e8271181890fULL});
+ cash_supported=check(base,{0x26ca07,0x1b,0x8a14561f57378bebULL})&&check(base,{0x89f166,6,0x197d729cc78433dbULL});
 }
 inline int player_id(uintptr_t base){
  uintptr_t loaded=0;

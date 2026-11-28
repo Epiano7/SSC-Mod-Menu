@@ -25,7 +25,7 @@ inline bool attach(uintptr_t base){
  // These exact native receive/copy/append fingerprints are verified before
  // hooks. No outgoing sender, packet builder or transport is used here.
  if(!ssc_planned_native::tts)return false;
- image_base=base;receive=reinterpret_cast<Receive>(base+0x31bf80);return true;
+ image_base=base;receive=reinterpret_cast<Receive>(base+0x31c010);return true;
 }
 inline std::wstring wide(const std::string& s){if(s.empty()||s.size()>8192)return {};int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s.data(),int(s.size()),nullptr,0);if(n<=0)return {};std::wstring out(size_t(n),L' ');MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s.data(),int(s.size()),out.data(),n);return out;}
 inline std::string utf8(const std::wstring& s){if(s.empty())return {};int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,s.data(),int(s.size()),nullptr,0,nullptr,nullptr);if(n<=0)return {};std::string out(size_t(n),' ');WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,s.data(),int(s.size()),out.data(),n,nullptr,nullptr);return out;}
